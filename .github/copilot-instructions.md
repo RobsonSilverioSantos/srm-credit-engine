@@ -18,7 +18,8 @@
 
 - Agent pode inspecionar Git, **criar branch/worktree, implementar, testar, fazer git add/commit, dar push na sua feature e abrir PR para develop**, sem pedir autorização adicional para cada comando não destrutivo dentro da tarefa autorizada.
 - Nome `feature/<id>-<slug extraído de Trabalho>`; ler exatamente a linha do TASKS.md. Criar com `git worktree add -b feature/... <diretorio> develop`; não usar `git flow feature finish`.
-- Abrir PR via `gh pr create --base develop --head feature/...`, com diffs, motivação, riscos e resultados reais. Se falhar teste ou faltar gh/autorização, comunicar.
+- Abrir PR via `gh pr create --base develop --head feature/...`, com diffs, motivação, riscos e resultados reais. **Antes de criar, conferir explicitamente a branch base; nunca abrir PR contra `main`.** Se falhar teste ou faltar gh/autorização, comunicar.
+- Respeitar o hook versionado `.githooks/pre-push` e verificar se o clone ativou `git config core.hooksPath .githooks`. Se o hook não estiver ativo, comunicar ao responsável antes do primeiro push; não contornar hooks com `--no-verify`. O workflow `.github/workflows/guard-main.yml` é apenas mitigação: GitHub Free privado ainda não dispõe de bloqueio server-side obrigatório. Consulte ADR-022.
 - **Somente candidato aprova/integra PRs.** Sem merge, auto-merge, pushes em main/develop, force-push, reset/clean destrutivo, alteração de especificação financeira sem autorização, gastos ou deploy.
 - Dependências **devem estar integradas em develop** antes de iniciar; conferir status e worktrees existentes. Nunca editar pasta de outro agente.
 - Arquivos globais TASKS/AI_USAGE/SPEC/DECISIONS apenas por coordenação serial; evidências de tarefa no PR para consolidação depois do merge.

@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+set -euo pipefail
+# Controle compensatório LOCAL. Requer: git config core.hooksPath .githooks
+while read -r local_ref local_oid remote_ref remote_oid; do
+  case "$remote_ref" in
+    refs/heads/main|refs/heads/develop)
+      printf 'BLOQUEADO: push direto para %s. Use feature/* + PR para develop.\n' "$remote_ref" >&2
+      exit 1
+      ;;
+  esac
+done
+exit 0

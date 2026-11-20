@@ -17,6 +17,12 @@ De `TASKS.md`: `feature/<ID normalizado>-<resumo do campo Trabalho em kebab-case
 
 **Nunca:** force push, checkout de outra tarefa no mesmo worktree, commits que misturem tarefas, atualização de `main`/`develop`, auto-merge, rebase sem autorização, exclusão de histórico, scripts destrutivos. Mudanças em migrations já aplicadas exigem novas versões.
 
+## Controles compensatórios — ADR-022
+
+- Após integrar o PR de governança, conferir a execução de `.github/workflows/guard-main.yml` no GitHub Actions; PRs para `main` vindos de qualquer origem diferente de `develop` do mesmo repositório são fechados automaticamente **quando o workflow executar**.
+- Em cada clone, ativar `git config core.hooksPath .githooks` antes do primeiro push; o hook recusa pushes diretos a `refs/heads/main` e `refs/heads/develop`.
+- Esses mecanismos não substituem Rulesets/branch protection. No GitHub Free privado atual, a API retornou HTTP 403 exigindo GitHub Pro ou tornar público. **Não há bloqueio no servidor**; o responsável técnico mantém vigilância e exclusivo controle humano dos merges.
+
 ## Paralelo sem conflito documental
 
 Agentes independentes podem trabalhar em código de módulos diferentes, mas não devem editar simultaneamente `AI_USAGE.md`, `TASKS.md`, `SPEC.md` ou `DECISIONS.md`; incluir evidência de execução no corpo do PR, para consolidação serial após merge. O histórico do repositório anterior não autoriza marcar trabalho do novo como feito.
