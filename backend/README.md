@@ -55,6 +55,64 @@ As credenciais inicializam o volume em seu primeiro uso; alterar o `.env` não
 altera a senha do banco existente. Não reutilize essas credenciais em outros
 ambientes. A configuração Compose não é destinada à produção.
 
+## Persistência e migrations
+
+O adaptador `app` executa Flyway na inicialização; os arquivos versionados ficam
+em `app/src/main/resources/db/migration`. Não edite uma versão já aplicada:
+adicione uma nova migration para evoluir o esquema.
+
+- Valores monetários e snapshots de BRL usam `NUMERIC(19, 2)` (até 17 dígitos
+  inteiros e centavos). Taxas mensais, armazenadas como frações, usam
+  `NUMERIC(12, 10)`; cotações BRL por USD usam `NUMERIC(20, 10)`. Tipos
+  decimais evitam erro de representação binária; o arredondamento HALF_EVEN
+  permanece responsabilidade do caso de uso.
+- Modalidades persistidas usam os identificadores do domínio: `DUPLICATA_MERCANTIL`
+  e `CHEQUE_PRE_DATADO`. Constraints de recebíveis, spreads e liquidações mantêm
+  o mesmo conjunto permitido.
+- UUIDs são fornecidos pela aplicação. Instantes usam `TIMESTAMPTZ`; `vigente_em`
+  registra quando uma taxa passa a valer e `criado_em` quando foi gravada.
+- O e-mail do usuário é único sem distinção de caixa globalmente, para que o
+  login local identifique uma conta sem ambiguidade; associação de uma mesma
+  identidade a múltiplas organizações exigiria separar identidade e associação.
+- Cedente, recebível, liquidação, auditoria e replay usam FKs compostas com
+  `organizacao_id` onde há escopo de tenant. Assim, um ID válido de outro tenant
+  não permite formar uma relação cruzada. A FK da liquidação também vincula
+  modalidade, valor de face e prazo ao recebível original, protegendo o snapshot
+  contra divergência e impedindo alterar esses dados depois de liquidado. As FKs
+  não substituem a autorização baseada na identidade autenticada.
+- A coluna `recebiveis.versao BIGINT` é o campo para o `@Version` futuro; o
+  conflito otimista continua precisando ser tratado pela aplicação. UNIQUE por
+  `(organizacao_id, recebivel_id)` impede segunda liquidação mesmo diante de
+  concorrência. A chave idempotente é única por organização e tipo de operação;
+  hash SHA-256 e resposta JSON/status suportam detectar payload divergente e
+  reproduzir o resultado. Reserva, liquidação e auditoria devem ser concluídas
+  na mesma transação.
+- A liquidação guarda os valores usados, IDs e cópias das taxas, cotações,
+  instantes de vigência, corte de liquidação, validade da cotação e a versão do
+  recebível. Triggers rejeitam UPDATE/DELETE/TRUNCATE em liquidações, auditoria e
+  histórico de taxas; idempotência só permite a transição inicial para conclusão,
+  que também não pode ser reescrita. Para corrigir o estado no futuro, é necessário
+  um evento compensatório, não reescrever o registro.
+- Índices de recebíveis atendem filtros por tenant/status/vencimento e joins por
+  cedente; os de liquidação suportam intervalo temporal e moeda, com `id` como
+  desempate estável. Índices únicos apoiam login por e-mail, unicidade do
+  documento do cedente, seleção temporal das taxas e buscas pelas FKs. Não foi
+  duplicado índice cambial: a chave única `(moeda_base, moeda_cotada, vigente_em)`
+  também permite buscar a cotação mais recente por par. Índices não dispensam
+  conferir planos com volume representativo.
+
+Para validar as migrations em PostgreSQL limpo e executar testes de FKs,
+unicidade, isolamento, valores inválidos e imutabilidade, use:
+
+```sh
+./scripts/verify-persistence.sh
+```
+
+O script sobe um projeto Compose exclusivo com portas efêmeras, aguarda a
+aplicação aplicar as migrations, executa
+`app/src/test/resources/db/postgresql-integrity.sql` e remove apenas o volume
+temporário desse projeto ao terminar.
+
 ## Fronteiras e verificação
 
 Um processo Spring Boot e um artefato executável (`app/build/libs/srm-credit-engine.jar`).
