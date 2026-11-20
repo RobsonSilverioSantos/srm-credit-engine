@@ -213,3 +213,33 @@ Para executar o teste de integração com PostgreSQL isolado e Flyway:
 
 O script cria e remove apenas seu projeto Compose e volume temporário. O build
 normal não executa esse teste sem `SRM_TEST_POSTGRES=true` e um banco configurado.
+
+### Resiliência da consulta cambial
+
+A B05 não possui fornecedor externo mockado: o câmbio demonstrativo é
+registrado no histórico PostgreSQL. Por escolha explícita, a leitura JDBC que
+inclui câmbio tem timeout por tentativa (`srm.cambio.consulta.timeout`,
+padrão `PT1S`, de 1 ms a 30 s), até `srm.cambio.consulta.tentativas`
+(padrão 3, incluindo a primeira, de 1 a 5) e atraso fixo entre tentativas
+(`srm.cambio.consulta.atraso`, padrão `PT0.1S`, de 0 a 5 s). Durações devem
+ter precisão de milissegundos. Configurações inválidas impedem a inicialização.
+
+Só timeout e `TransientDataAccessException` são elegíveis para repetição;
+falhas permanentes, cotação ausente ou vencida não são repetidas. O atraso
+ocorre fora da thread JDBC; a mesma referência UTC é usada em todas as tentativas.
+Escritas nunca são repetidas, e a consulta somente em BRL não é envolvida.
+A consulta cambial é recusada se houver transação ativa: a futura B06 deve
+buscar o snapshot antes da transação e verificar sua validade no instante de
+liquidação, sem chamadas bloqueantes dentro dela.
+
+O timeout limita a espera do chamador, não garante que o driver PostgreSQL
+interrompa imediatamente uma operação. Há no máximo quatro leituras em execução
+e quatro aguardando; o timeout inclui o tempo na fila. Capacidade esgotada
+falha explicitamente sem retry e tarefas expiradas são removidas da fila. Uma tentativa
+expirada ainda pode ocupar conexão enquanto termina, inclusive em paralelo com
+outra tentativa, mas apenas leituras são submetidas. É necessário configurar
+limites de conexão/rede do banco para conter operações que ignorem interrupção.
+Cada tentativa faz uma nova leitura: um registro criado até o corte, mas
+confirmado entre tentativas, pode aparecer apenas na última. O snapshot é o
+resultado da tentativa bem-sucedida, não uma visão compartilhada entre retries.
+Não há cache, fallback nem fonte de cotação inventada.
