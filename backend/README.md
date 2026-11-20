@@ -143,11 +143,10 @@ documento é aplicada por organização pela constraint existente; violações d
 integridade são propagadas, não convertidas em sucesso. Valores de face devem
 ser positivos, representáveis em centavos e caber em `NUMERIC(19,2)`.
 
-Não há implementação de identidade para uso público nesta etapa: o bean de
-cadastro só é criado quando uma implementação confiável de `ContextoOrganizacao`
-for fornecida. S01 deve fornecer essa implementação a partir da identidade
-validada; a implementação mutável usada nos testes não é autenticação. Não
-existem endpoints de cadastro enquanto S01/B08 não forem implementadas.
+O bean de cadastro só é criado quando há persistência e uma implementação
+confiável de `ContextoOrganizacao`. S01 fornece essa implementação a partir da
+identidade autenticada e validada; a implementação mutável usada em testes
+continua sendo apenas uma fixture. Não existem endpoints de cadastro até B08.
 
 Para criar somente uma organização demonstrativa, em banco de desenvolvimento,
 inicie a aplicação com o perfil `demo` **e** a propriedade
@@ -156,6 +155,61 @@ inicie a aplicação com o perfil `demo` **e** a propriedade
 O bootstrap é idempotente por ID, não cria usuário, credencial ou contexto de
 identidade e fica desabilitado por padrão. O ID demonstrativo é
 `00000000-0000-4000-8000-000000000001`.
+
+## Autenticação local e usuários de teste/demonstração
+
+A aplicação expõe somente `POST /api/v1/auth/token` para autenticação local.
+Ela carrega usuários e organizações ativas do PostgreSQL, verifica senhas com
+BCrypt e emite tokens bearer HS256 de curta duração. Cada requisição protegida
+valida assinatura, algoritmo fixo, emissor, expiração, usuário e organização;
+também confirma que o usuário continua ativo e vinculado àquela organização
+ativa. `ContextoOrganizacao` lê o escopo do principal validado da requisição.
+Não existe endpoint público para criar usuários.
+
+Configure um segredo novo fora do repositório antes de iniciar a aplicação. A
+ausência de segredo ou um valor menor que 256 bits impede a inicialização.
+Nunca reutilize segredo de teste ou o inclua no Git:
+
+```sh
+export SRM_JWT_SECRET="$(openssl rand -hex 32)"
+read -r -p "Database user: " SRM_DB_USER
+read -r -s -p "Database password: " SRM_DB_PASSWORD; printf '\n'
+export SRM_DB_USER SRM_DB_PASSWORD
+docker compose up --profile app --detach --wait
+```
+
+Para criar um usuário de demonstração, crie primeiro a organização com o
+bootstrap opt-in descrito acima e, então, use uma conexão PostgreSQL de
+operador. `DATABASE_URL` deve apontar para o banco PostgreSQL de demonstração;
+a organização informada deve existir e estar ativa. A role precisa de
+`CONNECT`, `USAGE` no schema e `INSERT` em `usuarios`. O exemplo solicita a
+senha sem exibi-la, gera localmente um hash BCrypt com `htpasswd` e envia
+somente o hash ao banco. O operador escolhe o ID da organização e o e-mail;
+não há credenciais fixas:
+
+```sh
+set -euo pipefail
+: "${DATABASE_URL:?Set DATABASE_URL to the demonstration PostgreSQL database}"
+trap 'unset SENHA HASH' EXIT
+read -r -p "Organization UUID: " ORGANIZACAO_ID
+read -r -p "Email: " EMAIL
+read -r -s -p "Password: " SENHA; printf '\n'
+HASH="$(printf '%s\n' "$SENHA" | htpasswd -nBi -C 12 "$EMAIL" | cut -d: -f2-)"
+unset SENHA
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
+  -v organizacao_id="$ORGANIZACAO_ID" -v email="$EMAIL" -v senha_hash="$HASH" \
+  <<'SQL'
+INSERT INTO usuarios (id, organizacao_id, email, senha_hash)
+VALUES (gen_random_uuid(), :'organizacao_id'::uuid, :'email', :'senha_hash');
+SQL
+unset HASH
+```
+
+Instale o utilitário Apache `htpasswd` se necessário. O heredoc protegido evita
+expansão pelo Bash; o próprio cliente `psql` interpola as variáveis como
+literais SQL, com `organizacao_id` convertida explicitamente para `UUID`.
+Testes de integração criam usuários e senhas aleatórios em cada execução e
+persistem somente hashes BCrypt.
 
 Execute os testes de integração reais e a regressão completa com:
 

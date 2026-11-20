@@ -11,6 +11,12 @@ spring:
   flyway:
     locations: classpath:db/migration
 
+security:
+  jwt:
+    secret: ${SRM_JWT_SECRET}
+    issuer: ${SRM_JWT_ISSUER:srm-credit-engine}
+    expiration: ${SRM_JWT_EXPIRATION:PT15M}
+
 server:
   address: 127.0.0.1
 

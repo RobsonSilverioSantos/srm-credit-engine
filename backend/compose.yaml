@@ -27,6 +27,7 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/srm_credit_engine
       SPRING_DATASOURCE_USERNAME: ${SRM_DB_USER:?defina SRM_DB_USER no .env local}
       SPRING_DATASOURCE_PASSWORD: ${SRM_DB_PASSWORD:?defina SRM_DB_PASSWORD no .env local}
+      SRM_JWT_SECRET: ${SRM_JWT_SECRET:-}
     ports:
       - "127.0.0.1:${SRM_APP_PORT:-8080}:8080"
     healthcheck:
