@@ -36,6 +36,9 @@ class HistoricoFinanceiroPostgresTest {
     @Test
     fun `persiste versões imutáveis e seleciona somente registros conhecidos e vigentes`() {
         assertThat(portaSpring).isNotNull()
+        val basesAntes = jdbc.queryForObject("SELECT count(*) FROM taxas_base", Int::class.java)!!
+        val spreadsAntes = jdbc.queryForObject("SELECT count(*) FROM spreads_recebiveis", Int::class.java)!!
+        val cotacoesAntes = jdbc.queryForObject("SELECT count(*) FROM cotacoes_cambiais", Int::class.java)!!
         val inicial = servico(inicio)
         val base1 = inicial.registrarTaxaBase(BigDecimal("0.01"), inicio)
         val spread1 = inicial.registrarSpread(modalidade, BigDecimal("0.015"), inicio)
@@ -66,9 +69,9 @@ class HistoricoFinanceiroPostgresTest {
         assertThat(servico(inicio.plusSeconds(300)).consultar(modalidade, true).taxaBase.id).isEqualTo(base1.id)
         assertThrows<DadosFinanceirosIndisponiveis> { servico(inicio.minusSeconds(1)).consultar(modalidade, true) }
         assertThrows<DadosFinanceirosIndisponiveis> { servico(futuro.plusSeconds(1801)).consultar(modalidade, true) }
-        assertThat(jdbc.queryForObject("SELECT count(*) FROM taxas_base", Int::class.java)).isEqualTo(3)
-        assertThat(jdbc.queryForObject("SELECT count(*) FROM spreads_recebiveis", Int::class.java)).isEqualTo(2)
-        assertThat(jdbc.queryForObject("SELECT count(*) FROM cotacoes_cambiais", Int::class.java)).isEqualTo(2)
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM taxas_base", Int::class.java)).isEqualTo(basesAntes + 3)
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM spreads_recebiveis", Int::class.java)).isEqualTo(spreadsAntes + 2)
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM cotacoes_cambiais", Int::class.java)).isEqualTo(cotacoesAntes + 2)
         assertThrows<DataAccessException> { jdbc.update("UPDATE taxas_base SET taxa_mensal = 0.03") }
         assertThrows<DataAccessException> { jdbc.update("DELETE FROM spreads_recebiveis") }
         assertThrows<DataAccessException> { jdbc.update("DELETE FROM cotacoes_cambiais") }

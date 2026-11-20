@@ -80,8 +80,7 @@ adicione uma nova migration para evoluir o esquema.
   modalidade, valor de face e prazo ao recebível original, protegendo o snapshot
   contra divergência e impedindo alterar esses dados depois de liquidado. As FKs
   não substituem a autorização baseada na identidade autenticada.
-- A coluna `recebiveis.versao BIGINT` é o campo para o `@Version` futuro; o
-  conflito otimista continua precisando ser tratado pela aplicação. UNIQUE por
+- A coluna `recebiveis.versao BIGINT` é usada no controle otimista JDBC. UNIQUE por
   `(organizacao_id, recebivel_id)` impede segunda liquidação mesmo diante de
   concorrência. A chave idempotente é única por organização e tipo de operação;
   hash SHA-256 e resposta JSON/status suportam detectar payload divergente e
@@ -241,7 +240,7 @@ testes unitários da precificação ficam em `app`, usando o JUnit já configura
 ## Histórico de taxas e câmbio
 
 `TaxasPorta` permite registrar manualmente versões de taxa base, spread por
-modalidade e cotação BRL por USD, e consultar os dados para um futuro snapshot.
+modalidade e cotação BRL por USD, e consultar os dados para um snapshot.
 Não há endpoint de manutenção nem carga automática de valores: o chamador deve
 registrar os dados e, futuramente, garantir autorização. Registros existentes
 nunca são atualizados; vigências futuras podem ser cadastradas antecipadamente.
@@ -255,9 +254,8 @@ já criados nesse corte. A cotação é exigida somente para USD; sua validade �
 microssegundos, padrão `PT30M`), inclusive no limite.
 Ausência, cotação expirada ou dados inválidos geram erro, sem fallback. O resultado
 inclui IDs, valores, vigências, datas de criação, referência e validade cambial;
-ele não persiste uma liquidação. O motor B03 ainda usa spreads fixos nas suas
-estratégias padrão: a futura integração deve fornecer a estratégia com o spread
-do snapshot, sem assumir que esses valores padrão acompanham o histórico.
+ele não persiste uma liquidação. As estratégias padrão B03 mantêm seus spreads
+fixos; a liquidação usa uma estratégia com o spread da versão selecionada.
 
 Para executar o teste de integração com PostgreSQL isolado e Flyway:
 
@@ -282,9 +280,9 @@ Só timeout e `TransientDataAccessException` são elegíveis para repetição;
 falhas permanentes, cotação ausente ou vencida não são repetidas. O atraso
 ocorre fora da thread JDBC; a mesma referência UTC é usada em todas as tentativas.
 Escritas nunca são repetidas, e a consulta somente em BRL não é envolvida.
-A consulta cambial é recusada se houver transação ativa: a futura B06 deve
-buscar o snapshot antes da transação e verificar sua validade no instante de
-liquidação, sem chamadas bloqueantes dentro dela.
+A consulta cambial é recusada se houver transação ativa. A liquidação busca o
+snapshot antes da transação e verifica novamente a validade cambial ao entrar e
+após a atualização otimista.
 
 O timeout limita a espera do chamador, não garante que o driver PostgreSQL
 interrompa imediatamente uma operação. Há no máximo quatro leituras em execução
@@ -297,3 +295,37 @@ Cada tentativa faz uma nova leitura: um registro criado até o corte, mas
 confirmado entre tentativas, pode aparecer apenas na última. O snapshot é o
 resultado da tentativa bem-sucedida, não uma visão compartilhada entre retries.
 Não há cache, fallback nem fonte de cotação inventada.
+
+## Liquidação
+
+`LiquidarRecebivel` recebe UUID do recebível, moeda e chave idempotente; não
+recebe organização ou usuário. A identidade vem do principal validado da S01.
+O resultado contém os valores decimais, moeda, instante e status 201 para uso
+futuro pela B08. Não há endpoint nesta tarefa.
+
+O hash SHA-256 usa a sequência UTF-8 `LIQUIDAR_RECEBIVEL`, UUID normalizado e
+moeda, separados por quebras de linha: é derivado do comando tipado, não da
+ordem das propriedades JSON. Alterações futuras no contrato devem considerar
+compatibilidade com hashes e respostas já persistidos. A mesma chave e comando
+reproduzem o corpo e status registrados, mesmo quando as taxas já expiraram;
+uma chave com comando diferente causa `ConflitoLiquidacao`.
+
+A reserva usa a unicidade do PostgreSQL, que aguarda uma transação concorrente
+com a mesma chave. Reserva, atualização, snapshot, auditoria e conclusão
+ocorrem na mesma transação; falhas desfazem tudo. A atualização condicional por
+organização, status e versão incrementa a versão somente se a versão lida ainda
+for válida; zero linhas é conflito. É equivalente ao controle de versão
+otimista para esta operação JDBC, mas **não usa literalmente `@Version` JPA**,
+conforme a divergência da ADR-010 a ser revisada por humano. A constraint
+UNIQUE por recebível é defesa adicional, não substituto da versão.
+
+O instante truncado a microssegundos é o corte UTC da seleção e o
+`liquidada_em` do snapshot. Câmbio resiliente é consultado fora da transação.
+O relógio é verificado antes e depois do UPDATE, inclusive após eventual
+espera por concorrência; cotação expirada provoca rollback. O tempo entre a
+última verificação e o commit não é limitado: o instante registrado é o corte
+da decisão, não o horário físico do commit. B07 deve ampliar os testes de
+interleavings e falhas; caso o negócio exija cotação válida até o commit
+físico, essa semântica precisa ser decidida e implementada separadamente.
+
+Os testes PostgreSQL da B06 integram o comando `bash scripts/test-cadastro-postgres.sh`.

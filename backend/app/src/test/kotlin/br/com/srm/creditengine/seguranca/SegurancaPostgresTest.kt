@@ -3,13 +3,20 @@ package br.com.srm.creditengine.seguranca
 import br.com.srm.creditengine.TestJwtSecret
 import br.com.srm.creditengine.cadastro.aplicacao.porta.entrada.Cadastro
 import br.com.srm.creditengine.cadastro.aplicacao.porta.saida.ContextoOrganizacao
+import br.com.srm.creditengine.liquidacao.aplicacao.porta.entrada.ComandoLiquidacao
+import br.com.srm.creditengine.liquidacao.aplicacao.porta.entrada.LiquidarRecebivel
+import br.com.srm.creditengine.liquidacao.dominio.MoedaPagamento
+import br.com.srm.creditengine.precificacao.dominio.Modalidades
+import br.com.srm.creditengine.taxas.aplicacao.porta.entrada.TaxasPorta
 import com.fasterxml.jackson.databind.ObjectMapper
+import java.math.BigDecimal
 import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.nio.charset.StandardCharsets
 import java.time.Instant
+import java.time.temporal.ChronoUnit
 import java.util.Base64
 import java.util.UUID
 import java.util.concurrent.CompletableFuture
@@ -44,14 +51,15 @@ class SegurancaPostgresTest {
     @TestConfiguration(proxyBeanMethods = false)
     class TestEndpoints {
         @Bean
-        fun securityTestEndpoints(contexto: ContextoOrganizacao, cadastro: Cadastro) =
-            SecurityTestEndpoints(contexto, cadastro)
+        fun securityTestEndpoints(contexto: ContextoOrganizacao, cadastro: Cadastro, liquidar: LiquidarRecebivel) =
+            SecurityTestEndpoints(contexto, cadastro, liquidar)
     }
 
     @RestController
     class SecurityTestEndpoints(
         private val contexto: ContextoOrganizacao,
         private val cadastro: Cadastro,
+        private val liquidar: LiquidarRecebivel,
     ) {
         @GetMapping("/test/identity")
         fun identity(): Map<String, UUID> = mapOf("organizacaoId" to contexto.organizacaoId())
@@ -59,10 +67,15 @@ class SegurancaPostgresTest {
         @GetMapping("/test/cedentes/{id}")
         fun cedente(@PathVariable id: UUID): ResponseEntity<Any> =
             cadastro.buscarCedente(id)?.let { ResponseEntity.ok(it) } ?: ResponseEntity.notFound().build()
+
+        @GetMapping("/test/liquidar/{id}")
+        fun liquidar(@PathVariable id: UUID): Map<String, UUID> =
+            mapOf("id" to liquidar.liquidar(ComandoLiquidacao(id, MoedaPagamento.BRL, "teste")).liquidacaoId)
     }
 
     @Autowired private lateinit var jdbc: JdbcTemplate
     @Autowired private lateinit var passwordEncoder: PasswordEncoder
+    @Autowired private lateinit var taxas: TaxasPorta
     @Autowired private lateinit var properties: br.com.srm.creditengine.seguranca.adaptador.entrada.JwtProperties
     @LocalServerPort private var port: Int = 0
     private val httpClient = HttpClient.newHttpClient()
@@ -130,6 +143,24 @@ class SegurancaPostgresTest {
         val token = autenticar(emailA, senhaA)
         assertThat(organizacaoDo(token)).isEqualTo(organizacaoA)
         assertThat(organizacaoDo(autenticar(emailB, senhaB))).isEqualTo(organizacaoB)
+    }
+
+    @Test
+    fun `liquidacao usa principal validado para escopo e auditoria`() {
+        val instante = Instant.now().truncatedTo(ChronoUnit.MICROS).minusSeconds(1)
+        taxas.registrarTaxaBase(BigDecimal("0.01"), instante)
+        taxas.registrarSpread(Modalidades.DUPLICATA_MERCANTIL, BigDecimal("0.015"), instante)
+        val recebivel = UUID.randomUUID()
+        jdbc.update("""INSERT INTO recebiveis
+            (id, organizacao_id, cedente_id, modalidade, valor_face_brl, prazo_meses)
+            VALUES (?, ?, ?, ?, 100000, 3)""", recebivel, organizacaoA, cedenteA, Modalidades.DUPLICATA_MERCANTIL)
+        assertThat(requisicao("GET", "/test/liquidar/$recebivel").statusCode()).isEqualTo(401)
+        val resposta = requisicao("GET", "/test/liquidar/$recebivel", autenticar(emailA, senhaA))
+        assertThat(resposta.statusCode()).isEqualTo(200)
+        val id = UUID.fromString(objectMapper.readTree(resposta.body()).get("id").asText())
+        val auditoria = jdbc.queryForMap("SELECT organizacao_id, usuario_id FROM auditoria_liquidacoes WHERE liquidacao_id = ?", id)
+        assertThat(auditoria["organizacao_id"]).isEqualTo(organizacaoA)
+        assertThat(auditoria["usuario_id"]).isEqualTo(usuarioA)
     }
 
     @Test
