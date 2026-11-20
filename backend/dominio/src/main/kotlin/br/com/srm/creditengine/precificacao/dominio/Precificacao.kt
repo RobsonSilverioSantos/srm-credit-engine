@@ -48,6 +48,14 @@ object CalculoValorPresente {
     }
 }
 
+class EstrategiaComSpreadVersionado(
+    override val modalidade: String,
+    private val spread: BigDecimal,
+) : EstrategiaPrecificacao {
+    override fun calcularValorPresente(dados: DadosPrecificacao): BigDecimal =
+        CalculoValorPresente.calcular(dados, spread)
+}
+
 object DuplicataMercantil : EstrategiaPrecificacao {
     override val modalidade = Modalidades.DUPLICATA_MERCANTIL
 

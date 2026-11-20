@@ -12,4 +12,5 @@ interface TaxasPorta {
     fun registrarSpread(modalidade: String, spread: BigDecimal, vigenteEm: Instant): SpreadRecebivel
     fun registrarCotacao(taxaBrlPorUsd: BigDecimal, vigenteEm: Instant): CotacaoCambial
     fun consultar(modalidade: String, exigirCotacao: Boolean): TaxasParaSnapshot
+    fun consultarEm(modalidade: String, exigirCotacao: Boolean, referencia: Instant): TaxasParaSnapshot
 }

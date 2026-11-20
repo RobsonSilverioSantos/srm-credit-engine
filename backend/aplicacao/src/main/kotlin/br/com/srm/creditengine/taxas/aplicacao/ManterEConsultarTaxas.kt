@@ -38,8 +38,11 @@ class ManterEConsultarTaxas(
         return CotacaoCambial(UUID.randomUUID(), taxaBrlPorUsd, vigenteEm, agora()).also { historico.incluir(it) }
     }
 
-    override fun consultar(modalidade: String, exigirCotacao: Boolean): TaxasParaSnapshot {
-        val referencia = agora()
+    override fun consultar(modalidade: String, exigirCotacao: Boolean): TaxasParaSnapshot =
+        consultarEm(modalidade, exigirCotacao, agora())
+
+    override fun consultarEm(modalidade: String, exigirCotacao: Boolean, referencia: Instant): TaxasParaSnapshot {
+        validarPrecisao(referencia)
         return seletor.selecionar(modalidade, referencia, exigirCotacao, historico.consultar(modalidade, referencia, exigirCotacao))
     }
 }
