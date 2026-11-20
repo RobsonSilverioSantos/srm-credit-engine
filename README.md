@@ -18,6 +18,43 @@ Motor demonstrativo de antecipação de recebíveis com **Kotlin / Spring Boot /
 Veja o [guia do backend](backend/README.md) para preparar o `.env` local,
 subir o PostgreSQL, executar o Spring Boot e verificar o build e o healthcheck.
 
+## Integração contínua
+
+O workflow [`CI`](.github/workflows/ci.yml) roda em PRs para `develop` na
+abertura, reabertura, atualização de commits e edição (inclusive mudança de
+base). Os jobs são independentes para identificar se a falha está no backend
+ou no frontend. Para reproduzir os checks:
+
+```sh
+cd backend
+./gradlew clean build
+```
+
+Use JDK 21. O build inclui testes e verificações hexagonais; o smoke test atual
+não usa PostgreSQL e não substitui testes de integração com banco.
+
+```sh
+cd frontend
+npm ci
+npm run lint
+npm test
+npm run build
+```
+
+Use Node.js 24 (ou outra versão compatível com `frontend/package.json`). No
+GitHub, abra o PR, escolha **Checks** e o job com falha; expanda o primeiro
+passo vermelho para identificar o comando e a mensagem. Corrija a causa,
+execute os comandos locais e envie outro commit para a feature: o PR dispara
+uma nova execução. Um passo ignorado após falha não significa que passou;
+execução pendente ou ausente também não é CI verde.
+
+O workflow usa `pull_request`, não `pull_request_target`, token somente de
+leitura e nenhuma credencial de produção. As actions são fixadas por commit;
+o Gradle valida os wrappers e usa cache, assim como o npm. Caches de PR ficam
+limitados pelo escopo de referências do GitHub e não devem conter segredos;
+código do PR pode ser executado no runner e acessa caches disponíveis à sua
+base. Esses checks não são proteção obrigatória de merge: veja ADR-022 abaixo.
+
 ## Documentos: fonte de verdade e finalidade
 
 1. `docs/requisitos/ENUNCIADO_ORIGINAL_SRM_CREDIT_ENGINE_V2.md` — enunciado original, preservado sem alteração.
