@@ -3,10 +3,12 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-project="srm-b04-test-$(cat /proc/sys/kernel/random/uuid)"
-export SRM_DB_USER="srm_b04_test"
-export SRM_DB_PASSWORD="b04-test-${$}-${RANDOM}"
+project="srm-s01-test-$(cat /proc/sys/kernel/random/uuid)"
+export SRM_DB_USER="srm_s01_test"
+export SRM_DB_PASSWORD="s01-test-${$}-${RANDOM}"
 export SRM_DB_PORT=0
+export SRM_JWT_SECRET
+SRM_JWT_SECRET="$(openssl rand -hex 32)"
 
 cleanup() {
     docker compose -p "$project" down --volumes --remove-orphans

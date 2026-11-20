@@ -11,6 +11,13 @@ import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.web.server.LocalServerPort
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.context.ApplicationContext
+import org.springframework.context.annotation.Bean
+import org.springframework.boot.test.context.TestConfiguration
+import org.springframework.context.annotation.Import
+import org.springframework.jdbc.core.JdbcTemplate
+import org.springframework.test.context.DynamicPropertyRegistry
+import org.springframework.test.context.DynamicPropertySource
+import org.mockito.Mockito
 import br.com.srm.creditengine.cadastro.aplicacao.porta.entrada.Cadastro
 
 @SpringBootTest(
@@ -20,7 +27,14 @@ import br.com.srm.creditengine.cadastro.aplicacao.porta.entrada.Cadastro
         "srm.taxas.enabled=false",
     ],
 )
+@Import(CreditEngineApplicationTest.DatabaseMock::class)
 class CreditEngineApplicationTest {
+    @TestConfiguration(proxyBeanMethods = false)
+    class DatabaseMock {
+        @Bean
+        fun jdbcTemplate(): JdbcTemplate = Mockito.mock(JdbcTemplate::class.java)
+    }
+
     @Autowired
     private lateinit var context: ApplicationContext
     @LocalServerPort
@@ -31,8 +45,8 @@ class CreditEngineApplicationTest {
         val health = get("/actuator/health")
         assertThat(health.statusCode()).isEqualTo(200)
         assertThat(health.body()).isEqualTo("""{"status":"UP"}""")
-        assertThat(get("/actuator/env").statusCode()).isEqualTo(404)
-        assertThat(get("/api/v1/cedentes").statusCode()).isEqualTo(404)
+        assertThat(get("/actuator/env").statusCode()).isEqualTo(401)
+        assertThat(get("/api/v1/cedentes").statusCode()).isEqualTo(401)
         assertThat(context.getBeansOfType(Cadastro::class.java)).isEmpty()
     }
 
@@ -42,5 +56,13 @@ class CreditEngineApplicationTest {
             .GET()
             .build()
         return HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString())
+    }
+
+    companion object {
+        @JvmStatic
+        @DynamicPropertySource
+        fun jwtProperties(registry: DynamicPropertyRegistry) {
+            registry.add("security.jwt.secret") { TestJwtSecret.value }
+        }
     }
 }
