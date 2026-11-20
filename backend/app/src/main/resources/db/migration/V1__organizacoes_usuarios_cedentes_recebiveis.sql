@@ -56,7 +56,7 @@ CREATE TABLE recebiveis (
         FOREIGN KEY (cedente_id, organizacao_id)
         REFERENCES cedentes (id, organizacao_id),
     CONSTRAINT recebiveis_modalidade_ck
-        CHECK (modalidade IN ('DUPLICATA', 'CHEQUE_PRE_DATADO')),
+        CHECK (modalidade IN ('DUPLICATA_MERCANTIL', 'CHEQUE_PRE_DATADO')),
     CONSTRAINT recebiveis_valor_face_positivo_ck CHECK (valor_face_brl > 0),
     CONSTRAINT recebiveis_prazo_positivo_ck CHECK (prazo_meses > 0),
     CONSTRAINT recebiveis_status_ck CHECK (status IN ('DISPONIVEL', 'LIQUIDADO')),

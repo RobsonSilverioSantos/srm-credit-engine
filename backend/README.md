@@ -66,6 +66,9 @@ adicione uma nova migration para evoluir o esquema.
   `NUMERIC(12, 10)`; cotações BRL por USD usam `NUMERIC(20, 10)`. Tipos
   decimais evitam erro de representação binária; o arredondamento HALF_EVEN
   permanece responsabilidade do caso de uso.
+- Modalidades persistidas usam os identificadores do domínio: `DUPLICATA_MERCANTIL`
+  e `CHEQUE_PRE_DATADO`. Constraints de recebíveis, spreads e liquidações mantêm
+  o mesmo conjunto permitido.
 - UUIDs são fornecidos pela aplicação. Instantes usam `TIMESTAMPTZ`; `vigente_em`
   registra quando uma taxa passa a valer e `criado_em` quando foi gravada.
 - O e-mail do usuário é único sem distinção de caixa globalmente, para que o

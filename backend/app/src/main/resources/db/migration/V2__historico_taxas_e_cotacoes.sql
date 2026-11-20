@@ -15,7 +15,7 @@ CREATE TABLE spreads_recebiveis (
     vigente_em TIMESTAMPTZ NOT NULL,
     criado_em TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT spreads_recebiveis_modalidade_ck
-        CHECK (modalidade IN ('DUPLICATA', 'CHEQUE_PRE_DATADO')),
+        CHECK (modalidade IN ('DUPLICATA_MERCANTIL', 'CHEQUE_PRE_DATADO')),
     CONSTRAINT spreads_recebiveis_taxa_nao_negativa_ck CHECK (spread_mensal >= 0),
     CONSTRAINT spreads_recebiveis_modalidade_vigencia_uk UNIQUE (modalidade, vigente_em),
     CONSTRAINT spreads_recebiveis_snapshot_uk

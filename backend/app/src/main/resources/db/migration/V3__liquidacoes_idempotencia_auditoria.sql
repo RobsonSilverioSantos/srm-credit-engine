@@ -35,7 +35,7 @@ CREATE TABLE liquidacoes (
         FOREIGN KEY (cotacao_cambial_id, taxa_brl_por_unidade, cotacao_vigente_em)
         REFERENCES cotacoes_cambiais (id, taxa_brl_por_unidade, vigente_em),
     CONSTRAINT liquidacoes_modalidade_ck
-        CHECK (modalidade IN ('DUPLICATA', 'CHEQUE_PRE_DATADO')),
+        CHECK (modalidade IN ('DUPLICATA_MERCANTIL', 'CHEQUE_PRE_DATADO')),
     CONSTRAINT liquidacoes_valor_face_positivo_ck CHECK (valor_face_brl > 0),
     CONSTRAINT liquidacoes_prazo_positivo_ck CHECK (prazo_meses > 0),
     CONSTRAINT liquidacoes_versao_recebivel_positiva_ck CHECK (versao_recebivel > 0),
