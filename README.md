@@ -1,6 +1,7 @@
-# SRM Credit Engine — novo repositório (baseline inicial)
+# SRM Credit Engine
 
-**Status em 20/11/2026:** documentação preparada; **não há backend/frontend implementados, testes executados, CI verde, PRs ou deploy neste novo repositório**. Este repositório começa de forma independente do anterior, que permanece como histórico em `AI_USAGE.md`.
+Este repositório é independente do anterior, que permanece como histórico em
+[`AI_USAGE.md`](AI_USAGE.md). O bootstrap do backend não implementa os fluxos de negócio do MVP.
 
 ## Visão e stack
 
@@ -12,9 +13,10 @@ Motor demonstrativo de antecipação de recebíveis com **Kotlin / Spring Boot /
 - **Frontend:** tema e componentes MUI gratuitos; pré-simulação sem persistência, depois cadastro e confirmação da liquidação; nenhuma matemática financeira executada no browser.
 - **Não há desembolso bancário real.** O sistema registra a liquidação lógica e seu snapshot.
 
-## Como rodar (quando houver implementação)
+## Como rodar o backend
 
-O código de execução ainda não existe nesta baseline. A tarefa `B02` criará backend/Compose/Gradle, `F00` criará o frontend e `B12` a CI. **Não executar comandos de build imaginários ou prometer uma aplicação pronta neste commit.** Conforme PRs forem integrados, esta seção deverá receber comandos de setup, versão de Java, Docker, portas, seed local e testes **efetivamente verificados**.
+Veja o [guia do backend](backend/README.md) para preparar o `.env` local,
+subir o PostgreSQL, executar o Spring Boot e verificar o build e o healthcheck.
 
 ## Documentos: fonte de verdade e finalidade
 

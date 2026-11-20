@@ -1,0 +1,39 @@
+services:
+  postgres:
+    image: postgres:17-alpine@sha256:526f86d93c6ea08fd3f1fe5605650cacc781b2c6013169a0ad8f42c7d3d84f32
+    environment:
+      POSTGRES_DB: srm_credit_engine
+      POSTGRES_USER: ${SRM_DB_USER:?defina SRM_DB_USER no .env local}
+      POSTGRES_PASSWORD: ${SRM_DB_PASSWORD:?defina SRM_DB_PASSWORD no .env local}
+    ports:
+      - "127.0.0.1:${SRM_DB_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "PGPASSWORD=\"$$POSTGRES_PASSWORD\" psql -h 127.0.0.1 -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\" -v ON_ERROR_STOP=1 -Atc 'SELECT 1'"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  app:
+    profiles: [app]
+    build:
+      context: .
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SERVER_ADDRESS: 0.0.0.0
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/srm_credit_engine
+      SPRING_DATASOURCE_USERNAME: ${SRM_DB_USER:?defina SRM_DB_USER no .env local}
+      SPRING_DATASOURCE_PASSWORD: ${SRM_DB_PASSWORD:?defina SRM_DB_PASSWORD no .env local}
+    ports:
+      - "127.0.0.1:${SRM_APP_PORT:-8080}:8080"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "--max-time", "8", "http://127.0.0.1:8080/actuator/health"]
+      interval: 5s
+      timeout: 10s
+      retries: 12
+
+volumes:
+  postgres-data:
