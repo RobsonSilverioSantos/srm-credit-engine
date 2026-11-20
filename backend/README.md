@@ -180,11 +180,17 @@ docker compose up --profile app --detach --wait
 
 Para criar um usuário de demonstração, crie primeiro a organização com o
 bootstrap opt-in descrito acima e, então, use uma conexão PostgreSQL de
-operador. O exemplo solicita a senha sem exibi-la, gera localmente um hash
-BCrypt com `htpasswd` e envia somente o hash ao banco. O operador escolhe o ID
-da organização e o e-mail; não há credenciais fixas:
+operador. `DATABASE_URL` deve apontar para o banco PostgreSQL de demonstração;
+a organização informada deve existir e estar ativa. A role precisa de
+`CONNECT`, `USAGE` no schema e `INSERT` em `usuarios`. O exemplo solicita a
+senha sem exibi-la, gera localmente um hash BCrypt com `htpasswd` e envia
+somente o hash ao banco. O operador escolhe o ID da organização e o e-mail;
+não há credenciais fixas:
 
 ```sh
+set -euo pipefail
+: "${DATABASE_URL:?Set DATABASE_URL to the demonstration PostgreSQL database}"
+trap 'unset SENHA HASH' EXIT
 read -r -p "Organization UUID: " ORGANIZACAO_ID
 read -r -p "Email: " EMAIL
 read -r -s -p "Password: " SENHA; printf '\n'
@@ -192,14 +198,18 @@ HASH="$(printf '%s\n' "$SENHA" | htpasswd -nBi -C 12 "$EMAIL" | cut -d: -f2-)"
 unset SENHA
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
   -v organizacao_id="$ORGANIZACAO_ID" -v email="$EMAIL" -v senha_hash="$HASH" \
-  -c "INSERT INTO usuarios (id, organizacao_id, email, senha_hash) VALUES (gen_random_uuid(), :'organizacao_id'::uuid, :'email', :'senha_hash')"
+  <<'SQL'
+INSERT INTO usuarios (id, organizacao_id, email, senha_hash)
+VALUES (gen_random_uuid(), :'organizacao_id'::uuid, :'email', :'senha_hash');
+SQL
 unset HASH
 ```
 
-Instale o utilitário Apache `htpasswd` se necessário. A operação requer uma
-organização existente e privilégio de inserção no banco. Testes de integração
-criam usuários e senhas aleatórios em cada execução e persistem somente hashes
-BCrypt.
+Instale o utilitário Apache `htpasswd` se necessário. O heredoc protegido evita
+expansão pelo Bash; o próprio cliente `psql` interpola as variáveis como
+literais SQL, com `organizacao_id` convertida explicitamente para `UUID`.
+Testes de integração criam usuários e senhas aleatórios em cada execução e
+persistem somente hashes BCrypt.
 
 Execute os testes de integração reais e a regressão completa com:
 
