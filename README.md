@@ -71,3 +71,4 @@ O repositório é privado e a conta atualmente não dispõe de Rulesets para est
 ADRs: `docs/adr/ADR-005-*.md`, `ADR-018-*.md`, `ADR-019-*.md`; EDA: `docs/arquitetura/EDA_LIQUIDACAO.md`; matriz: `docs/defesa/RASTREABILIDADE_STAFF_TECH_LEAD.md`. O design para 1 milhão/min permanece **pendente e independente**. Nenhum documento atesta benchmark executado. Keycloak e deploy em nuvem são cortes conscientes por prazo, justificados em `DECISIONS.md`.
 
 **Primeira ação:** crie um repositório privado **vazio** no GitHub, extraia este pacote e siga [`INICIO_GIT.md`](INICIO_GIT.md). Não apague o repositório antigo.
+
