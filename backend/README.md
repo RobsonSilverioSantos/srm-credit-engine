@@ -145,7 +145,7 @@ ser positivos, representáveis em centavos e caber em `NUMERIC(19,2)`.
 O bean de cadastro só é criado quando há persistência e uma implementação
 confiável de `ContextoOrganizacao`. S01 fornece essa implementação a partir da
 identidade autenticada e validada; a implementação mutável usada em testes
-continua sendo apenas uma fixture. Não existem endpoints de cadastro até B08.
+continua sendo apenas uma fixture.
 
 Para criar somente uma organização demonstrativa, em banco de desenvolvimento,
 inicie a aplicação com o perfil `demo` **e** a propriedade
@@ -300,8 +300,7 @@ Não há cache, fallback nem fonte de cotação inventada.
 
 `LiquidarRecebivel` recebe UUID do recebível, moeda e chave idempotente; não
 recebe organização ou usuário. A identidade vem do principal validado da S01.
-O resultado contém os valores decimais, moeda, instante e status 201 para uso
-futuro pela B08. Não há endpoint nesta tarefa.
+O resultado contém os valores decimais, moeda, instante e status 201.
 
 O hash SHA-256 usa a sequência UTF-8 `LIQUIDAR_RECEBIVEL`, UUID normalizado e
 moeda, separados por quebras de linha: é derivado do comando tipado, não da
@@ -329,3 +328,102 @@ interleavings e falhas; caso o negócio exija cotação válida até o commit
 físico, essa semântica precisa ser decidida e implementada separadamente.
 
 Os testes PostgreSQL da B06 integram o comando `bash scripts/test-cadastro-postgres.sh`.
+
+## Contratos HTTP API e BFF
+
+Os dois prefixos `/api/v1` e `/bff/v1` oferecem os mesmos contratos de cadastro,
+consulta e liquidação. O BFF é uma fronteira de entrada para a interface, não
+um cliente HTTP interno; ambos chamam `Cadastro` e `LiquidarRecebivel`. A
+organização e o usuário vêm exclusivamente do JWT validado pela S01. O corpo
+não aceita campos adicionais de identidade.
+
+| Método | Caminho após o prefixo | Finalidade |
+|---|---|---|
+| POST | `/cedentes` | Cadastrar cedente |
+| GET | `/cedentes` | Listar cedentes da organização |
+| GET | `/cedentes/{id}` | Consultar cedente da organização |
+| POST | `/recebiveis` | Cadastrar recebível |
+| GET | `/recebiveis` | Listar recebíveis da organização |
+| GET | `/recebiveis/{id}` | Consultar recebível da organização |
+| POST | `/recebiveis/{id}/liquidacoes` | Liquidar recebível previamente cadastrado |
+
+Criação e liquidação retornam `201`. O header `Idempotency-Key` é obrigatório
+na liquidação e deve ser mantido para retentativas da mesma intenção; a mesma
+chave e comando devolvem o corpo e status persistidos, inclusive entre API e
+BFF. Outro comando com a mesma chave e uma segunda liquidação com outra chave
+retornam `409`. Valores financeiros são strings decimais, sem separadores de
+milhar, e instantes são UTC ISO-8601. O `valorFaceBrl` é positivo, com no
+máximo 17 dígitos inteiros e duas casas decimais. Modalidades:
+`DUPLICATA_MERCANTIL` e `CHEQUE_PRE_DATADO`; moedas: `BRL` e `USD`.
+
+Erros de domínio/entrada seguem `{"codigo":"...","mensagem":"..."}`:
+`ENTRADA_INVALIDA` (400), `NAO_AUTENTICADO` (401), `RECURSO_NAO_ENCONTRADO`
+(404, inclusive acesso entre organizações), `CONFLITO` (409) e
+`SERVICO_INDISPONIVEL` (503). Falhas inesperadas recebem `ERRO_INTERNO` (500)
+sem detalhes internos. Falta de dados financeiros, cotação expirada e
+indisponibilidade transitória são 503: não há preço inventado ou fallback.
+
+OpenAPI JSON está em `/v3/api-docs` e Swagger UI em `/swagger-ui/index.html`.
+A documentação é pública; os endpoints de negócio continuam protegidos. No
+Swagger, informe o token JWT no botão **Authorize**. A simulação pré-cadastro
+e o extrato não fazem parte desta versão. O springdoc 3.0.3 é da linha para
+Spring Boot 4.0; a geração dos dois prefixos é verificada no teste HTTP real.
+
+**Manutenção global:** a S01 não define privilégios administrativos globais.
+Não há endpoint HTTP para criar taxas, spreads ou cotações; autenticação de
+usuário organizacional não confere tal privilégio. Os registros continuam
+disponíveis pela porta interna B05 para operação controlada fora do navegador,
+com acesso restrito ao PostgreSQL. Manutenção HTTP futura exige identidade e
+permissão administrativa persistentes, provisionamento e auditoria próprios.
+Esta lacuna impede demonstrar pelo navegador a atualização manual exigida no
+enunciado, até decisão e implementação separadas.
+
+### Fluxo de exemplo com curl
+
+Inicie o PostgreSQL e a aplicação conforme **Configuração local**, **Executar**
+e **Autenticação local** acima, incluindo segredo JWT e usuário provisionado.
+Para o exemplo USD, o operador precisa previamente registrar taxa base,
+spread e cotação vigentes pela operação administrativa controlada da B05;
+sem eles a liquidação retorna 503. Os comandos abaixo exigem `jq` e usam o
+mesmo token para os dois prefixos:
+
+Em um banco **descartável de demonstração**, um operador com acesso restrito
+pode preparar os dados de exemplo abaixo usando `psql "$DATABASE_URL"`.
+Isto grava diretamente no banco, não utiliza a porta B05 nem implementa uma
+ferramenta administrativa auditada; não é procedimento de produção. Os
+registros são globais e imutáveis e a cotação expira após 30 minutos.
+
+```sql
+BEGIN;
+INSERT INTO taxas_base (id, taxa_mensal, vigente_em)
+VALUES (gen_random_uuid(), 0.01, CURRENT_TIMESTAMP);
+INSERT INTO spreads_recebiveis (id, modalidade, spread_mensal, vigente_em)
+VALUES (gen_random_uuid(), 'DUPLICATA_MERCANTIL', 0.015, CURRENT_TIMESTAMP),
+       (gen_random_uuid(), 'CHEQUE_PRE_DATADO', 0.025, CURRENT_TIMESTAMP);
+INSERT INTO cotacoes_cambiais (id, taxa_brl_por_unidade, vigente_em)
+VALUES (gen_random_uuid(), 5.4321, CURRENT_TIMESTAMP);
+COMMIT;
+```
+
+```sh
+read -r -p "Email: " EMAIL
+read -r -s -p "Senha: " SENHA; printf '\n'
+TOKEN="$(jq -n --arg email "$EMAIL" --arg password "$SENHA" \
+  '{email:$email,password:$password}' | \
+  curl -fsS -H 'Content-Type: application/json' --data-binary @- \
+    http://127.0.0.1:8080/api/v1/auth/token | jq -er .accessToken)"
+unset SENHA
+CEDENTE="$(curl -fsS -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"nome":"Cedente exemplo","documento":"exemplo-unico"}' \
+  http://127.0.0.1:8080/api/v1/cedentes | jq -er .id)"
+RECEBIVEL="$(jq -n --arg cedente "$CEDENTE" \
+  '{cedenteId:$cedente,modalidade:"DUPLICATA_MERCANTIL",valorFaceBrl:"100000.00",prazoMeses:3}' | \
+  curl -fsS -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+    --data-binary @- http://127.0.0.1:8080/bff/v1/recebiveis | jq -er .id)"
+CHAVE="$(cat /proc/sys/kernel/random/uuid)"
+curl -fsS -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -H "Idempotency-Key: $CHAVE" -d '{"moeda":"USD"}' \
+  "http://127.0.0.1:8080/bff/v1/recebiveis/$RECEBIVEL/liquidacoes"
+# Repita a última requisição com a mesma chave para obter o mesmo resultado.
+unset TOKEN
+```

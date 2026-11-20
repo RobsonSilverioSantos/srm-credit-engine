@@ -14,6 +14,7 @@ import org.springframework.security.config.http.SessionCreationPolicy
 import org.springframework.security.core.userdetails.UserDetailsService
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder
 import org.springframework.security.crypto.password.PasswordEncoder
+import org.springframework.security.web.AuthenticationEntryPoint
 import org.springframework.security.web.SecurityFilterChain
 
 @Configuration(proxyBeanMethods = false)
@@ -40,6 +41,13 @@ class ConfiguracaoSeguranca {
         http: HttpSecurity,
         authenticationProvider: AuthenticationProvider,
     ): SecurityFilterChain {
+        val naoAutenticado = AuthenticationEntryPoint { _, response, _ ->
+            response.status = 401
+            response.setHeader("WWW-Authenticate", "Bearer")
+            response.contentType = "application/json"
+            response.characterEncoding = "UTF-8"
+            response.writer.write("""{"codigo":"NAO_AUTENTICADO","mensagem":"Autenticação necessária."}""")
+        }
         http
             .csrf { it.disable() }
             .sessionManagement { it.sessionCreationPolicy(SessionCreationPolicy.STATELESS) }
@@ -47,11 +55,16 @@ class ConfiguracaoSeguranca {
             .authorizeHttpRequests {
                 it.requestMatchers(HttpMethod.POST, "/api/v1/auth/token").permitAll()
                     .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
+                    .requestMatchers("/v3/api-docs/**", "/swagger-ui.html", "/swagger-ui/**").permitAll()
                     .anyRequest().authenticated()
             }
             .formLogin { it.disable() }
             .httpBasic { it.disable() }
-            .oauth2ResourceServer { it.jwt(Customizer.withDefaults()) }
+            .exceptionHandling { it.authenticationEntryPoint(naoAutenticado) }
+            .oauth2ResourceServer {
+                it.authenticationEntryPoint(naoAutenticado)
+                it.jwt(Customizer.withDefaults())
+            }
 
         return http.build()
     }
