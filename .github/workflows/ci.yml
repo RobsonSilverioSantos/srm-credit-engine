@@ -35,8 +35,8 @@ jobs:
         uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c # v5
         with:
           cache-read-only: false
-      - name: Build, testes e fronteiras hexagonais
-        run: ./gradlew clean build
+      - name: Build, testes PostgreSQL e fronteiras hexagonais
+        run: bash scripts/test-cadastro-postgres.sh
 
   frontend:
     name: Frontend — lint, testes e build

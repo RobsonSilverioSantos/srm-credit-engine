@@ -9,6 +9,9 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.web.server.LocalServerPort
+import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.context.ApplicationContext
+import br.com.srm.creditengine.cadastro.aplicacao.porta.entrada.Cadastro
 
 @SpringBootTest(
     webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
@@ -18,6 +21,8 @@ import org.springframework.boot.test.web.server.LocalServerPort
     ],
 )
 class CreditEngineApplicationTest {
+    @Autowired
+    private lateinit var context: ApplicationContext
     @LocalServerPort
     private var port: Int = 0
 
@@ -27,6 +32,8 @@ class CreditEngineApplicationTest {
         assertThat(health.statusCode()).isEqualTo(200)
         assertThat(health.body()).isEqualTo("""{"status":"UP"}""")
         assertThat(get("/actuator/env").statusCode()).isEqualTo(404)
+        assertThat(get("/api/v1/cedentes").statusCode()).isEqualTo(404)
+        assertThat(context.getBeansOfType(Cadastro::class.java)).isEmpty()
     }
 
     private fun get(path: String): HttpResponse<String> {
