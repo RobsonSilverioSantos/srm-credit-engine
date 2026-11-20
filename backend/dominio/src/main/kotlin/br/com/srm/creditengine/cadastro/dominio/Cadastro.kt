@@ -20,6 +20,17 @@ data class Cedente(
 
 enum class StatusRecebivel { DISPONIVEL, LIQUIDADO }
 
+fun validarDadosRecebivel(modalidade: String, valorFaceBrl: BigDecimal, prazoMeses: Int) {
+    require(modalidade in setOf(Modalidades.DUPLICATA_MERCANTIL, Modalidades.CHEQUE_PRE_DATADO)) {
+        "Modalidade não suportada"
+    }
+    require(valorFaceBrl.signum() > 0) { "Valor de face deve ser positivo" }
+    require(valorFaceBrl.stripTrailingZeros().scale() <= 2 && valorFaceBrl < BigDecimal("100000000000000000")) {
+        "Valor de face deve ser representável em NUMERIC(19,2)"
+    }
+    require(prazoMeses > 0) { "Prazo deve ser positivo" }
+}
+
 data class Recebivel(
     val id: UUID,
     val organizacaoId: UUID,
@@ -32,14 +43,7 @@ data class Recebivel(
     val versao: Long = 0,
 ) {
     init {
-        require(modalidade in setOf(Modalidades.DUPLICATA_MERCANTIL, Modalidades.CHEQUE_PRE_DATADO)) {
-            "Modalidade não suportada"
-        }
-        require(valorFaceBrl.signum() > 0) { "Valor de face deve ser positivo" }
-        require(valorFaceBrl.stripTrailingZeros().scale() <= 2 && valorFaceBrl < BigDecimal("100000000000000000")) {
-            "Valor de face deve ser representável em NUMERIC(19,2)"
-        }
-        require(prazoMeses > 0) { "Prazo deve ser positivo" }
+        validarDadosRecebivel(modalidade, valorFaceBrl, prazoMeses)
         require(versao >= 0) { "Versão deve ser não negativa" }
     }
 }
