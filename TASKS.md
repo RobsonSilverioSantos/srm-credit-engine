@@ -1,6 +1,6 @@
 # TASKS.md — Backlog de implementação do novo repositório
 
-**Baseline inicial:** 20/11/2026. **Atualização factual:** 20/11/2026 — G00 operacional; B01, B02, B03, B04, B05, B06, B09, B12, S01, D01 e F00 integradas em `develop` via PRs e revisão humana. **Progresso por contagem de itens:** 12/21 (57,1%), incluindo G00 operacional; prioridades P0: 10/18 (55,6%). `gh auth status` da G00 permanece sem evidência local direta. Execuções declaradas por agentes, testes locais confirmados pelo responsável e CI são diferenciados nas evidências. O histórico do repositório anterior não é evidência de implementação atual. **Este backlog contém exclusivamente trabalho do MVP, CI e documentos da arquitetura do MVP.**
+**Baseline inicial:** 20/11/2026. **Atualização factual:** 20/11/2026 — G00 operacional; B01, B02, B03, B04, B05, B06, B07, B08, B09, B12, S01, D01 e F00 integradas em `develop` via PRs e revisão humana. **Progresso por contagem de itens:** 14/21 (66,7%), incluindo G00 operacional; prioridades P0: 12/18 (66,7%). `gh auth status` da G00 permanece sem evidência local direta. Execuções declaradas por agentes, testes locais confirmados pelo responsável e CI são diferenciados nas evidências. O histórico do repositório anterior não é evidência de implementação atual. **Este backlog contém exclusivamente trabalho do MVP, CI e documentos da arquitetura do MVP.**
 
 `ID` e `Trabalho` determinam a branch `feature/<id-normalizado>-<slug-da-coluna-Trabalho>`. A coluna Trabalho deve ser usada como fonte do resumo; não criar branch arbitrária. O primeiro commit de baseline em `main`/`develop` será realizado pelo responsável técnico, não por agente.
 
@@ -14,10 +14,10 @@
 | B05 | P0 | backend | Implementar cotacoes BRL USD e taxa base versionadas | B01,B02 | Vigência UTC, cotação elegível e snapshot; validade configurável, erro sem cotação válida | **Integrada em `develop` — PR #11** (merge `21c649b`; histórico de taxas/câmbio, teste PostgreSQL relatado no PR e CI aprovada) |
 | S01 | P0 | backend/qa | Implementar autenticacao local Spring Security e autorizacao por organizacao | B02,B04 | BCrypt, token assinado com expiração, identidade confiável, testes de acesso cruzado; sem Keycloak | **Integrada em `develop` — PR #15** (merge `bd37ba9`; Spring Security/BCrypt/JWT, contexto confiável por organização e CI backend/frontend aprovada) |
 | B06 | P0 | backend | Implementar liquidacao ACID idempotente com optimistic locking e auditoria | B03,B04,B05,S01 | UNIQUE, hash canônico e replay, conflito 409, rollback, snapshot e auditoria atômica | **Integrada em `develop` — PR #17** (merge `204561b`; ACID, idempotência, replay, controle otimista JDBC, auditoria, snapshots e CI backend/frontend aprovadas; `@Version` literal não utilizado) |
-| B07 | P0 | qa | Comprovar concorrencia rollback idempotencia e isolamento em PostgreSQL real | B06 | Duas requisições concorrentes; só uma liquidação; replay idêntico; 0 efeitos parciais | **Liberada para iniciar** — B06 integrada; validação ampliada ainda pendente |
-| B08 | P0 | backend | Expor contratos REST BFF e OpenAPI dos casos de uso | B06 | `/api/v1` e `/bff/v1`; mesmo use case sem HTTP interno; erros semânticos; decimal string | **Liberada para iniciar** — B06 integrada; contratos REST/BFF ainda pendentes |
-| B08-S01 | P0 | backend | Implementar simulacao precadastro nao persistente na API e no BFF | B03,B05,B08 | Sem recebivelId, escrita ou chave de idempotência; preço indicativo com taxa/câmbio elegíveis | A fazer |
-| B08-E01 | P0 | backend | Implementar extrato analitico filtrado e paginado no servidor | B04,B06,B08 | Período/cedente/moeda; SQL parametrizado, isolamento, ordenação estável e testes PostgreSQL | A fazer |
+| B07 | P0 | qa | Comprovar concorrencia rollback idempotencia e isolamento em PostgreSQL real | B06 | Duas requisições concorrentes; só uma liquidação; replay idêntico; 0 efeitos parciais | **Integrada em `develop` — PR #19** (merge `e90f20b`; CI backend/frontend aprovada; agente relata 60 testes PostgreSQL, sem falhas/erros/ignorados, incluindo concorrência, rollback, replay, isolamento e expiração cambial) |
+| B08 | P0 | backend | Expor contratos REST BFF e OpenAPI dos casos de uso | B06 | `/api/v1` e `/bff/v1`; mesmo use case sem HTTP interno; erros semânticos; decimal string | **Integrada em `develop` — PR #20** (merge `b7b4495`; CI backend/frontend aprovada; agente relata 51 testes PostgreSQL, sem falhas/ignorados; REST API/BFF, JWT, OpenAPI, BRL/USD, erros e replay) |
+| B08-S01 | P0 | backend | Implementar simulacao precadastro nao persistente na API e no BFF | B03,B05,B08 | Sem recebivelId, escrita ou chave de idempotência; preço indicativo com taxa/câmbio elegíveis | **Liberada para iniciar (P0)** — B03, B05 e B08 integradas; implementação pendente |
+| B08-E01 | P0 | backend | Implementar extrato analitico filtrado e paginado no servidor | B04,B06,B08 | Período/cedente/moeda; SQL parametrizado, isolamento, ordenação estável e testes PostgreSQL | **Liberada para iniciar (P0)** — B04, B06 e B08 integradas; implementação pendente |
 | F00 | P0 | frontend | Definir tema Material UI e componentes visuais reutilizaveis | G00 | React/TS/Vite, MUI Core gratuito, tema, layout, acessibilidade e mocks explícitos | **Integrada em `develop` — PR #4** (commit de merge `c081fd5`; lint, 4 testes e build relatados no PR; revisão/merge humanos) |
 | F01 | P0 | frontend | Implementar painel de simulacao cadastro e liquidacao | F00,B08-S01,S01 | Debounce, prévia não persistente, confirmação idempotente, estados de erro e loading, BFF | A fazer |
 | F03 | P0 | frontend | Implementar extrato com filtros e paginacao server side | F00,B08-E01 | Filtros/paginação no BFF, estados vazio/erro/loading e testes de componente | A fazer |
@@ -32,14 +32,14 @@
 
 | Indicador | Quantidade | Percentual |
 |---|---:|---:|
-| Itens integrados ou operacionais | 12 de 21 | **57,1%** |
-| Itens ainda não concluídos | 9 de 21 | 42,9% |
-| Prioridade P0 integrada ou operacional | 10 de 18 | **55,6%** |
-| Prioridade P0 ainda pendente | 8 de 18 | 44,4% |
+| Itens integrados ou operacionais | 14 de 21 | **66,7%** |
+| Itens ainda não concluídos | 7 de 21 | 33,3% |
+| Prioridade P0 integrada ou operacional | 12 de 18 | **66,7%** |
+| Prioridade P0 ainda pendente | 6 de 18 | 33,3% |
 
-**Método:** contagem simples das 21 tarefas, não ponderada por esforço ou dificuldade. G00 conta como operacional, embora `gh auth status` permaneça sem evidência local; A01 é contínua e ainda não está concluída. B06 está integrada; B07, B08 e B10 estão apenas liberadas, **não implementadas**. Este percentual não é percentual de funcionalidades operacionais nem de horas executadas.
+**Método:** contagem simples das 21 tarefas, não ponderada por esforço ou dificuldade. G00 conta como operacional, embora `gh auth status` permaneça sem evidência local; A01 é contínua e ainda não está concluída. B06, B07 e B08 estão integradas; B08-S01 e B08-E01 estão liberadas, **não implementadas**. B10 permanece liberada (P1), também não implementada. Este percentual não é percentual de funcionalidades operacionais nem de horas executadas.
 
-**Caminho crítico atual:** `B07` (QA PostgreSQL real) e `B08` (contratos REST/BFF/OpenAPI) liberadas para execução em paralelo após B06 integrada; `B08-S01` e `B08-E01` dependem da B08, seguidas de F01/F03. B10 (P1) também foi liberada. D03 fecha a documentação e evidências do MVP.
+**Caminho crítico atual:** `B07` (QA PostgreSQL real) e `B08` (contratos REST/BFF/OpenAPI) integradas; `B08-S01` (simulação pré-cadastro) e `B08-E01` (extrato paginado/filtrado) podem começar **em paralelo**, em branches/worktrees independentes, ambas a partir de `develop`. `F01` depende de B08-S01 e `F03` de B08-E01; B10 permanece liberada (P1). D03 consolida documentação e evidências depois das integrações previstas.
 
 ## Evidências verificáveis desta atualização
 
@@ -55,14 +55,16 @@
 - **B09:** [PR #14](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/14), merge `8c1c975`; [CI aprovada](https://github.com/RobsonSilverioSantos/srm-credit-engine/actions/runs/44819849931). Testes locais confirmados pelo responsável. O adaptador de resiliência atua sobre leitura JDBC de câmbio (não provedor HTTP mockado), escolha registrada no PR; não há retry em escrita nem HTTP em transação.
 - **S01:** [PR #15](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/15), merge `bd37ba9`; [CI backend/frontend aprovada](https://github.com/RobsonSilverioSantos/srm-credit-engine/actions/runs/44820996219). Autenticação com BCrypt/JWT HS256, validação de usuário/organização ativos e `ContextoOrganizacao` derivado do principal autenticado. Testes PostgreSQL reportados pelo agente no PR.
 - **B06:** [PR #17](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/17), merge `204561b`. [CI backend/frontend aprovada](https://github.com/RobsonSilverioSantos/srm-credit-engine/actions/runs/44826072633). PR registra 46 testes de integração em PostgreSQL 17 temporário (nenhum ignorado), incluindo nove da B06, golden cases, idempotência, concorrência, rollback, isolamento, snapshots e auditoria. A atualização otimista foi implementada por SQL condicional e incremento de versão, não pela anotação literal `@Version`; equivalência funcional e diferença devem constar na revisão técnica.
-- **Próximas tarefas desbloqueadas:** B07 e B08 (P0) em paralelo; B10 (P1). Cada uma depende da B06 integrada. Nenhuma delas está implementada.
+- **B07:** [PR #19](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/19), merge `e90f20b`. [CI backend/frontend aprovada](https://github.com/RobsonSilverioSantos/srm-credit-engine/actions/runs/44829551932). O agente relata 60 testes executados com PostgreSQL 17 descartável, sem falhas/erros/ignorados, incluindo cenários de concorrência com chaves iguais e distintas, rollback, replay, isolamento e corte temporal. Não houve repetição manual independente desses testes nesta atualização documental.
+- **B08:** [PR #20](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/20), merge `b7b4495`. [CI backend/frontend aprovada](https://github.com/RobsonSilverioSantos/srm-credit-engine/actions/runs/44830560989). O agente relata 51 testes com PostgreSQL real, sem falhas/ignorados; os contratos `/api/v1` e `/bff/v1` cobrem cadastro, consulta e liquidação, com JWT, OpenAPI, idempotência e BRL/USD. Não há manutenção administrativa de taxas/cotações via HTTP, simulação ou extrato nesta integração.
+- **Próximas tarefas desbloqueadas:** B08-S01 e B08-E01 (P0), executáveis em paralelo a partir de B08 integrada; B10 (P1). F01 e F03 aguardam as respectivas APIs.
 
 ## Sequenciamento para evitar trabalho acumulado
 
 1. **G00 manual**: criar repositório privado vazio, publicar baseline em `main`/`develop` e revisar permissões.
 2. **Paralelo real a partir de G00:** `B02` (backend) e `F00` (frontend) em worktrees separados; `D01` pode aguardar. Não misturar backend e frontend no mesmo PR.
-3. **Já integradas:** B01, B02, B03, B04, B05, B06, B09, B12, S01, D01 e F00 (G00 operacional). B06 integrou o spread histórico da B05 e consulta cambial resiliente B09 fora da transação; B07 e B08 estão liberadas.
-4. **Iniciar B07 e B08 em paralelo**, em worktrees próprios a partir da B06 integrada; B08-S01 e B08-E01 aguardam B08 integrada, e F01/F03 aguardam as respectivas APIs/BFF.
+3. **Já integradas:** B01, B02, B03, B04, B05, B06, B07, B08, B09, B12, S01, D01 e F00 (G00 operacional). B06 integrou o spread histórico da B05 e consulta cambial resiliente B09 fora da transação; B07 comprovou invariantes em PostgreSQL real e B08 disponibilizou HTTP API/BFF/OpenAPI.
+4. **Iniciar B08-S01 e B08-E01 em paralelo**, em branches/worktrees próprios criados da `develop` com B08 integrada; não editar simultaneamente arquivos normativos, migrations históricas ou contratos de outra tarefa. F01 e F03 aguardam a integração das respectivas APIs/BFF.
 5. `B12` e `D01` já integradas; `D03` fecha a entrega com fatos verificáveis, sem transformar o modelo fictício de PR em evidência.
 6. Um único responsável atualiza `TASKS.md`, `SPEC.md`, `DECISIONS.md` e `AI_USAGE.md` após integração. Agentes registram evidências no corpo do PR.
 
