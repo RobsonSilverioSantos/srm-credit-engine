@@ -12,7 +12,10 @@ import org.springframework.boot.test.web.server.LocalServerPort
 
 @SpringBootTest(
     webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-    properties = ["spring.autoconfigure.exclude=org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration"],
+    properties = [
+        "spring.autoconfigure.exclude=org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration",
+        "srm.taxas.enabled=false",
+    ],
 )
 class CreditEngineApplicationTest {
     @LocalServerPort

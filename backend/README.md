@@ -150,3 +150,33 @@ O motor aceita uma lista de estratégias com modalidades únicas para extensão,
 sem dependência de framework ou persistência. A seleção de taxas e cotações
 vigentes não faz parte deste cálculo; elas são fornecidas pelo chamador. Os
 testes unitários da precificação ficam em `app`, usando o JUnit já configurado.
+
+## Histórico de taxas e câmbio
+
+`TaxasPorta` permite registrar manualmente versões de taxa base, spread por
+modalidade e cotação BRL por USD, e consultar os dados para um futuro snapshot.
+Não há endpoint de manutenção nem carga automática de valores: o chamador deve
+registrar os dados e, futuramente, garantir autorização. Registros existentes
+nunca são atualizados; vigências futuras podem ser cadastradas antecipadamente.
+A escala máxima é 10 casas, sem arredondamento na gravação; vigências aceitam
+precisão de microssegundos, como no PostgreSQL.
+
+Uma consulta captura um único instante UTC e busca as três versões em uma única
+instrução SQL: seleciona a maior vigência não posterior ao corte entre registros
+já criados nesse corte. A cotação é exigida somente para USD; sua validade é
+`srm.cambio.validade` (duração ISO-8601, positiva e com precisão de
+microssegundos, padrão `PT30M`), inclusive no limite.
+Ausência, cotação expirada ou dados inválidos geram erro, sem fallback. O resultado
+inclui IDs, valores, vigências, datas de criação, referência e validade cambial;
+ele não persiste uma liquidação. O motor B03 ainda usa spreads fixos nas suas
+estratégias padrão: a futura integração deve fornecer a estratégia com o spread
+do snapshot, sem assumir que esses valores padrão acompanham o histórico.
+
+Para executar o teste de integração com PostgreSQL isolado e Flyway:
+
+```sh
+./scripts/verify-taxas-postgres.sh
+```
+
+O script cria e remove apenas seu projeto Compose e volume temporário. O build
+normal não executa esse teste sem `SRM_TEST_POSTGRES=true` e um banco configurado.
