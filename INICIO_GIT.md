@@ -34,6 +34,20 @@ Na interface do GitHub: definir **`develop` como branch padrão** para facilitar
 - A disponibilidade de branch protection/rulesets para repositórios privados varia com o plano/organização. As instruções dos agentes continuam proibindo push direto, mesmo quando não houver bloqueio técnico.
 - Desabilitar auto-merge para os agentes; não conceder permissões desnecessárias a bots/apps ou tokens.
 
+### 3.1. Ativar controles compensatórios no GitHub Free
+
+A ausência de Rulesets para este repositório privado foi confirmada por resposta HTTP 403 com indicação de GitHub Pro ou repositório público. ADR-022 documenta o corte de custo e o risco aceito.
+
+1. **Após o merge** do PR que adiciona `.github/workflows/guard-main.yml`, em **Settings → Actions → General** conferir que Actions está habilitado e que a política de permissões permite ao workflow solicitar `pull-requests: write`.
+2. Ativar o hook versionado em **cada clone** do repositório (os worktrees do mesmo clone compartilham configuração):
+   ```bash
+   git config core.hooksPath .githooks
+   git config --get core.hooksPath
+   ```
+   O arquivo `.githooks/pre-push` está versionado com modo executável. Não usar `--no-verify` ou outra forma de desativar o hook nos agentes.
+3. Realizar teste seguro: abrir PR descartável de `feature/*` para `main` e verificar que foi fechado pelo workflow; realizar ensaio local do hook com entrada simulada ou tentativa controlada, **sem push destrutivo**.
+4. O workflow **não** bloqueia push direto/merge no servidor; as medidas são mitigação e devem constar na defesa. Para bloqueio obrigatório, reavaliar o plano e aplicar branch protection/Ruleset nativo.
+
 ## 4. Criar primeiro worktree: backend
 
 O primeiro PR de backend é `B02`; o `F00` pode ocorrer em paralelo **depois do G00 finalizado**. Os comandos abaixo são exemplos e a branch real deve sempre derivar do ID e do título `Trabalho` em `TASKS.md`.
