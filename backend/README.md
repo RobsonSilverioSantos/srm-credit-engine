@@ -221,6 +221,20 @@ com `SRM_TEST_POSTGRES=true` e remove o projeto e seu volume ao terminar. Sem
 essa variável, os testes de PostgreSQL são explicitamente ignorados; o build
 local isolado não comprova integração. O CI backend usa o mesmo script.
 
+## Extrato de liquidações
+
+`GET /api/v1/extrato` e `GET /bff/v1/extrato` exigem JWT e usam a organização
+da identidade autenticada. Os filtros opcionais são `inicio` e `fim` (datas
+`AAAA-MM-DD` inclusivas em UTC), `cedenteId` (UUID) e `moeda` (`BRL` ou `USD`).
+`pagina` começa em zero (padrão 0) e `tamanho` varia de 1 a 100 (padrão 20).
+Filtros inválidos retornam 400. A resposta contém `itens`, `pagina`, `tamanho`
+e `total`, ordenados por `liquidadaEm` e `liquidacaoId` decrescentes.
+
+Os valores e taxas são strings decimais lidas dos snapshots de liquidação;
+os campos cambiais são nulos para BRL. O ID do cedente é obtido do recebível
+vinculado. Cada resposta calcula itens e total no mesmo snapshot do banco;
+inserções entre requisições podem deslocar itens entre páginas.
+
 ## Precificação
 
 O domínio oferece `MotorPrecificacao`, com estratégias para duplicata mercantil
