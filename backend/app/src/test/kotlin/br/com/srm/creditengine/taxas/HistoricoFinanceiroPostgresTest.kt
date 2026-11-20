@@ -1,6 +1,7 @@
 package br.com.srm.creditengine.taxas
 
 import br.com.srm.creditengine.precificacao.dominio.Modalidades
+import br.com.srm.creditengine.taxas.adaptador.saida.HistoricoCambialResiliente
 import br.com.srm.creditengine.taxas.adaptador.saida.HistoricoFinanceiroJdbc
 import br.com.srm.creditengine.taxas.aplicacao.ManterEConsultarTaxas
 import br.com.srm.creditengine.taxas.aplicacao.porta.entrada.TaxasPorta
@@ -25,6 +26,7 @@ import org.springframework.jdbc.core.JdbcTemplate
 class HistoricoFinanceiroPostgresTest {
     @Autowired private lateinit var jdbc: JdbcTemplate
     @Autowired private lateinit var portaSpring: TaxasPorta
+    @Autowired private lateinit var historicoSpring: HistoricoCambialResiliente
     private val inicio = Instant.parse("2026-11-20T20:00:00Z")
     private val modalidade = Modalidades.DUPLICATA_MERCANTIL
     private fun servico(instante: Instant) = ManterEConsultarTaxas(
@@ -47,6 +49,10 @@ class HistoricoFinanceiroPostgresTest {
         servico(futuro.plusSeconds(1)).registrarTaxaBase(BigDecimal("0.03"), inicio.plusSeconds(300))
 
         val antes = inicial.consultar(modalidade, true)
+        val consultaResiliente = historicoSpring.consultar(modalidade, inicio, true)
+        assertThat(consultaResiliente.taxaBase?.id).isEqualTo(base1.id)
+        assertThat(consultaResiliente.spread?.id).isEqualTo(spread1.id)
+        assertThat(consultaResiliente.cotacao?.id).isEqualTo(cotacao1.id)
         assertThat(antes.taxaBase.id).isEqualTo(base1.id)
         assertThat(antes.spread.id).isEqualTo(spread1.id)
         assertThat(antes.cotacao?.id).isEqualTo(cotacao1.id)
