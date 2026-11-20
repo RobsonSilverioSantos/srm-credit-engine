@@ -125,15 +125,48 @@ Organize código por capacidade de negócio dentro de cada projeto, seguindo
 | `aplicacao` | `<capacidade>.aplicacao`: casos de uso; portas de entrada/saída em `.porta.entrada` e `.porta.saida`. Só depende do domínio. |
 | `app` | `<capacidade>.adaptador.entrada` (REST/BFF) e `.saida` (persistência/integrações); composição Spring. Depende de aplicação e domínio, não o contrário. |
 
-O healthcheck desta etapa usa os adaptadores HTTP/JDBC configurados
-pelo Spring Boot; não há portas ou regras de negócio artificiais para ilustrar o
-layout. Os projetos de núcleo estão prontos para receber suas primeiras capacidades.
+O healthcheck usa os adaptadores HTTP/JDBC configurados pelo Spring Boot.
 
 `./gradlew clean build` executa o smoke test HTTP (sem PostgreSQL) e as
 verificações `:dominio:verificarFronteiraHexagonal` e
 `:aplicacao:verificarFronteiraHexagonal`. Elas validam os artefatos resolvidos nos
 classpaths de compilação e execução do núcleo. O teste HTTP não substitui a
-checagem com PostgreSQL real pelos comandos acima.
+checagem com PostgreSQL real pelos comandos abaixo.
+
+## Cadastro e isolamento
+
+Os comandos de cadastro não recebem organização. `ServicoCadastro` obtém a
+organização de `ContextoOrganizacao` uma vez por operação; consultas e inserções
+usam esse escopo, e a FK composta do banco impede vínculos cruzados mesmo se
+o cedente desaparecer ou mudar entre a consulta e a inserção. A unicidade de
+documento é aplicada por organização pela constraint existente; violações de
+integridade são propagadas, não convertidas em sucesso. Valores de face devem
+ser positivos, representáveis em centavos e caber em `NUMERIC(19,2)`.
+
+Não há implementação de identidade para uso público nesta etapa: o bean de
+cadastro só é criado quando uma implementação confiável de `ContextoOrganizacao`
+for fornecida. S01 deve fornecer essa implementação a partir da identidade
+validada; a implementação mutável usada nos testes não é autenticação. Não
+existem endpoints de cadastro enquanto S01/B08 não forem implementadas.
+
+Para criar somente uma organização demonstrativa, em banco de desenvolvimento,
+inicie a aplicação com o perfil `demo` **e** a propriedade
+`srm.demo.bootstrap-organizacao=true` (por exemplo, variáveis
+`SPRING_PROFILES_ACTIVE=demo` e `SRM_DEMO_BOOTSTRAP_ORGANIZACAO=true`).
+O bootstrap é idempotente por ID, não cria usuário, credencial ou contexto de
+identidade e fica desabilitado por padrão. O ID demonstrativo é
+`00000000-0000-4000-8000-000000000001`.
+
+Execute os testes de integração reais e a regressão completa com:
+
+```sh
+bash scripts/test-cadastro-postgres.sh
+```
+
+O script cria um projeto Compose e banco efêmeros, executa `./gradlew clean build`
+com `SRM_TEST_POSTGRES=true` e remove o projeto e seu volume ao terminar. Sem
+essa variável, os testes de PostgreSQL são explicitamente ignorados; o build
+local isolado não comprova integração. O CI backend usa o mesmo script.
 
 ## Precificação
 
