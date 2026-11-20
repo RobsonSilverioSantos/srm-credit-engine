@@ -1,0 +1,22 @@
+# Backend / Kotlin / Java
+.gradle/
+**/build/
+*.class
+*.log
+# IDE / tooling
+.idea/
+.vscode/*.log
+*.iml
+# Node / frontend
+node_modules/
+dist/
+coverage/
+# Local secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+# Operating systems
+.DS_Store
+Thumbs.db

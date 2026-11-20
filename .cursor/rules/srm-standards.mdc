@@ -1,0 +1,13 @@
+---
+description: Regras gerais do novo SRM Credit Engine
+globs: ["**/*"]
+alwaysApply: true
+---
+
+Seguir SPEC.md, DECISIONS.md, TASKS.md e `.github/copilot-instructions.md` (norma compartilhada Cursor/Copilot). Novo repo inicia sem código. Arquitetura hexagonal obrigatória, organização como escopo de autorização, autenticação local Spring Security sem Keycloak, BigDecimal HALF_EVEN, optimistic locking, idempotência por organização, frontend React/MUI com simulação pré-cadastro.
+
+Agents estão autorizados a criar worktree/branch derivada de ID+Trabalho, implementar, testar, commitar, dar push da feature e abrir PR **para develop**. Nunca fazer merge nem push direto em develop/main; em teste falho ou dependência não integrada, parar e relatar. Code review, post-mortem e futura arquitetura de alta escala são exercícios independentes, sem agente e fora do TASKS.md.
+
+
+- A tarefa D01 cobre C4, ADRs e EDA **do MVP**, não o exercício de arquitetura de alta escala.
+- Em PRs, explique por que, alternativas, riscos, testes executados e aprendizado para desenvolvedor júnior conforme `.github/PULL_REQUEST_TEMPLATE.md`.

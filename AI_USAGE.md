@@ -1,0 +1,332 @@
+# AI_USAGE.md — SRM Credit Engine (novo repositório)
+
+> **Aviso de rastreabilidade — 20/11/2026:** o conteúdo abaixo inclui o **histórico factual do repositório anterior**, marcado como tal. Nenhum commit, teste, artefato compilado ou serviço do repositório anterior equivale a implementação no novo repositório. O novo repositório começa sem código e terá evidências próprias. A escolha de novo Git/repositório e de escopo é decisão do candidato.
+
+## RESET-01 — Reinício planejado após incidente Git e revisão de custo/prazo (20/11/2026)
+
+- **Relato humano:** após operações Git/merge inadequadas, o candidato relata perda do estado útil do código e de configuração dos agentes; decidiu **não priorizar recuperação** e reiniciar em repositório novo. Não houve investigação forense ou confirmação independente de perda irreversível.
+- **Problema de processo identificado:** B01–B06 foram trabalhadas inicialmente numa sessão/branch acumuladora, com histórico de commits e PRs insuficientemente segregados. O uso de uma sessão não cria branches automaticamente; a ausência do gate de branch por tarefa foi parte da causa de rastreabilidade deficiente.
+- **Mudança autorizada:** agentes do Cursor e do Copilot permanecem; cada tarefa usa Git worktree/branch própria. **Nova autorização:** agentes podem gerar nomes de feature a partir de ID + Trabalho, criar worktrees, executar testes, criar commit com mensagem descritiva, dar push **somente da feature** e abrir PR **somente para develop**. O candidato controla revisão e merge.
+- **Corte de escopo por prazo e capacidade de revisão:** remover Keycloak/federação e adotar autenticação local demonstrativa Spring Security + BCrypt + token assinado. Não enfraquecer autorização por organização. DECISIONS.md ADR-007.
+- **Mudanças de domínio/frontend:** organização é o escopo lógico de acesso e cedente permanece entidade de negócio vinculada à organização; não incluir entidade adicional para a parte compradora neste MVP. Material UI Core definido como design system, com tarefa F00 antes do frontend.
+- **Evidência externa e custo:** preservar OPS-01 (esgotamento de cota do Cursor) e os registros reais de mudança de ferramenta. Não afirmar preço de assinatura ou gastos sem comprovante.
+- **Escopo independente:** REVIEW.md e post-mortem continuam exercícios separados e **não** entram no TASKS.md deste repositório.
+- **Estado desta entrada:** planejamento/documentação; nenhum repositório remoto criado por esta entrada, nenhum comando Git, teste, build ou nova implementação realizada.
+
+### TERMINOLOGIA-01 — Organização e cedente (20/11/2026)
+
+- **Decisão humana:** manter `Organizacao` como unidade de isolamento e `Cedente` como entidade do domínio que cede recebíveis. Retirar do modelo planejado a referência a uma entidade específica para a parte compradora, evitando introduzir escopo desnecessário.
+- **Arquivos documentais ajustados:** `SPEC.md`, `DECISIONS.md` (ADR-006), `README.md` e `.github/copilot-instructions.md`. A especificação original do desafio foi preservada sem alterações.
+- **Natureza da mudança:** exclusivamente documental no novo bootstrap; nenhum código, migration, teste, commit ou PR foi produzido por esta adequação.
+
+## BOOTSTRAP-02 — Pacote documental de reinício preparado (20/11/2026)
+
+- **Ferramenta:** ChatGPT, com inspeção dos arquivos normativos e do enunciado original disponível; sem executar código do novo repositório.
+- **Orientação humana:** criar novo repositório GitHub, preservar organização e cedente, Git Flow simplificado e worktrees por tarefa, agentes autorizados a commit/push/PR para `develop`, merge exclusivamente humano, retirar Keycloak do MVP e adotar Material UI.
+- **Separação de escopo reforçada:** Review TypeScript, post-mortem de war room e proposta de alta escala são três exercícios independentes em `docs/exercicios/`, fora de `TASKS.md`.
+- **Correção documental:** a proposta anterior de arquitetura de 1 milhão/min foi considerada incorreta e **não será usada**. O documento de status é apenas placeholder; projeto arquitetural independente será elaborado em discussão posterior entre responsável técnico e ChatGPT, sem ocupar agentes.
+- **Artefatos:** SPEC, DECISIONS, TASKS, README, guia Git, prompts, agentes Cursor/Copilot, template de PR, ADRs/EDA do MVP, matriz de avaliação e exercícios independentes já redigidos.
+- **Estado:** arquivos documentais preparados para extração; **nenhum repositório remoto, commit, push, PR, workflow CI, build, teste ou benchmark novo confirmado**.
+
+## Evidências do novo repositório (preencher somente após execução)
+
+| Tarefa | Branch | Commit | PR para develop | Testes observados | Revisão/merge humano |
+|---|---|---|---|---|---|
+| G00 | Pendente | — | — | Não executados | — |
+
+---
+
+## Histórico do repositório anterior (preservado, não vigente para o novo código)
+
+
+**Exceção editorial:** este documento registra explicitamente o uso de IA, inclusive prompts, conversas, verificações, limitações e correções, quando houver evidências. A restrição de linguagem metadiscursiva aplicada aos documentos técnicos não se aplica a este registro.
+
+## 1. Objetivo e transparência
+
+Este documento registra a estratégia de colaboração com IA no desafio técnico **SRM Credit Engine — Edição AI-native (v2)**. O uso de IA é uma ferramenta de engenharia, não uma delegação de responsabilidade técnica. As decisões finais, a validação dos resultados e a defesa do código cabem ao candidato.
+
+**Estado deste registro:** B01 revalidada (24 PASS). B02 reexecutada. B03 publicada em `fa6616f`. B04, B05 e a separação de tipos públicos entram no commit autorizado pelo candidato em 18/11/2026. Branch: `feature/b01-migrations`. Sem push nesta etapa.
+
+## 2. Contexto e decisões de colaboração
+
+A partir de conversas com ChatGPT, foram explorados: (a) Strategy e persistência/configuração de regras financeiras, incluindo possibilidade de novas fórmulas; (b) cálculo de valor presente em Java e necessidade de precisão aos centavos; (c) agentes especializados no Cursor, monorepo, opções de hospedagem, custos e autenticação com Keycloak, Google e Microsoft.
+
+A opção por **monorepo** busca facilitar rastreabilidade, integração e revisão. A proposta inicial de AWS Amplify/ECS/Fargate/Terraform foi reavaliada em função do caráter temporário do desafio, do custo e do esforço-alvo. A publicação em nuvem não será tratada como pré-requisito sem exigência explícita do enunciado. **Keycloak é um diferencial escolhido pelo candidato, não um requisito do enunciado**, e deve ser limitado para não prejudicar o core.
+
+## 3. Estratégia de agentes de IA (Cursor e preparação para GitHub Copilot)
+
+| Agente | Responsabilidade | Saída esperada | Limite |
+|---|---|---|---|
+| analyst | Ambiguidades, perguntas ao negócio, critérios de aceite | proposta de `SPEC.md` | não decide premissas sozinho |
+| architect | Domínio, Strategy, ACID, idempotência, ADRs e C4 | desenho, contratos e ADRs | não impõe arquitetura excessiva |
+| backend | API, precificação, câmbio, liquidação e auditoria | implementação e testes | não define política financeira unilateralmente |
+| frontend | Simulação e grid com filtros/paginação | interface e testes | não replica cálculo financeiro |
+| devops | Compose, CI, deploy opcional e custos | configuração reproduzível | sem deploy ou gastos sem aprovação |
+| reviewer | Revisão independente e Anexo A | `REVIEW.md` e achados | não altera código durante review |
+| qa | Golden cases, concorrência, integração e regressão | testes e evidências | não altera expectativas para fazer testes passarem |
+
+O agente principal distribui tarefas; o candidato aprova premissas, contratos e decisões de risco. O revisor e o QA devem confrontar o código com a especificação, não apenas confirmar que compila.
+
+## 4. Specs/prompts estratégicos
+
+### P1 — Análise antes de implementação
+
+> Analise o enunciado SRM Credit Engine v2. Liste ambiguidades sobre unidade do prazo, taxa base, vigência cambial, arredondamento, liquidação e idempotência. Proponha alternativas, impactos e perguntas ao negócio. Produza um rascunho de SPEC.md com decisões marcadas como pendentes de aprovação. Não escreva código.
+
+**Critério de validação:** cada premissa deve ser explícita, justificável e compatível com os golden cases de aferição, que possuem regras próprias.
+
+### P2 — Motor financeiro e golden cases
+
+> Implemente Strategy para Duplicata Mercantil e Cheque Pré-datado, separando regras de precificação de persistência e HTTP. Use BigDecimal e arredondamento HALF_EVEN somente no momento especificado. Crie testes C1, C2 e C3 do enunciado sem alterar os valores esperados. Mostre cálculos intermediários e explique escala, unidade das taxas e conversão cambial.
+
+**Critério de validação:** C1 = BRL 92.859,94; C2 = BRL 23.337,77; C3 = USD 17.094,67, conforme a tabela fornecida; conferir também deságios e coerência dos dados de entrada. Se a fórmula e a tabela divergirem, registrar e investigar antes de ajustar implementação ou expectativas.
+
+### P3 — Liquidação robusta
+
+> Proponha e implemente liquidação atômica, idempotente e auditável. Inclua testes para retry da mesma chave, requisições concorrentes sobre o mesmo recebível, rollback e imutabilidade do registro. Identifique restrições de banco necessárias e efeitos de falhas do serviço de câmbio.
+
+**Critério de validação:** evidências de testes de integração e concorrência; ausência de liquidação duplicada; nenhuma escrita parcial.
+
+### P4 — Revisão reversa
+
+> Faça code review do Anexo A do enunciado. Ordene problemas por severidade e, para cada achado, apresente impacto em produção, evidência no trecho e correção proposta. Não modifique o trecho analisado. Gere proposta para REVIEW.md.
+
+**Critério de validação:** revisão humana da priorização e dos impactos; foco em SQL injection, precisão, transação, idempotência, concorrência, tratamento de falhas e semântica financeira.
+
+### P5 — Arquitetura e defesa
+
+> Proponha ADRs enxutos, C4 níveis 1 e 2, evolução orientada a eventos e desenho conceitual para 1 milhão de transações/minuto. Distingua claramente implementação atual de evolução hipotética. Prepare perguntas para uma alteração ao vivo de Strategy, moeda ou arredondamento.
+
+**Critério de validação:** trade-offs claros, sem alegar que a escala projetada foi implementada ou medida.
+
+## 5. Verificação independente
+
+- Testes unitários e de integração executados por ferramentas, não apenas descritos pela IA.
+- Golden cases preservados como oráculo externo de aferição; resultados divergentes são bloqueadores.
+- Revisão humana de transações, isolamento, índices/constraints, locking e trilha de auditoria.
+- PRs pequenos com motivação, evidências e alternativas rejeitadas.
+- Registro dos comandos executados, seus resultados e links para commits/PRs.
+
+## 6. Caso concreto de recomendação incorreta da IA — detectado na revisão do enunciado
+
+**Estado da evidência:** erro real de orientação arquitetural durante o planejamento, identificado e corrigido antes da implementação. Não se trata de defeito executado, bug em produção ou teste automatizado já realizado. A evidência de código/commit e de teste deverá ser anexada após implementação.
+
+- **Contexto e pedido:** ao definir concorrência, idempotência e limites transacionais da liquidação, a IA propôs bloqueio pessimista do recebível, além de constraint de unicidade e reserva de chave idempotente. O candidato buscava uma solução segura para o desafio e sua defesa.
+- **Recomendação incorreta:** usar bloqueio pessimista (`SELECT FOR UPDATE`) para serializar liquidações simultâneas do mesmo recebível. A solução poderia evitar duplicidade, mas não demonstrava o mecanismo exigido pelo enunciado.
+- **Detecção humana:** o candidato releu a seção “Sênior — operação” do enunciado e confrontou a proposta com o requisito textual: “optimistic locking na liquidação, com um teste que demonstra o conflito sendo tratado (duas liquidações simultâneas do mesmo recebível)”. Questionou explicitamente se o bloqueio pessimista prejudicaria a avaliação.
+- **Correção aprovada (17/11/2026):** optimistic locking com versão no `Recebivel` (`@Version` no adaptador JPA), atualização versionada dentro da transação, rollback do perdedor e HTTP 409; manter índice `UNIQUE` em liquidação e idempotência por `(tenant, tipo_operacao, Idempotency-Key)` com hash canônico do payload.
+- **Validação planejada:** teste de integração com PostgreSQL/Testcontainers e duas transações sincronizadas lendo a mesma versão, comprovando conflito otimista, exatamente uma liquidação e ausência de estado parcial. O teste ainda não foi executado neste registro.
+- **Mudança no processo:** confrontar recomendações de agentes com requisitos explícitos e critérios de avaliação antes de aprová-las; incluir o requisito de optimistic locking no contrato do agente backend e na revisão QA.
+
+**Evidências a anexar no repositório:** referência ao requisito no enunciado; decisão em `DECISIONS.md` §19; teste de integração e sua execução; commit/PR de implementação. O histórico da conversa é evidência da detecção humana, mas não substitui testes.
+
+## 7. O que não foi delegado à IA
+
+- Escolha final das premissas financeiras e sua justificativa perante o negócio.
+- Aceitação de divergências dos golden cases e definição da política de arredondamento.
+- Aprovação de mudanças em semântica de liquidação, idempotência e auditoria.
+- Aceitação final de riscos de segurança, segredos, permissões e gastos de nuvem.
+- Decisão sobre escopo e cortes documentados em `DECISIONS.md`.
+- Defesa ao vivo e explicação/autoria do código entregue.
+
+A IA pode sugerir opções e implementar alternativas; o candidato precisa compreender, testar e aprovar.
+
+## 8. Registro de evidências antes da entrega
+
+| Item | Evidência a acrescentar | Estado |
+|---|---|---|
+| SPEC.md revisado | commit/PR | Pendente |
+| Golden cases | B03: `backend/gradlew -p backend test --no-daemon`, 7 testes da suíte de golden cases no registro B03; commit `fa6616f` | Evidência registrada em B03; revisão humana pendente |
+| Idempotência/concorrência | testes e resultado | Pendente |
+| REVIEW.md | commit e revisão humana | Pendente |
+| ADRs/DECISIONS.md | commits e decisões | Pendente |
+| Erro real de IA | recomendação pessimista identificada na revisão do enunciado; acrescentar diff/teste após implementação | Evidência de planejamento registrada; teste pendente |
+| CI | URL de execução | Pendente |
+| Regressão de recuperação de artefatos | seção REC-01; ZIPs da baseline v2.2 e agente frontend existente | Evidência documental registrada; testes não executados |
+| Lacuna de rastreabilidade frontend/extrato | ESCOPO-01; requisitos do enunciado e atualização de TASKS.md | Identificada pelo candidato; RF01 aprovada em 18/11/2026 e registrada em RF01-APROVACAO; sem implementação/testes de código |
+| Limite de uso e custo da ferramenta | OPS-01; captura da mensagem de quota do Cursor | Bloqueio real; migração posteriormente efetivada com B01–B05 no Copilot, conforme registros abaixo; valor da assinatura não verificado neste documento |
+
+## 9. Registro verificável das interações dos agentes
+
+Este documento registra **interações relevantes**, não transcrições integrais. Cada entrada deve ser acrescentada ao final da tarefa, com revisão do candidato. Os agentes não devem inventar ou reconstruir prompts exatos que não estejam disponíveis; nesse caso, identificar o registro como **resumo**.
+
+### GATE-0 — revisão arquitetural antes do B01 (17/11/2026)
+
+- **Agente:** `architect` no Cursor. **Origem:** parecer apresentado pelo candidato; a transcrição literal do prompt submetido ao Cursor não foi incorporada a este registro.
+- **Objetivo resumido:** validar conformidade de enunciado, SPEC/DECISIONS, modelo físico e migrations antes da implementação B01; identificar conflitos de tenant, idempotência, locking e temporalidade.
+- **Saída real informada:** parecer “aprovado com ressalvas”, com hierarquia de artefatos, verificação estática de FKs/constraints e quatro aprovações requeridas (prevalência, catálogo `tipoOperacao`, seleção temporal de taxas/cotações e FK de cotação/moeda).
+- **Revisão humana registrada:** aprovada prevalência enunciado > SPEC > DECISIONS > modelo físico/migrations > referências; aprovado catálogo `CADASTRAR_CEDENTE`, `CADASTRAR_RECEBIVEL`, `REGISTRAR_COTACAO`, `SUBSTITUIR_TAXA_BASE`, `LIQUIDAR_RECEBIVEL`; hash SHA-256 de comando normalizado; instante UTC único; FK composta para cotação/moeda com constraint de referência; índice de auditoria por tenant na migration V2; separação de administração global e tenant. Política de 30 min segue premissa P0.
+- **Arquivos de código alterados pelo agente:** nenhum, conforme seu parecer. **Migrations executadas:** não. **Testes executados:** não. **Commit/PR:** não informado.
+- **Próxima evidência obrigatória:** B01 deve informar arquivos/diffs, comandos reais, saída das migrations em PostgreSQL de teste e testes das constraints antes de qualquer declaração de aprovação técnica.
+
+
+### REC-01 — Regressão na recuperação de artefatos e auditoria do agente frontend (17/11/2026)
+
+- **Natureza:** erro real de recuperação de contexto/artefatos e interpretação de configuração pela IA durante a fase documental; **não é defeito de código executado, incidente de produção nem falha demonstrada por teste**.
+- **Contexto:** o planejamento havia alcançado o Gate 0, com parecer do agente `architect`, documentação do frontend React/TypeScript e arquivos ZIP preparados para continuar a B01. Nenhum repositório Git ou código de aplicação havia sido criado.
+- **Erro verificável:** ao recuperar a última solicitação após interrupção, a IA apresentou como referência arquivos soltos `SPEC.md` v2.1 e `DECISIONS.md` sem a decisão 30, concluindo incorretamente que o pacote de planejamento estava incompleto quanto ao frontend. Essas cópias eram anteriores aos artefatos `SRM_ATUALIZACAO_PRE_B01.zip` e `SRM_PLANEJAMENTO_B01_COMPLETO.zip`.
+- **Detecção humana:** o candidato identificou a ausência das decisões de frontend no material recuperado e informou que a revisão do agente de arquitetura e os ZIPs completos já haviam sido produzidos. Mais tarde esclareceu que os dois ZIPs eram os artefatos mais recentes e pediu um reinício limpo, sem herança de sessões antigas.
+- **Investigação e evidência:** inspeção direta dos ZIPs existentes mostrou `SPEC.md` v2.2, `DECISIONS.md` §30, `TASKS.md` B08/F01, relatório do Gate 0 e `.cursor/agents/frontend.md`. Portanto, o agente frontend **já existia**; a deficiência real era o detalhamento insuficiente de seu contrato, agravado pela recuperação de versões antigas. Os arquivos soltos não tinham prioridade sobre o ZIP consolidado.
+- **Decisão humana e correção:** manter `SRM_PLANEJAMENTO_B01_COMPLETO.zip` como **baseline documental de origem** e `SRM_ATUALIZACAO_PRE_B01.zip` como conferência; elaborar um novo pacote limpo de início de repositório preservando documentos e histórico de decisões, sem incluir sessões do Cursor, arquivos de build, commits inexistentes ou contexto de execução anterior. Fortalecer o agente frontend e fornecer `docs/arquitetura/FRONTEND.md`; usar B08 como dependência para F01. Não apagar registros autênticos de uso da IA.
+- **Verificação desta correção:** listagem e comparação do conteúdo dos dois ZIPs, presença das decisões de frontend e checagem de integridade do novo pacote. **Não houve** execução de backend, frontend, migrations, testes, CI ou comandos Git na recuperação.
+- **Prevenção:** (a) inventariar e comparar artefatos por nome/versão/data e conteúdo antes de declarar perda; (b) trabalhar a partir de uma baseline consolidada e imutável, com hash SHA-256; (c) verificar `SPEC.md` §6, `DECISIONS.md` §30, `.cursor/agents/frontend.md` e B08/F01 na abertura; (d) não interpretar ausência em arquivos avulsos como ausência no pacote; (e) documentar o resultado e separar decisões aprovadas de implementação testada.
+- **Evidências de código/testes para anexar depois:** commits e execução efetiva de B01, B08 e F01. Não existentes no momento deste registro.
+
+### OPS-01 — Cota gratuita esgotada antes da B01 e migração de ferramenta planejada (17/11/2026)
+
+- **Natureza:** limitação real de acesso/cota da plataforma de agentes; **não é bug de código, falha de testes, indisponibilidade do GitHub nem comprovação de gasto financeiro efetivo**.
+- **Contexto:** após concluir planejamento, revisão do Gate 0, recuperação da baseline documental e configuração do Git Flow, o candidato preparou no Cursor o prompt de execução da B01. A interface exibiu a mensagem *"You've hit your usage limit"* e ofereceu upgrade para Premium. A tarefa não chegou a executar; nenhuma migration foi aplicada ou teste rodado em decorrência desse prompt.
+- **Evidência:** captura de tela apresentada pelo candidato em 17/11/2026 com o aviso de limite do Cursor. A imagem demonstra o bloqueio por cota, mas **não** demonstra cobrança, valor de assinatura contratado ou consumo exato de créditos.
+- **Impacto:** impediu o início da primeira tarefa planejada, inviabilizou a execução noturna no plano gratuito e tornou necessário revisar o custo de operação das ferramentas de IA sob o prazo curto do desafio.
+- **Decisão humana:** não contratar uma assinatura Premium imediatamente apenas para contornar o bloqueio; preparar migração das instruções dos agentes para GitHub Copilot no VS Code, preservando `SPEC.md`, `DECISIONS.md`, `TASKS.md`, limites dos módulos, Git Flow e histórico autêntico de IA. Suspender a execução dos agentes até que o candidato possa acompanhar e revisar os resultados.
+- **Correção/prevenção:** separar arquitetura e regras permanentes do formato específico de cada IDE; conservar instruções versionáveis `.github/agents/*.agent.md` e `.github/copilot-instructions.md`; controlar consumo/cotas e validar previamente o acesso ao modelo/ferramentas, pois **Copilot Free também possui limites e pode não permitir execução intensiva de agentes**. Estabelecer checkpoints e aprovação humana antes de qualquer operação financeira/código crítico.
+- **Estado da evidência:** adaptação documental preparada; execução da B01 no Copilot **não realizada**; testes, commits de implementação, PRs, builds e custos efetivamente incorridos **não verificados**. Adicionar posteriormente o plano efetivamente usado, os comandos executados e as evidências de revisão.
+
+### B01 — Baseline V1–V3 alinhada, aplicada e constraints validadas (18/11/2026)
+
+- **Agente / ferramenta:** `architect` (análise) e execução delegada no GitHub Copilot / VS Code, sob autorização humana.
+- **Prompt relevante:** resumo — (1) atuar como architect, analisar exclusivamente a B01, comparar DECISIONS/SPEC/modelos com migrations V1–V3 e produzir plano de correção sem modificar nada; (2) autorização humana subsequente: "Pode executar a opção A, validar a escala do campo valor_pago e manter para os demais campos numeric alinhar o check manter a validade de 30 min da cotação".
+- **Objetivo e limites:** aplicar a Opção A (alinhar baseline nunca aplicada); sem commit/push; sem alteração de premissas P0; validade de 30 min mantida como premissa P0.
+- **Resultado produzido:**
+  - `db/migration/V1__criar_estrutura_financeira.sql`: `UNIQUE (id, codigo_moeda)` em `cotacoes`; FK composta `liquidacoes (cotacao_id, codigo_moeda_pagamento) → cotacoes (id, codigo_moeda)` substituindo a FK simples; CHECKs de `taxa_base_aplicada` e `spread_aplicado` alinhados (`>= 0 AND < 1`).
+  - `db/migration/V2__auditoria_e_integridade.sql`: índice `registros_auditoria_tenant_idx (tenant_id, ocorrido_em DESC)`; bloco duplicado de `COMMENT ON` removido (conjunto único mencionando redação de campos sensíveis).
+  - `docs/arquitetura/MODELO_DOMINIO.md` v0.4: `Liquidacao` com `configuracaoTaxaBaseId` e `instanteReferencia`; `Cotacao` harmonizada (`codigoMoeda`, `valorEmReais`); Mermaid corrigido (id de auditoria `long`; FK composta cotação–moeda documentada).
+  - `docs/arquitetura/MODELO_FISICO_POSTGRESQL.md` v0.4: FK composta e índice registrados na baseline; seção de decisões atualizada.
+  - `db/validacao/validacao_b01_constraints.sql`: script re-executável com 21 verificações PASS/FAIL.
+- **Revisão humana:** aprovada a Opção A (baseline nunca aplicada, conforme comentário da V1 e inventário de bootstrap); **validada a escala `numeric(20,6)` de `liquidacoes.valor_pago` (mantida)**; aprovado o alinhamento dos CHECKs de taxa no snapshot; mantida a validade de 30 min da cotação como premissa P0.
+- **Execuções verificadas:** PostgreSQL 15.20 descartável (`docker run postgres:15`, porta 55432) + `docker run flyway/flyway:10 ... migrate` → "Successfully applied 3 migrations ... now at version v3"; `psql < db/validacao/validacao_b01_constraints.sql` em banco recriado do zero → **21 PASS, 0 FAIL** (histórico Flyway, FK composta cotação–moeda, isolamento por tenant, UNIQUE de liquidação, idempotência e hash, imutabilidade, redação/operador/rollback de auditoria, uso do índice por tenant no plano, taxa ativa única, CHECK de taxa, checklist de catálogo). Container removido após a validação.
+- **Erro de IA detectado e corrigido durante a tarefa:** a primeira versão da verificação V08 do script capturava apenas a primeira linha do `EXPLAIN (FORMAT TEXT)` via `EXECUTE ... INTO`, gerando FAIL falso; detecção pela leitura do plano truncado ("Limit") e correção para `EXPLAIN (FORMAT JSON)`, com reexecução integral em banco limpo.
+- **Evidência:** saídas de Flyway e do script registradas na sessão; artefato re-executável `db/validacao/validacao_b01_constraints.sql`. Commit/PR: **nenhum** (sem autorização de commit nesta etapa).
+- **Pendências e riscos:** commit em branch `feature/b01-migrations` autorizado pelo candidato, com mensagem definida por ele (não executado por este agente); limites de taxa continuam técnicos provisórios; B02 iniciada em seguida.
+
+### B01-ESCALA — validação da escala única `numeric(20,6)` (18/11/2026)
+
+- **Agente / ferramenta:** revisão do agente principal (architect/backend) após edição humana direta em `db/migration/V1__criar_estrutura_financeira.sql`.
+- **Prompt relevante:** citação — "Alterei manualmente os campos de valores para numeric(20,6) os campos valor_face_brl, valor_presente_brl, desagio_brl, valor_pago nas tabelas recebiveis e liquidacoes, autorizo commit porém eu decido a mensagem de commit, limites de taxa pode manter e iniciar o B02, valide a decisão no AI_USAGE.md".
+- **Decisão humana:** persistir os quatro montantes em `numeric(20,6)`. Limites `taxa_mensal`/`taxa_base_aplicada`/`spread_aplicado` (`>= 0 AND < 1`) permanecem. Validade de 30 minutos da cotação não foi alterada.
+- **Validação técnica:** a decisão é compatível com `SPEC.md` §2 e `DECISIONS.md` §17. `numeric(20,6)` é capacidade de armazenamento alinhada ao teto `moedas.casas_decimais BETWEEN 0 AND 6`; não autoriza calcular ou expor BRL/USD com seis casas. O domínio deve continuar arredondando com `HALF_EVEN` a 2 casas no VP BRL e no valor pago de BRL/USD antes de gravar. A igualdade `valor_face_brl = valor_presente_brl + desagio_brl` segue exata porque as três colunas têm a mesma escala. A baseline segue editável: não houve aplicação em banco compartilhado; o PostgreSQL descartável da B01 foi removido.
+- **Arquivos alinhados à decisão humana:** comentários da V1, `docs/arquitetura/MODELO_FISICO_POSTGRESQL.md` e verificação V12 em `db/validacao/validacao_b01_constraints.sql`. A V1 não foi revertida.
+- **Execuções verificadas nesta entrada:** conferência estática do DDL alterado pelo candidato. A reaplicação da escala foi comprovada depois, no teste `persisteMontantesEmNumeric20Escala6` da B02.
+- **Commit:** autorizado, não executado aqui, porque a mensagem fica a cargo do candidato.
+
+### B02 — bootstrap do monólito hexagonal (18/11/2026)
+
+- **Agente / ferramenta:** backend/devops no GitHub Copilot / VS Code, após autorização para iniciar a B02.
+- **Prompt relevante:** o mesmo pedido citado em B01-ESCALA, na parte "iniciar o B02".
+- **Resultado produzido:** projeto Gradle Kotlin DSL em `backend/` (Spring Boot 4.1.2, Kotlin 2.3.21, Java toolchain 21, Flyway 12 via BOM), pacotes `dominio`, `aplicacao` e `adaptadores` sem fórmula financeira, `docker-compose.yml` com PostgreSQL 15 e a aplicação. Flyway lê `db/migration` por `filesystem`, não copia regra de negócio para adaptador.
+- **Versões validadas no build real:** Spring Boot `4.1.2`, Kotlin `2.3.21`, Gradle Wrapper `9.1.0`, PostgreSQL 15.20. O Initializr público falhou ao resolver o BOM (`4.1.2.RELEASE`); as coordenadas sem sufixo `.RELEASE` foram confirmadas no Maven Central e no build.
+- **Execuções verificadas:**
+  - `JAVA_HOME` Temurin 24 apenas para iniciar o Wrapper; compilação/teste pelo toolchain 21 provisionado pelo plugin Foojay. Primeira execução falhou por ausência de JDK 21 local (só havia JRE 21 e não foi possível instalar pacote com sudo). Correção: plugin `org.gradle.toolchains.foojay-resolver-convention` 1.0.0.
+  - `backend/gradlew -p backend test --no-daemon`: primeira vez 1 falha por contagem incorreta no teste (esperava 4 colunas e o esquema tem 5: face do recebível mais quatro montantes da liquidação). Erro do teste, não do esquema. Corrigido para 5 e reexecutado: `BUILD SUCCESSFUL`.
+  - `backend/gradlew -p backend bootJar --no-daemon`: `BUILD SUCCESSFUL`; artefato `backend/build/libs/motor-credito.jar`.
+  - `docker compose -p srm-b02 up -d --build`: imagem construída com Temurin 21; log `Successfully applied 3 migrations to schema "public", now at version v3`; `GET http://localhost:8080/actuator/health` retornou `{"status":"UP"}`. Em seguida `docker compose -p srm-b02 down -v`; nenhum container `srm-b02` permaneceu.
+- **Limites mantidos:** CHECKs de taxa `< 1` e validade de 30 minutos da cotação não foram alterados. Nenhuma regra de precificação foi colocada em adaptador.
+- **Commit/PR:** nenhum. A autorização de commit existe, mas a mensagem será definida pelo candidato.
+- **Pendências:** ktlint/Detekt/CI permanecem na B12; Keycloak não entra neste bootstrap; revisão humana do diff antes do merge. O commit `8e6a8a9` foi criado depois desta entrada, com mensagem definida pelo candidato, e publicado em `origin/feature/b01-migrations`. Nenhum PR foi aberto.
+
+### B01-REVALIDACAO — conferência pós-commit (18/11/2026)
+
+- **Agente / ferramenta:** agente principal no GitHub Copilot / VS Code.
+- **Prompt relevante:** citação — "pode atualizar e verificar se a B01 foi executada?"
+- **Objetivo:** não aceitar só o registro anterior; reaplicar a baseline commitada e o script de constraints, e corrigir TASKS/AI_USAGE que ainda diziam "sem commit".
+- **Execuções verificadas:**
+  - `docker run postgres:15` (PostgreSQL 15.20), rede e container descartáveis `srm-b01-net` / `srm-b01-pg`.
+  - `docker run flyway/flyway:10` (Flyway OSS 10.22.0) com `db/migration` montado: `Successfully applied 3 migrations to schema "public", now at version v3`.
+  - `psql -v ON_ERROR_STOP=1 -f db/validacao/validacao_b01_constraints.sql`: saída com 24 linhas PASS (V01–V12) e nenhuma FAIL; código de saída 0. V12 confirmou os cinco montantes em `numeric(20,6)`.
+  - Ambiente removido com `docker rm -f srm-b01-pg` e `docker network rm srm-b01-net`.
+- **Leitura da evidência anterior:** a entrada B01 citava 21 PASS. Essa contagem é anterior à verificação V12, acrescentada depois da escala humana. A reexecução do script commitado é a evidência atual: 24 PASS, 0 FAIL.
+- **B02 nesta conferência:** não reexecutada. A evidência dela continua sendo a entrada B02 (Gradle e Compose), já incluída em `8e6a8a9`.
+- **Commit desta atualização documental:** ainda não criado; a mensagem fica a cargo do candidato.
+
+### B02-REVALIDACAO — conferência antes da B03 (18/11/2026)
+
+- **Agente / ferramenta:** agente principal no GitHub Copilot / VS Code.
+- **Prompt relevante:** citação — "verifique se A b02 foi concluída e passe para a B03 caso a tarefa esteja concluida".
+- **Critério conferido:** build inicia, Flyway em banco limpo e domínio/aplicação sem framework. O Compose e o health UP não foram repetidos nesta conferência; continuam registrados na entrada B02, já commitada em `8e6a8a9`.
+- **Execução verificada:** `backend/gradlew -p backend test --no-daemon --tests br.com.srm.motorcredito.arquitetura.FronteiraHexagonalTest --tests br.com.srm.motorcredito.infraestrutura.MigracaoFlywayIntegracaoTest` → `BUILD SUCCESSFUL` em 17s. A suíte posterior, já com a B03, repetiu esses testes: 2 + 2, 0 falhas.
+- **Conclusão:** B02 está concluída para o critério de aceite. Não há PR.
+
+### B03 — golden cases e Strategy (18/11/2026)
+
+- **Agente / ferramenta:** agente principal no GitHub Copilot / VS Code, após a revalidação da B02.
+- **Prompt relevante:** o mesmo citado em B02-REVALIDACAO.
+- **Resultado produzido:** motor de domínio em `backend/src/main/kotlin/br/com/srm/motorcredito/dominio/precificacao/`. `EstrategiaDuplicataMercantil` (spread `0.015`) e `EstrategiaChequePreDatado` (spread `0.025`) selecionam a política; a fórmula compartilhada fica em `CalculadoraValorPresente`. Intermediários usam `MathContext.DECIMAL128`. `HALF_EVEN` em 2 casas só no VP BRL e, depois disso, no valor USD. Deságio = face − VP arredondado. `prazoMeses <= 0` é rejeitado. Sem Spring, JPA ou HTTP nesse pacote.
+- **Conferência independente da fórmula, antes do código:** Python `decimal` com 50 dígitos reproduziu C1 `92859.94`, C2 `23337.77` e C3 `17094.67`.
+- **Execução verificada:** `backend/gradlew -p backend test --no-daemon` → `BUILD SUCCESSFUL` em 26s. Relatórios JUnit: `GoldenCasesPrecificacaoTest` 7 testes, `FronteiraHexagonalTest` 2, `MigracaoFlywayIntegracaoTest` 2; 0 falhas e 0 erros.
+- **Limites:** não persiste taxa, não simula a partir de recebível cadastrado e não liquida. Isso permanece em B04–B06. A taxa base dos golden cases entra no pedido (`0.01`), não é lida do banco.
+- **Commit/PR:** nenhum neste momento. O commit posterior está em B03-PUBLICACAO.
+
+### B03-PUBLICACAO — commit e push (18/11/2026)
+
+- **Prompt relevante:** citação — "ok pode subir a B03 para o git e executar a B04 e B05".
+- **Resultado:** commit `fa6616f` com a mensagem fornecida pelo candidato, `:construction:  inicio da criação do motor de precificação`, publicado em `origin/feature/b01-migrations`. Sem PR.
+- **Limite:** a mensagem foi decidida pelo candidato; o agente não a reescreveu.
+
+### B04 e B05 — cadastro por tenant, cotação e taxa base (18/11/2026)
+
+- **Agente / ferramenta:** agente principal no GitHub Copilot / VS Code.
+- **Prompt relevante:** citação — "ok pode subir a B03 para o git e executar a B04 e B05".
+- **Decisão humana anterior reaplicada:** validade inicial da cotação permanece `PT30M`; limites de taxa não foram alterados; escala monetária `numeric(20,6)` já estava na baseline.
+- **Resultado produzido:** cadastro de cedente e recebível usa `tenantId` somente do `ContextoAutenticado`. O contexto atual é `ContextoAutenticadoTransiente` até a B11; não há Keycloak nesta etapa. `prazoMeses` é persistido como informado e `dataVencimento` permanece informativo. A seleção de cotação exige vigência e registro não posteriores ao instante e idade da vigência menor ou igual à validade. A substituição da taxa desativa a ativa, faz flush e insere a versão seguinte. O provedor mockado recusa chamada com transação Spring ativa. Não há cliente HTTP, timeout nem retry; isso permanece na B09.
+- **Erro real de compilação:** `@JvmField` nas entidades foi rejeitado porque o plugin JPA torna as propriedades abertas. A correção foi remover o campo JVM e inserir com `versao` nula no recebível, para o Hibernate tratar a inclusão como nova. Um teste unitário também tentou instanciar a interface `ContextoAutenticado`; foi corrigido para uma implementação anônima.
+- **Arquivos:** domínio `cadastro` e `cambio`; portas e casos de uso; adaptadores de persistência, contexto, configuração e provedor mockado; `application.yml`; testes de cadastro, elegibilidade e fronteira.
+- **Execução verificada:** `backend/gradlew -p backend test --no-daemon` → `BUILD SUCCESSFUL` em 33s. Relatórios JUnit: 19 testes, 0 falhas e 0 erros, incluindo os 7 golden cases. PostgreSQL de teste veio do Testcontainers `postgres:15-alpine`.
+- **Commit/PR:** o candidato autorizou o commit em 18/11/2026 com a mensagem exata `:construction:  Criar cadastro de cedentes/recebíveis por tenant; input prazo/vencimento e autenticação confiável e Criar o provedor de cotações mockado`. Sem push e sem PR nesta etapa.
+- **Pendências:** revisão humana, push, B06 (liquidação, conflito otimista e idempotência), B09 (HTTP) e B11 (OIDC).
+- **Reorganização posterior, a pedido do candidato:** os três arquivos de persistência foram separados em `persistencia/adapters`, `persistencia/entity` e `persistencia/repository`, um tipo por arquivo. Pacotes em inglês por refletirem JPA/Spring Data. `backend/gradlew -p backend test --no-daemon` → `BUILD SUCCESSFUL` em 31s. Incluída no mesmo commit.
+- **Reorganização de tipos públicos (18/11/2026):** um tipo público principal por arquivo em casos de uso, portas, estratégias, comandos e resultados. Pacotes e assinaturas preservados. `Pagamento` permaneceu privado em `MotorPrecificacao`. `backend/gradlew -p backend test --no-daemon` → `BUILD SUCCESSFUL` em 29s, 19 testes, 0 falhas. Incluída no mesmo commit.
+
+### ESCOPO-01 — Lacuna de rastreabilidade identificada na revisão de frontend/extrato (18/11/2026)
+
+- **Natureza:** omissão/incompletude de planejamento na decomposição de tarefas sugerida com apoio de IA; não é defeito de código executado nem incidente de produção.
+- **Detecção humana:** o candidato confrontou o `TASKS.md` com trechos do enunciado sobre painel do operador, simulação em tempo real, grid de transações com paginação server-side/filtros dinâmicos e extrato analítico filtrado por período, cedente e moeda. Apontou que não identificava tarefas suficientemente explícitas e que a lacuna poderia demandar mudanças no backend.
+- **Evidência inicial:** o `TASKS.md` recebido continha uma B08 genérica, com “extrato paginado”, e uma F01 única, combinando formulário, simulação reativa e grid, sem critérios completos para os filtros de extrato, a query analítica e o grid. O requisito estava parcialmente representado, mas sem rastreabilidade e aceite independentes.
+- **Divergência de negócio identificada:** a premissa documentada de simular apenas recebíveis cadastrados não se encaixa automaticamente na interação descrita como simulação durante o preenchimento do painel. **Nenhuma alteração de regra foi aprovada nesta etapa.**
+- **Decisão de planejamento:** criar RF01 (avaliação/decisão humana sobre simulação pré-cadastro), B08-S01 (contrato de simulação no backend), B08-E01 (extrato analítico no backend) e F03 (grid filtrável e paginado no frontend); restringir B08 aos adaptadores/contratos comuns e F01 ao painel com simulação. Preservar B01–B05 e B05-R01 sem reabertura.
+- **Trade-off:** manter a premissa existente até deliberação evita introduzir comportamento financeiro arbitrário; a separação em tarefas aumenta a rastreabilidade e deixa explícitas dependências e critérios de aceite para as duas camadas. Query builder/SQL nativo otimizado permanece diferencial avaliado, não obrigação indiscriminada de usar SQL nativo.
+- **Artefatos documentais:** `TASKS.md` revisado e presente registro em `AI_USAGE.md`. `SPEC.md`, `DECISIONS.md`, código, migrations e testes **não foram modificados** por esta adequação.
+- **Execuções e evidências:** comparação textual do enunciado e do `TASKS.md` fornecido; **nenhum agente executado, compilação, teste, commit, push ou PR realizado nesta atualização documental**. A revisão final e o versionamento desses arquivos ficam sob controle do candidato.
+- **Prevenção:** adotar matriz requisito → tarefa backend/frontend → critério de aceite → teste; revisar dependências entre interface e contratos do backend antes de avançar a B08/F01; não assumir que menção genérica no backlog comprova cumprimento do enunciado.
+
+### Modelo de entrada para as próximas tarefas (copiar e preencher apenas após executar)
+
+```markdown
+### [ID/TAREFA] — [título] ([data])
+- Agente / ferramenta: ...
+- Prompt relevante: [citação fiel se preservada; senão "resumo", não entre aspas]
+- Objetivo e instruções/limites fornecidos: ...
+- Resultado produzido: ...
+- Revisão humana: o que foi aprovado, rejeitado ou corrigido e por quê
+- Arquivos alterados / diff: ...
+- Execuções verificadas: comando; ambiente; resultado (passou/falhou/não executado)
+- Evidência: commit/PR, log ou arquivo de teste, se existente
+- Pendências e riscos: ...
+```
+
+**Política de atualização:** não gravar tokens, chaves idempotentes reais, dados de clientes ou segredos. Agentes em paralelo fornecem resumos ao orquestrador; apenas um responsável edita `AI_USAGE.md` por vez, para evitar conflitos. O candidato valida cada registro.
+
+## 10. Escopo e priorização
+
+O enunciado fixa prazo de até cinco dias e esforço-alvo de 8–16 horas, privilegiando julgamento sobre volume. Ordem de prioridade: SPEC → golden cases/core → ACID/idempotência/auditoria → REVIEW → testes/CI → ADRs/DECISIONS e defesa → extras como Keycloak e hospedagem. Registrar em `DECISIONS.md` qualquer redução de escopo deliberada.
+
+
+### RF01-APROVACAO — Simulação pré-cadastro sem persistência (18/11/2026)
+
+- **Origem:** revisão humana do escopo e decisão expressa do candidato: **"Pode aprovar a simulação"**, após a apresentação da proposta de cálculo antes do cadastro.
+- **Problema identificado:** a decisão anterior exigia `Recebivel` cadastrado para simular, embora o enunciado previsse painel com simulação do líquido em tempo real durante o preenchimento. O planejamento ESCOPO-01 havia sinalizado a divergência; a presente aprovação fecha RF01, sem modificar retroativamente o relato de detecção.
+- **Decisão humana:** habilitar prévia sem persistência antes do cadastro, mantendo o cadastro obrigatório para efetivar liquidação. A simulação usa o motor financeiro do backend, não grava `recebiveis`, `liquidacoes` nem `requisicoes_idempotentes`, não reserva taxas/cotação e não exige `Idempotency-Key` por não ser escrita persistente crítica. O frontend consome o BFF, aplica debounce e evita exibir respostas obsoletas. A prévia é estimativa não vinculante, sujeita a revalidação no momento de liquidar.
+- **Arquivos documentais atualizados:** `SPEC.md` v2.3, `DECISIONS.md` v1.0 (§31) e `TASKS.md` (RF01, B08-S01 e F01), além deste `AI_USAGE.md`.
+- **Evidências desta etapa:** aprovação explícita e comparação documental. **Nenhum agente de implementação, teste, build, commit, push ou PR foi executado como parte desta decisão**. Comandos e resultados de B01–B05 permanecem os previamente relatados, sem nova validação.
+- **Verificações futuras:** testes de simulação pré-cadastro sem inserções no banco, golden cases C1–C3, moeda/taxa elegíveis, contrato API/BFF, validação e fluxo da interface. A banca deverá distinguir prévia indicativa de liquidação efetivada.
+- **Governança Git:** seleção de arquivos para commit, autoria da mensagem, commits e push permanecem sob controle do candidato.
+
+
+### STAFF-DOC-01 — Rastreabilidade documental Staff/Tech Lead (20/11/2026)
+
+> **Atualização posterior (BOOTSTRAP-02):** houve um rascunho de escala nesta etapa histórica, **mas o responsável técnico o rejeitou** por não constituir projeto arquitetural adequado. Esse rascunho foi excluído do pacote inicial; o exercício permanece pendente e independente. Os fatos abaixo registram o trabalho anterior, não validade atual do documento.
+
+- **Natureza:** preparação assistida por IA de documentação para os critérios Staff/Tech Lead; não é implementação da arquitetura distribuída, medição de throughput nem evidência de commits no novo repositório.
+- **Pedido do responsável:** garantir ADRs comparando SQL/NoSQL, monólito/serviços e síncrono/eventos; desenho de 1 milhão de transações/minuto com caching, sharding, consistência eventual e idempotência; EDA para liquidação; post-mortem independente; justificativa de Git Flow no README; PRs com explicação didática.
+- **Saída documental preparada:** detalhamento de ADR-005/018/019, DECISIONS atualizado, proposta EDA, desenho de escala, seção Git no README, template e exemplo hipotético de PR e matriz de rastreabilidade. Os documentos independentes REVIEW e POST_MORTEM foram mantidos sem alterar seu conteúdo.
+- **Verificação nesta preparação:** consistência de caminhos/nomes e preservação dos arquivos originais no pacote gerado; **não houve** acesso ao repositório remoto, criação de PR, execução de build, carga ou testes.
+- **Revisão humana pendente:** avaliar mérito de alternativas/restrições, aceitar os documentos como baseline e anexar links de PR/CI **apenas após execução real**.
