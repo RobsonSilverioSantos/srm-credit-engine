@@ -14,6 +14,8 @@ import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneOffset
 import java.time.temporal.ChronoUnit
 import java.util.UUID
 import org.assertj.core.api.Assertions.assertThat
@@ -69,6 +71,7 @@ class ContratosHttpPostgresTest {
     private val http = HttpClient.newHttpClient()
     private val json = ObjectMapper()
     private lateinit var orgA: UUID
+    private lateinit var orgB: UUID
     private lateinit var usuarioA: UUID
     private lateinit var tokenA: String
     private lateinit var tokenB: String
@@ -76,7 +79,7 @@ class ContratosHttpPostgresTest {
     @BeforeEach
     fun preparar() {
         orgA = UUID.randomUUID()
-        val orgB = UUID.randomUUID()
+        orgB = UUID.randomUUID()
         usuarioA = UUID.randomUUID()
         val usuarioB = UUID.randomUUID()
         val senha = UUID.randomUUID().toString()
@@ -142,6 +145,108 @@ class ContratosHttpPostgresTest {
         assertThat(terceiro.tree()["liquidadaEm"].asText()).endsWith("Z")
         assertThat(post("/bff/v1/recebiveis/$c3/liquidacoes", tokenA, """{"moeda":"USD"}""", "c3").body())
             .isEqualTo(terceiro.body())
+        val extrato = get("/api/v1/extrato", tokenA)
+        assertThat(extrato.statusCode()).isEqualTo(200)
+        val itens = extrato.tree()["itens"]
+        val item = itens.find { it["liquidacaoId"].asText() == terceiro.tree()["liquidacaoId"].asText() }!!
+        listOf("recebivelId", "moeda", "valorPresenteBrl", "desagioBrl", "valorPagamento", "liquidadaEm").forEach {
+            assertThat(item[it]).isEqualTo(terceiro.tree()[it])
+        }
+        assertThat(item["taxaBrlPorUnidade"].asText()).isEqualTo("5.4321000000")
+        assertThat(item["taxaBaseMensal"].asText()).isEqualTo("0.0100000000")
+        assertThat(item["spreadMensal"].asText()).isEqualTo("0.0150000000")
+        taxas.registrarTaxaBase(BigDecimal("0.08"), instante.plusSeconds(1))
+        taxas.registrarSpread(Modalidades.DUPLICATA_MERCANTIL, BigDecimal("0.09"), instante.plusSeconds(1))
+        taxas.registrarCotacao(BigDecimal("9.00"), instante.plusSeconds(1))
+        val depois = get("/api/v1/extrato", tokenA).tree()["itens"]
+            .find { it["liquidacaoId"] == item["liquidacaoId"] }
+        assertThat(depois).isEqualTo(item)
+    }
+
+    @Test
+    fun `extrato filtra pagina e isola organizacoes com ordenacao deterministica`() {
+        val referencia = Instant.now().truncatedTo(ChronoUnit.MICROS).minus(10, ChronoUnit.DAYS)
+        val base = taxas.registrarTaxaBase(BigDecimal("0.01"), referencia)
+        val spread = taxas.registrarSpread(Modalidades.DUPLICATA_MERCANTIL, BigDecimal("0.015"), referencia)
+        val cotacao = taxas.registrarCotacao(BigDecimal("5.4321"), referencia)
+        val dia = LocalDate.now(ZoneOffset.UTC).minusDays(2)
+        val cedenteA = UUID.randomUUID()
+        val outroCedenteA = UUID.randomUUID()
+        val cedenteB = UUID.randomUUID()
+        listOf(cedenteA to orgA, outroCedenteA to orgA, cedenteB to orgB).forEach { (id, org) ->
+            jdbc.update("INSERT INTO cedentes (id, organizacao_id, nome, documento) VALUES (?, ?, 'Teste', ?)",
+                id, org, id.toString().take(32))
+        }
+        fun inserir(org: UUID, cedente: UUID, moeda: String, data: Instant): UUID {
+            val recebivel = UUID.randomUUID()
+            val liquidacao = UUID.randomUUID()
+            jdbc.update("""INSERT INTO recebiveis
+                (id, organizacao_id, cedente_id, modalidade, valor_face_brl, prazo_meses, status, versao)
+                VALUES (?, ?, ?, 'DUPLICATA_MERCANTIL', 100000, 3, 'LIQUIDADO', 1)""", recebivel, org, cedente)
+            jdbc.update("""INSERT INTO liquidacoes
+                (id, organizacao_id, recebivel_id, modalidade, valor_face_brl, prazo_meses, versao_recebivel,
+                 taxa_base_id, taxa_base_mensal, taxa_base_vigente_em, spread_id, spread_mensal, spread_vigente_em,
+                 valor_presente_brl, desagio_brl, moeda_pagamento, cotacao_cambial_id, taxa_brl_por_unidade,
+                 cotacao_vigente_em, cotacao_valida_ate, valor_pagamento, liquidada_em)
+                VALUES (?, ?, ?, 'DUPLICATA_MERCANTIL', 100000, 3, 1, ?, 0.01, ?, ?, 0.015, ?,
+                        92859.94, 7140.06, ?, ?, ?, ?, ?, ?, ?)""",
+                liquidacao, org, recebivel, base.id, referencia.atOffset(ZoneOffset.UTC),
+                spread.id, referencia.atOffset(ZoneOffset.UTC), moeda,
+                if (moeda == "USD") cotacao.id else null,
+                if (moeda == "USD") BigDecimal("5.4321") else null,
+                if (moeda == "USD") referencia.atOffset(ZoneOffset.UTC) else null,
+                if (moeda == "USD") data.plusSeconds(60).atOffset(ZoneOffset.UTC) else null,
+                if (moeda == "USD") BigDecimal("17094.67") else BigDecimal("92859.94"),
+                data.atOffset(ZoneOffset.UTC))
+            return liquidacao
+        }
+        val inicioDia = dia.atStartOfDay().toInstant(ZoneOffset.UTC)
+        val primeiro = inserir(orgA, cedenteA, "USD", inicioDia)
+        val segundo = inserir(orgA, cedenteA, "USD", inicioDia)
+        inserir(orgA, cedenteA, "BRL", inicioDia.plusSeconds(60))
+        inserir(orgA, outroCedenteA, "USD", inicioDia.plusSeconds(120))
+        val anterior = inserir(orgA, cedenteA, "USD", inicioDia.minusSeconds(1))
+        val posterior = inserir(orgA, cedenteA, "USD", inicioDia.plusSeconds(86400))
+        inserir(orgA, cedenteA, "BRL", inicioDia.plusSeconds(86399))
+        inserir(orgB, cedenteB, "USD", inicioDia)
+        val filtro = "inicio=$dia&fim=$dia&cedenteId=$cedenteA&moeda=USD&tamanho=1"
+        val pagina0 = get("/api/v1/extrato?$filtro&pagina=0", tokenA)
+        val pagina1 = get("/bff/v1/extrato?$filtro&pagina=1", tokenA)
+        assertThat(pagina0.statusCode()).isEqualTo(200)
+        assertThat(pagina1.statusCode()).isEqualTo(200)
+        val ids = listOf(pagina0, pagina1).map { it.tree()["itens"][0]["liquidacaoId"].asText() }
+        assertThat(ids).containsExactly(*listOf(primeiro.toString(), segundo.toString()).sortedDescending().toTypedArray())
+        assertThat(pagina0.tree()["total"].asLong()).isEqualTo(2)
+        assertThat(pagina1.tree()["total"].asLong()).isEqualTo(2)
+        assertThat(get("/bff/v1/extrato?$filtro&pagina=0", tokenA).body()).isEqualTo(pagina0.body())
+        val vazia = get("/api/v1/extrato?$filtro&pagina=2", tokenA).tree()
+        assertThat(vazia["itens"]).isEmpty()
+        assertThat(vazia["total"].asLong()).isEqualTo(2)
+        assertThat(get("/api/v1/extrato?$filtro", tokenB).tree()["total"].asLong()).isZero()
+        assertThat(get("/api/v1/extrato", tokenB).tree()["total"].asLong()).isEqualTo(1)
+        assertThat(get("/api/v1/extrato?inicio=$dia&fim=$dia", tokenA).tree()["total"].asLong()).isEqualTo(5)
+        val todos = get("/api/v1/extrato", tokenA).tree()["itens"]
+        assertThat(todos.first()["liquidacaoId"].asText()).isEqualTo(posterior.toString())
+        assertThat(todos.last()["liquidacaoId"].asText()).isEqualTo(anterior.toString())
+        val brl = todos.find { it["moeda"].asText() == "BRL" }!!
+        assertThat(brl["taxaBrlPorUnidade"].isNull).isTrue()
+        assertThat(brl["cotacaoCambialId"].isNull).isTrue()
+        val item = pagina0.tree()["itens"][0]
+        assertThat(item["cedenteId"].asText()).isEqualTo(cedenteA.toString())
+        assertThat(item["valorFaceBrl"].asText()).isEqualTo("100000.00")
+        assertThat(item["valorPresenteBrl"].asText()).isEqualTo("92859.94")
+        assertThat(item["desagioBrl"].asText()).isEqualTo("7140.06")
+        assertThat(item["valorPagamento"].asText()).isEqualTo("17094.67")
+        assertThat(item["cotacaoCambialId"].asText()).isEqualTo(cotacao.id.toString())
+        assertThat(item["liquidadaEm"].asText()).isEqualTo(inicioDia.toString())
+    }
+
+    @Test
+    fun `extrato rejeita filtros invalidos e exige autenticacao`() {
+        listOf("inicio=invalido", "fim=2026-02-30", "inicio=2026-02-02&fim=2026-02-01",
+            "cedenteId=123", "moeda=EUR", "pagina=-1", "pagina=999999999999", "tamanho=0", "tamanho=101")
+            .forEach { assertThat(get("/api/v1/extrato?$it", tokenA).statusCode()).isEqualTo(400) }
+        assertThat(get("/bff/v1/extrato").statusCode()).isEqualTo(401)
     }
 
     @Test
@@ -174,6 +279,9 @@ class ContratosHttpPostgresTest {
         val resposta = get("/v3/api-docs")
         assertThat(resposta.statusCode()).isEqualTo(200)
         val doc = resposta.tree()
+        listOf("api", "bff").forEach { prefixo ->
+            assertThat(doc["paths"]["/$prefixo/v1/extrato"]["get"]).isNotNull()
+        }
         assertThat(doc["paths"]["/api/v1/recebiveis/{id}/liquidacoes"]["post"]).isNotNull()
         assertThat(doc["paths"]["/bff/v1/recebiveis/{id}/liquidacoes"]["post"]).isNotNull()
         assertThat(doc["components"]["securitySchemes"]["bearerAuth"]["scheme"].asText()).isEqualTo("bearer")
