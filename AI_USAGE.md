@@ -28,11 +28,29 @@
 - **Artefatos:** SPEC, DECISIONS, TASKS, README, guia Git, prompts, agentes Cursor/Copilot, template de PR, ADRs/EDA do MVP, matriz de avaliação e exercícios independentes já redigidos.
 - **Estado:** arquivos documentais preparados para extração; **nenhum repositório remoto, commit, push, PR, workflow CI, build, teste ou benchmark novo confirmado**.
 
-## Evidências do novo repositório (preencher somente após execução)
+## Evidências do novo repositório — atualização 20/11/2026
 
-| Tarefa | Branch | Commit | PR para develop | Testes observados | Revisão/merge humano |
+| Tarefa | Branch / origem | Commit / merge observado | PR e evidência | Testes registrados | Revisão / merge humano |
 |---|---|---|---|---|---|
-| G00 | Pendente | — | — | Não executados | — |
+| G00 — baseline e governança | `main`, `develop`; governança em `feature/g00-...` | Baseline `05b9528`; governança integrada `7b89828`; sincronização inicial da `main` `5e7a87b` | [PR #1](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/1) → `develop`; [PR #2](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/2) `develop` → `main`; [PR #3](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/3) — teste proibido, não integrado | [Action do caminho permitido](https://github.com/RobsonSilverioSantos/srm-credit-engine/actions/runs/44787664195): sucesso; [Action do caminho proibido](https://github.com/RobsonSilverioSantos/srm-credit-engine/actions/runs/44789563476): falha intencional, PR fechado pelo bot; recusa local de push nas duas branches demonstrada pelo responsável | #1 e #2 integrados mediante decisão humana; #3 fechado pelo bot, sem merge. A verificação de `gh auth status` no Linux ainda não consta como evidência direta |
+| B02 — bootstrap backend | `feature/b02-preparar-backend-kotlin-spring-boot-gradle-e-docker-compose` | Feature `053c215`; merge `1a3ba3b` | [PR #5](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/5) para `develop` | **Declarado no PR pelo agente:** `./gradlew --no-daemon clean build --warning-mode all`, `./gradlew --no-daemon check`, 1 teste JUnit e smoke Compose/PostgreSQL/Actuator; não existe validação de CI B12 desse PR | Responsável técnico informou aprovação e GitHub confirma merge em `develop` |
+| F00 — design system frontend | `feature/f00-definir-tema-material-ui-e-componentes-visuais-reutilizaveis` | Feature `80cc60f`; merge `c081fd5` | [PR #4](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/4) para `develop` | **Declarado no PR pelo agente:** `npm ci`, `npm run lint`, `npm test` (4/4) e `npm run build`, com verificações visuais; CI B12 ainda pendente | Responsável técnico informou aprovação e GitHub confirma merge em `develop` |
+
+### GOV-01 — Controle compensatório de PRs sem GitHub Pro
+
+- **Condição externa confirmada:** repositório privado sem Rulesets disponíveis na configuração atual; tentativa de consulta da API retornou HTTP 403 com exigência de GitHub Pro ou repositório público.
+- **Decisão humana:** preservar repositório privado e evitar custo adicional; ADR-022 registra a combinação de GitHub Actions, hook local e instruções dos agentes, aceitando risco residual por ausência de bloqueio server-side.
+- **Validação automatizada positiva:** PR #2 com origem `develop` para `main` — workflow `Guardar branch main` completou com sucesso.
+- **Validação negativa real:** PR #3 com origem `feature/g00-validar-guard-main` para `main` — execução [44789563476](https://github.com/RobsonSilverioSantos/srm-credit-engine/actions/runs/44789563476) terminou em falha intencional; `github-actions[bot]` comentou e fechou o PR automaticamente. Não houve merge.
+- **Validação local do hook:** responsável executou entradas de teste para `refs/heads/main` e `refs/heads/develop` em `.githooks/pre-push`, obtendo a mensagem de bloqueio; teste da `develop` retornou status 1. Esses comandos validam a lógica local, **não** um bloqueio imposto pelo servidor.
+- **Limitação:** há janela até a Action reagir; a UI/API do GitHub e clones sem hook não são abrangidos. Não declarar proteção absoluta de `main`.
+
+### DEV-01 — Execução de agentes em worktrees isolados
+
+- Backend B02: sessão de agente inicialmente arquivada antes de executar; tentativa de restauração repetiu a interrupção. Uma **nova sessão** no mesmo worktree concluiu a tarefa e publicou PR #5. A causa exata do arquivamento não foi diagnosticada.
+- Frontend F00: sessão distinta concluiu tema e componentes, publicou PR #4. Ambas as tarefas foram integradas por revisão e merge humanos.
+- **Rastreabilidade e limites:** descrições dos PRs documentam comandos e resultados relatados por cada agente. GitHub confirma as branches, commits, PRs e merges, mas não substitui reexecução independente dos testes. B12 (CI automatizada em PRs) permanece pendente; B01/B03/B12 estão desbloqueadas pelas dependências integradas.
+- **Roteiro de trabalho:** não utilizar a mesma sessão nem o mesmo worktree para B01, B03 ou B12; cada tarefa deverá ter PR didático para `develop`. Os exercícios independentes de review, post-mortem e alta escala permanecem fora deste backlog.
 
 ---
 
