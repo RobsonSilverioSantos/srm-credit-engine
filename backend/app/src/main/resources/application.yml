@@ -8,6 +8,8 @@ spring:
     hikari:
       connection-timeout: 3000
       validation-timeout: 1000
+  flyway:
+    locations: classpath:db/migration
 
 server:
   address: 127.0.0.1
