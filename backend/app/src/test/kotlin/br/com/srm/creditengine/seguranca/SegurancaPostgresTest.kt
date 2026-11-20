@@ -6,6 +6,8 @@ import br.com.srm.creditengine.cadastro.aplicacao.porta.saida.ContextoOrganizaca
 import br.com.srm.creditengine.liquidacao.aplicacao.porta.entrada.ComandoLiquidacao
 import br.com.srm.creditengine.liquidacao.aplicacao.porta.entrada.LiquidarRecebivel
 import br.com.srm.creditengine.liquidacao.dominio.MoedaPagamento
+import br.com.srm.creditengine.liquidacao.dominio.ConflitoLiquidacao
+import br.com.srm.creditengine.liquidacao.dominio.RecebivelNaoEncontrado
 import br.com.srm.creditengine.precificacao.dominio.Modalidades
 import br.com.srm.creditengine.taxas.aplicacao.porta.entrada.TaxasPorta
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -71,6 +73,20 @@ class SegurancaPostgresTest {
         @GetMapping("/test/liquidar/{id}")
         fun liquidar(@PathVariable id: UUID): Map<String, UUID> =
             mapOf("id" to liquidar.liquidar(ComandoLiquidacao(id, MoedaPagamento.BRL, "teste")).liquidacaoId)
+
+        @GetMapping("/test/recebiveis/{id}")
+        fun recebivel(@PathVariable id: UUID): ResponseEntity<Any> =
+            cadastro.buscarRecebivel(id)?.let { ResponseEntity.ok(it) } ?: ResponseEntity.notFound().build()
+
+        @GetMapping("/test/b07/liquidar/{id}/{chave}")
+        fun liquidarB07(@PathVariable id: UUID, @PathVariable chave: String): ResponseEntity<Any> =
+            try {
+                ResponseEntity.ok(liquidar.liquidar(ComandoLiquidacao(id, MoedaPagamento.BRL, chave)))
+            } catch (_: RecebivelNaoEncontrado) {
+                ResponseEntity.notFound().build()
+            } catch (_: ConflitoLiquidacao) {
+                ResponseEntity.status(409).build()
+            }
     }
 
     @Autowired private lateinit var jdbc: JdbcTemplate
@@ -161,6 +177,53 @@ class SegurancaPostgresTest {
         val auditoria = jdbc.queryForMap("SELECT organizacao_id, usuario_id FROM auditoria_liquidacoes WHERE liquidacao_id = ?", id)
         assertThat(auditoria["organizacao_id"]).isEqualTo(organizacaoA)
         assertThat(auditoria["usuario_id"]).isEqualTo(usuarioA)
+    }
+
+    @Test
+    fun `identidades autenticadas isolam consulta liquidacao e replay com mesma chave textual`() {
+        val instante = Instant.now().truncatedTo(ChronoUnit.MICROS).minusSeconds(1)
+        taxas.registrarTaxaBase(BigDecimal("0.01"), instante)
+        taxas.registrarSpread(Modalidades.DUPLICATA_MERCANTIL, BigDecimal("0.015"), instante)
+        val recebivelA = UUID.randomUUID()
+        val recebivelB = UUID.randomUUID()
+        listOf(Triple(recebivelA, organizacaoA, cedenteA), Triple(recebivelB, organizacaoB, cedenteB)).forEach {
+            (id, org, cedente) ->
+            jdbc.update("""INSERT INTO recebiveis
+                (id, organizacao_id, cedente_id, modalidade, valor_face_brl, prazo_meses)
+                VALUES (?, ?, ?, ?, 100000, 3)""", id, org, cedente, Modalidades.DUPLICATA_MERCANTIL)
+        }
+        val tokenA = autenticar(emailA, senhaA)
+        val tokenB = autenticar(emailB, senhaB)
+        val caminhoB = "/test/b07/liquidar/$recebivelB/compartilhada"
+        val caminhoA = "/test/b07/liquidar/$recebivelA/compartilhada"
+        assertThat(requisicao("GET", "/test/recebiveis/$recebivelB", tokenA).statusCode()).isEqualTo(404)
+        assertThat(requisicao("GET", "/test/cedentes/$cedenteB", tokenA).statusCode()).isEqualTo(404)
+        assertThat(requisicao("GET", caminhoB, tokenA).statusCode()).isEqualTo(404)
+        val b = requisicao("GET", caminhoB, tokenB)
+        assertThat(b.statusCode()).isEqualTo(200)
+        assertThat(requisicao("GET", caminhoB, tokenA).statusCode()).isEqualTo(404)
+        val a = requisicao("GET", caminhoA, tokenA)
+        assertThat(a.statusCode()).isEqualTo(200)
+        val idA = UUID.fromString(objectMapper.readTree(a.body()).get("liquidacaoId").asText())
+        val idB = UUID.fromString(objectMapper.readTree(b.body()).get("liquidacaoId").asText())
+        assertThat(idA).isNotEqualTo(idB)
+        assertThat(requisicao("GET", caminhoA, tokenA).body()).isEqualTo(a.body())
+        assertThat(requisicao("GET", caminhoB, tokenB).body()).isEqualTo(b.body())
+        val acessoCruzado = requisicao("GET", caminhoB, tokenA)
+        assertThat(acessoCruzado.statusCode()).isEqualTo(409)
+        assertThat(acessoCruzado.body()).doesNotContain(idB.toString())
+        val registros = jdbc.queryForList("""SELECT organizacao_id, liquidacao_id, situacao FROM idempotencia
+            WHERE chave = 'compartilhada' AND organizacao_id IN (?, ?) ORDER BY organizacao_id""", organizacaoA, organizacaoB)
+        assertThat(registros).hasSize(2)
+        assertThat(registros.map { it["liquidacao_id"] }).containsExactlyInAnyOrder(idA, idB)
+        assertThat(registros.map { it["situacao"] }).containsOnly("CONCLUIDA")
+        val auditorias = jdbc.queryForList("""SELECT organizacao_id, usuario_id, liquidacao_id FROM auditoria_liquidacoes
+            WHERE liquidacao_id IN (?, ?)""", idA, idB)
+        assertThat(auditorias).hasSize(2)
+        assertThat(auditorias).contains(
+            mapOf("organizacao_id" to organizacaoA, "usuario_id" to usuarioA, "liquidacao_id" to idA),
+            mapOf("organizacao_id" to organizacaoB, "usuario_id" to usuarioB, "liquidacao_id" to idB),
+        )
     }
 
     @Test
