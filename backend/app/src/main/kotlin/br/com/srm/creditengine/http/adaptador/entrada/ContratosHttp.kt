@@ -10,6 +10,9 @@ import br.com.srm.creditengine.liquidacao.aplicacao.porta.entrada.LiquidarRecebi
 import br.com.srm.creditengine.liquidacao.dominio.MoedaPagamento
 import br.com.srm.creditengine.liquidacao.dominio.RecebivelNaoEncontrado
 import br.com.srm.creditengine.liquidacao.dominio.ResultadoLiquidacao
+import br.com.srm.creditengine.simulacao.aplicacao.porta.entrada.ComandoSimulacao
+import br.com.srm.creditengine.simulacao.aplicacao.porta.entrada.ResultadoSimulacao
+import br.com.srm.creditengine.simulacao.aplicacao.porta.entrada.SimularRecebivel
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.media.Content
@@ -44,6 +47,14 @@ data class RecebivelEntrada(
     val vencimento: LocalDate? = null,
 )
 data class LiquidacaoEntrada(@field:Schema(allowableValues = ["BRL", "USD"]) val moeda: String)
+data class SimulacaoEntrada(
+    @field:Schema(allowableValues = ["DUPLICATA_MERCANTIL", "CHEQUE_PRE_DATADO"], requiredMode = Schema.RequiredMode.REQUIRED)
+    val modalidade: String,
+    @field:Schema(example = "100000.00", description = "BRL em string decimal", requiredMode = Schema.RequiredMode.REQUIRED)
+    val valorFaceBrl: String,
+    @field:Schema(requiredMode = Schema.RequiredMode.REQUIRED) val prazoMeses: Int,
+    @field:Schema(allowableValues = ["BRL", "USD"], requiredMode = Schema.RequiredMode.REQUIRED) val moeda: String,
+)
 data class CedenteResposta(val id: UUID, val nome: String, val documento: String, val ativo: Boolean)
 data class RecebivelResposta(
     val id: UUID, val cedenteId: UUID, val modalidade: String,
@@ -57,6 +68,17 @@ data class LiquidacaoResposta(
     @field:Schema(example = "17094.67") val valorPagamento: String,
     @field:Schema(example = "2026-11-20T12:00:00Z") val liquidadaEm: String,
 )
+data class SimulacaoResposta(
+    val moeda: String,
+    @field:Schema(example = "92859.94") val valorPresenteBrl: String,
+    @field:Schema(example = "7140.06") val desagioBrl: String,
+    @field:Schema(example = "17094.67") val valorPagamento: String,
+    @field:Schema(example = "0.0100000000") val taxaBaseMensal: String,
+    @field:Schema(example = "0.0150000000") val spreadMensal: String,
+    @field:Schema(example = "5.4321000000", nullable = true) val cotacaoBrlPorUsd: String?,
+    val referencia: String,
+    @field:Schema(nullable = true) val cotacaoValidaAte: String?,
+)
 
 private fun Cedente.resposta() = CedenteResposta(id, nome, documento, ativo)
 private fun Recebivel.resposta() = RecebivelResposta(
@@ -65,6 +87,12 @@ private fun Recebivel.resposta() = RecebivelResposta(
 private fun ResultadoLiquidacao.resposta() = LiquidacaoResposta(
     liquidacaoId, recebivelId, moeda.name, valorPresenteBrl.toPlainString(), desagioBrl.toPlainString(),
     valorPagamento.toPlainString(), liquidadaEm.toString(),
+)
+private fun ResultadoSimulacao.resposta() = SimulacaoResposta(
+    moeda.name, precificacao.valorPresenteBrl.toPlainString(), precificacao.desagioBrl.toPlainString(),
+    (if (moeda == MoedaPagamento.USD) checkNotNull(precificacao.valorPresenteUsd) else precificacao.valorPresenteBrl).toPlainString(),
+    taxas.taxaBase.taxaMensal.toPlainString(), taxas.spread.spreadMensal.toPlainString(),
+    taxas.cotacao?.taxaBrlPorUsd?.toPlainString(), taxas.referencia.toString(), taxas.cotacaoValidaAte?.toString(),
 )
 
 private fun JsonNode.validarCampos(vararg permitidos: String) {
@@ -79,6 +107,11 @@ private fun JsonNode.inteiro(nome: String): Int {
     val campo = get(nome)
     require(campo != null && campo.isIntegralNumber && campo.canConvertToInt()) { "Campo inválido" }
     return campo.intValue()
+}
+private fun JsonNode.valorFaceBrl(): BigDecimal {
+    val valor = texto("valorFaceBrl")
+    require(valor.matches(Regex("[0-9]{1,17}(\\.[0-9]{1,2})?"))) { "Decimal inválido" }
+    return BigDecimal(valor)
 }
 private fun uuid(valor: String): UUID {
     require(valor.matches(Regex("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"))) {
@@ -102,7 +135,25 @@ private fun uuid(valor: String): UUID {
 class ContratosHttp(
     private val cadastros: ObjectProvider<Cadastro>,
     private val liquidacoes: ObjectProvider<LiquidarRecebivel>,
+    private val simulacoes: ObjectProvider<SimularRecebivel>,
 ) {
+    @PostMapping("/simulacoes")
+    @Operation(summary = "Simular recebível antes do cadastro",
+        description = "Preço indicativo, sem persistência ou reserva de taxa e câmbio.",
+        requestBody = io.swagger.v3.oas.annotations.parameters.RequestBody(
+            required = true, content = [Content(schema = Schema(implementation = SimulacaoEntrada::class))],
+        ))
+    @ApiResponse(responseCode = "200", description = "Simulação indicativa",
+        content = [Content(mediaType = "application/json", schema = Schema(implementation = SimulacaoResposta::class))])
+    fun simular(@RequestBody corpo: JsonNode): SimulacaoResposta {
+        corpo.validarCampos("modalidade", "valorFaceBrl", "prazoMeses", "moeda")
+        val comando = ComandoSimulacao(
+            corpo.texto("modalidade"), corpo.valorFaceBrl(), corpo.inteiro("prazoMeses"),
+            MoedaPagamento.valueOf(corpo.texto("moeda")),
+        )
+        return simulacoes.`object`.simular(comando).resposta()
+    }
+
     @PostMapping("/cedentes")
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(summary = "Cadastrar cedente", requestBody = io.swagger.v3.oas.annotations.parameters.RequestBody(
@@ -134,11 +185,9 @@ class ContratosHttp(
         content = [Content(mediaType = "application/json", schema = Schema(implementation = RecebivelResposta::class))])
     fun cadastrarRecebivel(@RequestBody corpo: JsonNode): ResponseEntity<RecebivelResposta> {
         corpo.validarCampos("cedenteId", "modalidade", "valorFaceBrl", "prazoMeses", "vencimento")
-        val valor = corpo.texto("valorFaceBrl")
-        require(valor.matches(Regex("[0-9]{1,17}(\\.[0-9]{1,2})?"))) { "Decimal inválido" }
         val vencimento = corpo.get("vencimento")?.let { if (it.isNull) null else LocalDate.parse(corpo.texto("vencimento")) }
         val comando = NovoRecebivel(
-            uuid(corpo.texto("cedenteId")), corpo.texto("modalidade"), BigDecimal(valor), corpo.inteiro("prazoMeses"), vencimento,
+            uuid(corpo.texto("cedenteId")), corpo.texto("modalidade"), corpo.valorFaceBrl(), corpo.inteiro("prazoMeses"), vencimento,
         )
         return ResponseEntity.status(HttpStatus.CREATED).body(cadastros.`object`.cadastrarRecebivel(comando).resposta())
     }

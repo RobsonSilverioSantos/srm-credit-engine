@@ -345,14 +345,15 @@ Os testes PostgreSQL da B06 integram o comando `bash scripts/test-cadastro-postg
 
 ## Contratos HTTP API e BFF
 
-Os dois prefixos `/api/v1` e `/bff/v1` oferecem os mesmos contratos de cadastro,
-consulta e liquidação. O BFF é uma fronteira de entrada para a interface, não
-um cliente HTTP interno; ambos chamam `Cadastro` e `LiquidarRecebivel`. A
+Os dois prefixos `/api/v1` e `/bff/v1` oferecem os mesmos contratos de simulação,
+cadastro, consulta e liquidação. O BFF é uma fronteira de entrada para a interface, não
+um cliente HTTP interno; ambos chamam os mesmos casos de uso. A
 organização e o usuário vêm exclusivamente do JWT validado pela S01. O corpo
 não aceita campos adicionais de identidade.
 
 | Método | Caminho após o prefixo | Finalidade |
 |---|---|---|
+| POST | `/simulacoes` | Prévia indicativa antes do cadastro |
 | POST | `/cedentes` | Cadastrar cedente |
 | GET | `/cedentes` | Listar cedentes da organização |
 | GET | `/cedentes/{id}` | Consultar cedente da organização |
@@ -370,6 +371,14 @@ milhar, e instantes são UTC ISO-8601. O `valorFaceBrl` é positivo, com no
 máximo 17 dígitos inteiros e duas casas decimais. Modalidades:
 `DUPLICATA_MERCANTIL` e `CHEQUE_PRE_DATADO`; moedas: `BRL` e `USD`.
 
+A simulação recebe, por exemplo,
+`{"modalidade":"DUPLICATA_MERCANTIL","valorFaceBrl":"100000.00","prazoMeses":3,"moeda":"USD"}`.
+Retorna `200` com VP e deságio em BRL, valor de pagamento na moeda escolhida,
+taxa base, spread, cotação opcional, instante de referência e validade cambial
+quando aplicável. Não recebe ID de recebível, cedente ou chave de idempotência,
+nem grava dados. A prévia não reserva preço ou câmbio; a liquidação consulta
+novamente os dados elegíveis. Taxas são frações decimais em strings.
+
 Erros de domínio/entrada seguem `{"codigo":"...","mensagem":"..."}`:
 `ENTRADA_INVALIDA` (400), `NAO_AUTENTICADO` (401), `RECURSO_NAO_ENCONTRADO`
 (404, inclusive acesso entre organizações), `CONFLITO` (409) e
@@ -379,8 +388,8 @@ indisponibilidade transitória são 503: não há preço inventado ou fallback.
 
 OpenAPI JSON está em `/v3/api-docs` e Swagger UI em `/swagger-ui/index.html`.
 A documentação é pública; os endpoints de negócio continuam protegidos. No
-Swagger, informe o token JWT no botão **Authorize**. A simulação pré-cadastro
-e o extrato não fazem parte desta versão. O springdoc 3.0.3 é da linha para
+Swagger, informe o token JWT no botão **Authorize**. O extrato ainda não faz
+parte desta versão. O springdoc 3.0.3 é da linha para
 Spring Boot 4.0; a geração dos dois prefixos é verificada no teste HTTP real.
 
 **Manutenção global:** a S01 não define privilégios administrativos globais.

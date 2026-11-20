@@ -3,9 +3,15 @@ package br.com.srm.creditengine.http
 import br.com.srm.creditengine.TestJwtSecret
 import br.com.srm.creditengine.precificacao.dominio.Modalidades
 import br.com.srm.creditengine.seguranca.adaptador.entrada.JwtProperties
+import br.com.srm.creditengine.liquidacao.dominio.MoedaPagamento
+import br.com.srm.creditengine.simulacao.aplicacao.ServicoSimulacao
+import br.com.srm.creditengine.simulacao.aplicacao.porta.entrada.ComandoSimulacao
 import br.com.srm.creditengine.taxas.adaptador.saida.ConsultaCambialIndisponivel
+import br.com.srm.creditengine.taxas.adaptador.saida.HistoricoFinanceiroJdbc
+import br.com.srm.creditengine.taxas.aplicacao.ManterEConsultarTaxas
 import br.com.srm.creditengine.taxas.aplicacao.porta.entrada.TaxasPorta
 import br.com.srm.creditengine.taxas.dominio.DadosFinanceirosIndisponiveis
+import br.com.srm.creditengine.taxas.dominio.SeletorTaxas
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import java.math.BigDecimal
@@ -13,6 +19,8 @@ import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
+import java.time.Clock
+import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
@@ -21,6 +29,7 @@ import java.util.UUID
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -250,6 +259,93 @@ class ContratosHttpPostgresTest {
     }
 
     @Test
+    fun `simulacao previa calcula golden cases nas duas fronteiras sem gravar e usa taxas vigentes`() {
+        val instante = Instant.now().truncatedTo(ChronoUnit.MICROS)
+        taxas.registrarTaxaBase(BigDecimal("0.01"), instante)
+        taxas.registrarSpread(Modalidades.DUPLICATA_MERCANTIL, BigDecimal("0.015"), instante)
+        taxas.registrarSpread(Modalidades.CHEQUE_PRE_DATADO, BigDecimal("0.025"), instante)
+        taxas.registrarCotacao(BigDecimal("5.4321"), instante)
+        taxas.registrarTaxaBase(BigDecimal("0.50"), instante.plusSeconds(86400))
+        taxas.registrarSpread(Modalidades.DUPLICATA_MERCANTIL, BigDecimal("0.50"), instante.plusSeconds(86400))
+        taxas.registrarCotacao(BigDecimal("9.00"), instante.plusSeconds(86400))
+        val tabelas = listOf("cedentes", "recebiveis", "liquidacoes", "idempotencia", "auditoria_liquidacoes",
+            "taxas_base", "spreads_recebiveis", "cotacoes_cambiais")
+        val antes = tabelas.associateWith { jdbc.queryForObject("SELECT count(*) FROM $it", Long::class.java) }
+        val casos = listOf(
+            Triple("""{"modalidade":"DUPLICATA_MERCANTIL","valorFaceBrl":"100000.00","prazoMeses":3,"moeda":"BRL"}""", "92859.94", "7140.06"),
+            Triple("""{"modalidade":"CHEQUE_PRE_DATADO","valorFaceBrl":"25000.00","prazoMeses":2,"moeda":"BRL"}""", "23337.77", "1662.23"),
+            Triple("""{"modalidade":"DUPLICATA_MERCANTIL","valorFaceBrl":"100000.00","prazoMeses":3,"moeda":"USD"}""", "17094.67", "7140.06"),
+        )
+        casos.forEach { (corpo, pagamento, desagio) ->
+            val respostas = listOf("/api/v1", "/bff/v1").map { prefixo ->
+                val resposta = post("$prefixo/simulacoes", tokenA, corpo)
+                assertThat(resposta.statusCode()).isEqualTo(200)
+                val dados = resposta.tree()
+                assertThat(dados["valorPagamento"].isTextual).isTrue()
+                assertThat(dados["valorPagamento"].asText()).isEqualTo(pagamento)
+                assertThat(dados["desagioBrl"].asText()).isEqualTo(desagio)
+                assertThat(BigDecimal(dados["taxaBaseMensal"].asText())).isEqualByComparingTo("0.01")
+                assertThat(dados["referencia"].asText()).endsWith("Z")
+                dados
+            }
+            listOf("moeda", "valorPresenteBrl", "desagioBrl", "valorPagamento", "taxaBaseMensal", "spreadMensal",
+                "cotacaoBrlPorUsd", "cotacaoValidaAte").forEach { campo ->
+                assertThat(respostas[0][campo]).isEqualTo(respostas[1][campo])
+            }
+            if (corpo.contains("USD")) {
+                assertThat(respostas[0]["valorPresenteBrl"].asText()).isEqualTo("92859.94")
+                assertThat(BigDecimal(respostas[0]["cotacaoBrlPorUsd"].asText())).isEqualByComparingTo("5.4321")
+                assertThat(respostas[0]["cotacaoValidaAte"].asText()).endsWith("Z")
+            } else {
+                assertThat(respostas[0]["cotacaoBrlPorUsd"].isNull).isTrue()
+                assertThat(respostas[0]["cotacaoValidaAte"].isNull).isTrue()
+            }
+        }
+        assertThat(tabelas.associateWith { jdbc.queryForObject("SELECT count(*) FROM $it", Long::class.java) }).isEqualTo(antes)
+        val novaVigencia = Instant.now().truncatedTo(ChronoUnit.MICROS)
+        taxas.registrarSpread(Modalidades.DUPLICATA_MERCANTIL, BigDecimal("0.02"), novaVigencia)
+        val novaPrevia = post("/api/v1/simulacoes", tokenA, casos[0].first)
+        assertThat(novaPrevia.statusCode()).isEqualTo(200)
+        assertThat(BigDecimal(novaPrevia.tree()["spreadMensal"].asText())).isEqualByComparingTo("0.02")
+        assertThat(novaPrevia.tree()["valorPagamento"].asText()).isNotEqualTo("92859.94")
+    }
+
+    @Test
+    fun `simulacao exige autenticacao e rejeita dados invalidos e campos adicionais`() {
+        val valido = """{"modalidade":"DUPLICATA_MERCANTIL","valorFaceBrl":"100.00","prazoMeses":1,"moeda":"BRL"}"""
+        listOf("/api/v1", "/bff/v1").forEach { prefixo ->
+            assertThat(post("$prefixo/simulacoes", null, valido).statusCode()).isEqualTo(401)
+            listOf(
+                valido.replace("\"100.00\"", "100.00"), valido.replace("100.00", "0"),
+                valido.replace("100.00", "1.001"), valido.replace("100.00", "100000000000000000"),
+                valido.replace("\"prazoMeses\":1", "\"prazoMeses\":0"),
+                valido.replace("\"prazoMeses\":1", "\"prazoMeses\":1.0"),
+                valido.replace("DUPLICATA_MERCANTIL", "OUTRA"), valido.replace("BRL", "EUR"),
+                valido.dropLast(1) + ""","recebivelId":"${UUID.randomUUID()}"}""",
+                valido.dropLast(1) + ""","organizacaoId":"$orgA"}""",
+                valido.dropLast(1) + ""","chaveIdempotencia":"x"}""",
+            ).forEach { assertThat(post("$prefixo/simulacoes", tokenA, it).statusCode()).isEqualTo(400) }
+        }
+    }
+
+    @Test
+    fun `simulacao rejeita dados ausentes e cambio vencido sem impedir BRL`() {
+        fun servico(instante: Instant) = ServicoSimulacao(ManterEConsultarTaxas(
+            HistoricoFinanceiroJdbc(jdbc), SeletorTaxas(Duration.ofMinutes(30)), Clock.fixed(instante, ZoneOffset.UTC),
+        ))
+        val comando = ComandoSimulacao(Modalidades.DUPLICATA_MERCANTIL, BigDecimal("100000.00"), 3, MoedaPagamento.USD)
+        assertThrows<DadosFinanceirosIndisponiveis> { servico(Instant.parse("1900-01-01T00:00:00Z")).simular(comando) }
+        val agora = Instant.now().truncatedTo(ChronoUnit.MICROS)
+        taxas.registrarTaxaBase(BigDecimal("0.01"), agora)
+        taxas.registrarSpread(Modalidades.DUPLICATA_MERCANTIL, BigDecimal("0.015"), agora)
+        taxas.registrarCotacao(BigDecimal("5.4321"), agora)
+        val vencida = servico(agora.plusSeconds(1801))
+        assertThrows<DadosFinanceirosIndisponiveis> { vencida.simular(comando) }
+        assertThat(vencida.simular(comando.copy(moeda = MoedaPagamento.BRL)).precificacao.valorPresenteBrl)
+            .isEqualByComparingTo("92859.94")
+    }
+
+    @Test
     fun `valida formatos campos header e identidade sem aceitar manutencao global`() {
         val cedente = criarCedente("/api/v1")["id"].asText()
         val recebivel = criarRecebivel("/api/v1", cedente)["id"].asText()
@@ -294,6 +390,13 @@ class ContratosHttpPostgresTest {
             .endsWith("/LiquidacaoResposta")
         assertThat(operacao["responses"].has("200")).isFalse()
         listOf("api", "bff").forEach { prefixo ->
+            val simulacao = doc["paths"]["/$prefixo/v1/simulacoes"]["post"]
+            assertThat(simulacao["requestBody"]["content"]["application/json"]["schema"]["\$ref"].asText())
+                .endsWith("/SimulacaoEntrada")
+            assertThat(simulacao["responses"]["200"]["content"]["application/json"]["schema"]["\$ref"].asText())
+                .endsWith("/SimulacaoResposta")
+            assertThat(simulacao["security"][0]["bearerAuth"].isArray).isTrue()
+            assertThat(simulacao.path("parameters").toString()).doesNotContain("Idempotency-Key")
             listOf("cedentes" to "CedenteResposta", "recebiveis" to "RecebivelResposta").forEach { (rota, schema) ->
                 assertThat(doc["paths"]["/$prefixo/v1/$rota"]["post"]["responses"]["201"]
                     ["content"]["application/json"]["schema"]["\$ref"].asText()).endsWith("/$schema")
@@ -302,6 +405,10 @@ class ContratosHttpPostgresTest {
         assertThat(doc["components"]["schemas"]["RecebivelEntrada"]["properties"]["valorFaceBrl"]["type"].asText())
             .isEqualTo("string")
         assertThat(doc["components"]["schemas"]["LiquidacaoResposta"]["properties"]["valorPagamento"]["type"].asText())
+            .isEqualTo("string")
+        assertThat(doc["components"]["schemas"]["SimulacaoEntrada"]["properties"]["valorFaceBrl"]["type"].asText())
+            .isEqualTo("string")
+        assertThat(doc["components"]["schemas"]["SimulacaoResposta"]["properties"]["valorPagamento"]["type"].asText())
             .isEqualTo("string")
         assertThat(resposta.body()).contains("Idempotency-Key", "valorFaceBrl", "201", "409")
         assertThat(get("/swagger-ui/index.html").statusCode()).isEqualTo(200)

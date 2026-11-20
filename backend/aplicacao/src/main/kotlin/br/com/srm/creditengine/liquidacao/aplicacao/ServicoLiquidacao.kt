@@ -12,9 +12,7 @@ import br.com.srm.creditengine.liquidacao.dominio.Liquidacao
 import br.com.srm.creditengine.liquidacao.dominio.MoedaPagamento
 import br.com.srm.creditengine.liquidacao.dominio.RecebivelNaoEncontrado
 import br.com.srm.creditengine.liquidacao.dominio.ResultadoLiquidacao
-import br.com.srm.creditengine.precificacao.dominio.DadosPrecificacao
-import br.com.srm.creditengine.precificacao.dominio.EstrategiaComSpreadVersionado
-import br.com.srm.creditengine.precificacao.dominio.MotorPrecificacao
+import br.com.srm.creditengine.precificacao.aplicacao.precificarComTaxas
 import br.com.srm.creditengine.taxas.aplicacao.porta.entrada.TaxasPorta
 import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
@@ -44,11 +42,7 @@ class ServicoLiquidacao(
         }
         val referencia = relogio.instant().truncatedTo(ChronoUnit.MICROS)
         val snapshot = taxas.consultarEm(recebivel.modalidade, comando.moeda == MoedaPagamento.USD, referencia)
-        val estrategia = EstrategiaComSpreadVersionado(recebivel.modalidade, snapshot.spread.spreadMensal)
-        val resultado = MotorPrecificacao(listOf(estrategia)).precificar(
-            DadosPrecificacao(recebivel.modalidade, recebivel.valorFaceBrl, snapshot.taxaBase.taxaMensal,
-                recebivel.prazoMeses, snapshot.cotacao?.taxaBrlPorUsd),
-        )
+        val resultado = precificarComTaxas(recebivel.modalidade, recebivel.valorFaceBrl, recebivel.prazoMeses, snapshot)
         val pagamento = if (comando.moeda == MoedaPagamento.USD) checkNotNull(resultado.valorPresenteUsd)
         else resultado.valorPresenteBrl
         val liquidacao = Liquidacao(UUID.randomUUID(), recebivel, snapshot, resultado, comando.moeda, pagamento)
