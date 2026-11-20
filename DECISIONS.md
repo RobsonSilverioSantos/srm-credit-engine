@@ -25,6 +25,7 @@
 | ADR-019 | Operação financeira síncrona no MVP; EDA com transactional outbox como evolução | Evita inconsistência de dupla escrita banco/broker e diferencia liquidação lógica de pagamento externo. Ver `docs/adr/ADR-019-sincrono-vs-eventos.md` e `docs/arquitetura/EDA_LIQUIDACAO.md` |
 | ADR-020 | **Proposta de alta escala independente — pendente** | A proposta anterior foi rejeitada; nenhum HLD está aprovado. Elaborar futuramente com o responsável técnico e ChatGPT, sem agente e sem vínculo de dependência com o MVP. `docs/exercicios/ALTA_ESCALA_STATUS.md` é apenas marcador de pendência |
 | ADR-021 | PRs devem justificar escolhas e ensinar raciocínio | Modelo obrigatório com motivação, alternativas, testes executados, riscos e explicação didática; o agente publica PR, o responsável aprova/integra |
+| ADR-022 | **Controles compensatórios de branches em repositório privado sem GitHub Pro** | Rulesets/branch protection não disponíveis na configuração atual (API retornou 403 exigindo GitHub Pro ou repositório público); adotar GitHub Actions para fechar PRs indevidos para `main`, hook local para recusar push direto em `main`/`develop` e instruções explícitas dos agentes. Controles preventivos parciais, não equivalentes a proteção no servidor. Ver `docs/adr/ADR-022-controles-github-free.md` |
 
 ## Critérios de arquitetura e defesa
 
@@ -32,6 +33,7 @@
 - **EDA:** documento de evolução opcional do fluxo do MVP; não prometer broker ou pagamento externo implementados.
 - **Alta escala:** exercício arquitetural **independente e ainda não produzido**. Não confundir a futura proposta com ADRs do MVP, nem marcar como atendido o requisito de 1 milhão/min.
 - **Git Flow:** escolha aprovada pelos PRs pequenos e revisáveis, custo de autonomia dos agentes e necessidade de auditoria. A justificativa versus trunk-based/GitHub Flow aparece no README; processos paralelos devem usar worktrees para isolamento.
+- **Limite das proteções GitHub (ADR-022):** na configuração atual (repositório privado sem GitHub Pro), não há Ruleset aplicado. O workflow fecha PRs de origem diferente da branch `develop` apontados a `main`, quando executado; o hook `pre-push` bloqueia pushes locais para `main` e `develop` apenas onde estiver habilitado. **Nenhum desses mecanismos impede tecnicamente todo push direto ou merge na interface/API do GitHub.** A validação real do workflow e a ativação local do hook devem ser registradas após a integração. O risco residual é aceito apenas para o exercício; a proteção nativa no servidor deve ser reavaliada antes de colaboração ampliada ou produção.
 - **Corte consciente:** ADR-007 e ADR-017 excluem Keycloak, federação e deploy cloud deste MVP. Autenticação mínima e invariantes financeiras permanecem exigidas; nenhum corte implica produção pronta.
 - **Exercícios separados:** code review TypeScript, war room e proposta futura de alta escala permanecem em `docs/exercicios/`; nenhum deles é tarefa de desenvolvimento do `TASKS.md`. A rastreabilidade está em `docs/defesa/RASTREABILIDADE_STAFF_TECH_LEAD.md`.
 

@@ -46,6 +46,17 @@ ADRs sobre escolhas **do MVP** e proposta de EDA evolutiva ficam em `docs/adr/` 
 - **PR didático:** cada PR deve explicar motivação, responsabilidades, alternativas, testes realizados, riscos e um ponto de aprendizado para um júnior. Template em `.github/PULL_REQUEST_TEMPLATE.md`; exemplo **fictício** em `docs/engenharia/EXEMPLO_PR_DIDATICO.md`.
 - **Review do próprio autor:** em um repositório individual onde a mesma identidade abre o PR, o GitHub não permite aprovação formal do próprio PR. Fazer a revisão humana do diff e executar o merge manualmente; **não ativar requisito de aprovação por terceiro que não existe**. Verificar disponibilidade das proteções conforme o plano GitHub e configuração do repositório.
 
+
+### Proteção compensatória de branches — restrição de plano (ADR-022)
+
+O repositório é privado e a conta atualmente não dispõe de Rulesets para esta configuração: uma consulta de 20/11/2026 à API retornou HTTP 403 com a orientação de usar GitHub Pro ou tornar o repositório público. **Não tornaremos o repositório público nem adicionaremos despesa exclusivamente para este exercício.**
+
+- `.github/workflows/guard-main.yml`: ao detectar PR para `main`, permite somente origem `develop` do mesmo repositório; fecha outras origens automaticamente, quando GitHub Actions estiver executando e autorizado.
+- `.githooks/pre-push`: impede pushes locais diretamente para `main` e `develop`, desde que o clone tenha executado `git config core.hooksPath .githooks`. Hooks não se ativam automaticamente com clone/pull.
+- Instruções dos agentes: apenas push em `feature/*`, PR com base `develop`, jamais merge/automerge. O responsável técnico revisa e integra manualmente.
+- **Limitação aceita:** sem Ruleset/branch protection no servidor, esses controles não impedem todos os pushes/merges por CLI, interface ou API. O workflow pode executar depois da tentativa de merge, e hooks podem ser contornados. Não descrever como bloqueio absoluto.
+- **Evidências pendentes:** merge do PR de governança, autorização de execução do GitHub Actions e teste real de PR indevido fechado; ativação do hook local e teste de recusa antes de prosseguir. Ver `docs/adr/ADR-022-controles-github-free.md` e matriz `docs/defesa/RASTREABILIDADE_STAFF_TECH_LEAD.md`.
+
 ## Agentes e governança
 
 - Cursor: `.cursor/agents/` e `.cursor/rules/srm-standards.mdc`.
