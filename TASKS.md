@@ -1,6 +1,6 @@
 # TASKS.md — Backlog de implementação do novo repositório
 
-**Baseline inicial:** 20/11/2026. **Atualização factual:** 20/11/2026 — G00 operacional, B02 e F00 integradas em `develop` após PRs e revisão humana. Testes citados nas descrições dos PRs são evidências declaradas pelos respectivos agentes; não equivalem a reexecução independente. O histórico do repositório anterior não é evidência de implementação atual. **Este backlog contém exclusivamente trabalho do MVP, CI e documentos da arquitetura do MVP.**
+**Baseline inicial:** 20/11/2026. **Atualização factual:** 20/11/2026 — G00 operacional; B01, B02, B03, B04, B05, B12 e F00 integradas em `develop` após PRs e revisão humana. **Progresso por contagem de itens:** 8/21 (38,1%), incluindo G00 operacional; prioridades P0: 8/18 (44,4%). O item G00 ainda tem verificação local de `gh auth status` pendente. Testes relatados pelos agentes e resultados de CI estão diferenciados abaixo; a CI não comprova testes que não executa. O histórico do repositório anterior não é evidência de implementação atual. **Este backlog contém exclusivamente trabalho do MVP, CI e documentos da arquitetura do MVP.**
 
 `ID` e `Trabalho` determinam a branch `feature/<id-normalizado>-<slug-da-coluna-Trabalho>`. A coluna Trabalho deve ser usada como fonte do resumo; não criar branch arbitrária. O primeiro commit de baseline em `main`/`develop` será realizado pelo responsável técnico, não por agente.
 
@@ -8,10 +8,10 @@
 |---|---|---|---|---|---|---|
 | G00 | P0 | Responsável técnico | Inicializar repositorio GitHub main develop e regras de PR | Nenhuma | Baseline publicada; branches existentes; Cursor/Copilot visíveis no Git; acesso do gh conferido | **Operacional** — baseline + governança PR #1 e release PR #2 integrados; guard PR #3 e hook local validados; **`gh auth status` ainda sem evidência direta** |
 | B02 | P0 | backend/devops | Preparar backend Kotlin Spring Boot Gradle e Docker Compose | G00 | Java 21 e wrapper reproduzíveis; módulo hexagonal sem Spring/JPA no domínio; banco local sobe; healthcheck | **Integrada em `develop` — PR #5** (commit de merge `1a3ba3b`; build, smoke JUnit e Compose relatados no PR; revisão/merge humanos) |
-| B01 | P0 | backend | Criar migrations PostgreSQL de organizacoes usuarios cedentes recebiveis cambio liquidacoes e idempotencia | B02 | Flyway em banco limpo; FKs por organizacao_id; versão otimista, índices e constraints verificados | A fazer |
-| B03 | P0 | backend/qa | Implementar Strategy de precificacao e golden cases financeiros C1 C2 C3 | B02 | BigDecimal; HALF_EVEN; três valores exatos em centavos; prazos inválidos rejeitados | A fazer |
-| B04 | P0 | backend | Implementar cadastro de cedentes e recebiveis com isolamento por organizacao | B01,B02 | Organização bootstrap para demonstração; organização do principal, FKs/consultas com escopo; sem autorização por body | A fazer |
-| B05 | P0 | backend | Implementar cotacoes BRL USD e taxa base versionadas | B01,B02 | Vigência UTC, cotação elegível e snapshot; validade configurável, erro sem cotação válida | A fazer |
+| B01 | P0 | backend | Criar migrations PostgreSQL de organizacoes usuarios cedentes recebiveis cambio liquidacoes e idempotencia | B02 | Flyway em banco limpo; FKs por organizacao_id; versão otimista, índices e constraints verificados | **Integrada em `develop` — PR #9** (merge `af9c703`; migrations V1–V3, correção de modalidades, testes PostgreSQL relatados no PR e CI aprovada) |
+| B03 | P0 | backend/qa | Implementar Strategy de precificacao e golden cases financeiros C1 C2 C3 | B02 | BigDecimal; HALF_EVEN; três valores exatos em centavos; prazos inválidos rejeitados | **Integrada em `develop` — PR #8** (merge `a75e62a`; Strategy, golden cases C1–C3 e CI aprovada) |
+| B04 | P0 | backend | Implementar cadastro de cedentes e recebiveis com isolamento por organizacao | B01,B02 | Organização bootstrap para demonstração; organização do principal, FKs/consultas com escopo; sem autorização por body | **Integrada em `develop` — PR #10** (merge `3cd2bde`; cadastro multi-organização, testes PostgreSQL e CI aprovados) |
+| B05 | P0 | backend | Implementar cotacoes BRL USD e taxa base versionadas | B01,B02 | Vigência UTC, cotação elegível e snapshot; validade configurável, erro sem cotação válida | **Integrada em `develop` — PR #11** (merge `21c649b`; histórico de taxas/câmbio, teste PostgreSQL relatado no PR e CI aprovada) |
 | S01 | P0 | backend/qa | Implementar autenticacao local Spring Security e autorizacao por organizacao | B02,B04 | BCrypt, token assinado com expiração, identidade confiável, testes de acesso cruzado; sem Keycloak | A fazer |
 | B06 | P0 | backend | Implementar liquidacao ACID idempotente com optimistic locking e auditoria | B03,B04,B05,S01 | UNIQUE, hash canônico e replay, conflito 409, rollback, snapshot e auditoria atômica | A fazer |
 | B07 | P0 | qa | Comprovar concorrencia rollback idempotencia e isolamento em PostgreSQL real | B06 | Duas requisições concorrentes; só uma liquidação; replay idêntico; 0 efeitos parciais | A fazer |
@@ -23,17 +23,35 @@
 | F03 | P0 | frontend | Implementar extrato com filtros e paginacao server side | F00,B08-E01 | Filtros/paginação no BFF, estados vazio/erro/loading e testes de componente | A fazer |
 | B09 | P1 | backend/qa | Implementar timeout e retry seguro na consulta de cambio mockado | B05 | Sem HTTP externo na transação financeira; falhas tratadas; testes de indisponibilidade | A fazer |
 | B10 | P1 | backend/devops | Implementar logs estruturados metricas de negocio e trilha operacional | B06 | Métricas Micrometer sem labels de alta cardinalidade; logs correlacionados sem segredos; confirmações só pós-commit | A fazer |
-| B12 | P0 | devops/qa | Configurar GitHub Actions de build testes e lint backend frontend | B02,F00 | Checks em PR; falhas visíveis; comandos descritos em README; sem green inventado | A fazer |
+| B12 | P0 | devops/qa | Configurar GitHub Actions de build testes e lint backend frontend | B02,F00 | Checks em PR; falhas visíveis; comandos descritos em README; sem green inventado | **Integrada em `develop` — PR #7** (merge `6c3bcd5`; GitHub Actions com jobs backend/frontend e execuções aprovadas) |
 | D01 | P1 | architect | Revisar C4 niveis um e dois ADRs e proposta EDA do MVP | B02 | Contexto/conteineres do MVP, ADRs SQL/NoSQL, monólito/serviços, sync/eventos, EDA; **sem alta escala** | A fazer (rascunhos disponíveis) |
 | D03 | P0 | analyst/reviewer | Consolidar README AI_USAGE e roteiro de defesa com evidencias reais | B07,B08,B08-S01,B08-E01,F01,F03,B12 | README com execução comprovada, links PR, limitações, custos e intervenções humanas | A fazer |
 | A01 | P0 | todos | Registrar evidencias reais de IA e PRs didaticos | Contínua | ID, agente, prompt/resumo, revisão, comandos, testes efetivos, commit e PR | A fazer |
+
+## Indicadores de progresso — 20/11/2026
+
+| Indicador | Quantidade | Percentual |
+|---|---:|---:|
+| Itens integrados ou operacionais | 8 de 21 | **38,1%** |
+| Itens ainda não concluídos | 13 de 21 | 61,9% |
+| Prioridade P0 integrada ou operacional | 8 de 18 | **44,4%** |
+| Prioridade P0 ainda pendente | 10 de 18 | 55,6% |
+
+**Método:** contagem simples das 21 linhas de tarefas deste backlog, não ponderada por horas, risco ou esforço. G00 é contada como operacional, não como verificação integralmente encerrada; `gh auth status` ainda sem evidência direta. A01 é contínua e permanece pendente; rascunhos D01 não caracterizam conclusão. A porcentagem não indica que 38,1% do esforço total foi consumido.
+
+**Caminho crítico atual:** iniciar S01 (B02 e B04 integradas); B06 só inicia depois de S01 integrada, pois B03/B04/B05 já estão integradas. B09 e D01 estão habilitadas, mas são P1. B07/B08, B08-S01/B08-E01 e F01/F03 continuam dependentes das integrações indicadas na tabela.
 
 ## Evidências verificáveis desta atualização
 
 - **G00:** baseline `05b9528`, [PR #1](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/1) integrado em `develop` e [PR #2](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/2) integrado em `main` como sincronização inicial. [PR de teste #3](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/3) de feature para `main` fechado automaticamente pelo GitHub Actions; [execução correspondente](https://github.com/RobsonSilverioSantos/srm-credit-engine/actions/runs/44789563476) terminou com falha **esperada** para o caminho proibido. O responsável técnico demonstrou a recusa local do hook para `main` e `develop`. Risco residual sem Ruleset: ADR-022. **Verificação do GitHub CLI local permanece pendente**.
 - **B02:** [PR #5](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/5), branch exclusiva, commit da feature `053c215`, merge `1a3ba3b`. Descrição do PR registra Gradle build/check, 1 teste JUnit e verificações Docker/Actuator em PostgreSQL local; **resultados declarados pelo agente, sem CI B12 ainda**.
 - **F00:** [PR #4](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/4), branch exclusiva, commit da feature `80cc60f`, merge `c081fd5`. Descrição do PR registra `npm ci`, lint, 4/4 testes, build e verificações de interface; **resultados declarados pelo agente, sem CI B12 ainda**.
-- **Próximas tarefas desbloqueadas:** B01 e B03 dependem de B02; B12 depende de B02 e F00. Criar as três features exclusivamente da ponta atual de `origin/develop`; nenhuma tarefa inicia a partir da feature de outra.
+- **B12:** [PR #7](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/7), merge `6c3bcd5`. [Execução CI](https://github.com/RobsonSilverioSantos/srm-credit-engine/actions/runs/44806750599) com jobs backend e frontend aprovados; pipeline integrado antes dos PRs posteriores.
+- **B03:** [PR #8](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/8), merge `a75e62a`. [CI](https://github.com/RobsonSilverioSantos/srm-credit-engine/actions/runs/44808357093) aprovada; o PR registra testes de Strategy, precisão HALF_EVEN e golden cases C1–C3.
+- **B01:** [PR #9](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/9), merge `af9c703`. A convenção `DUPLICATA_MERCANTIL` foi alinhada à B03 antes da integração. [CI final](https://github.com/RobsonSilverioSantos/srm-credit-engine/actions/runs/44811816556) aprovada. O teste completo `./scripts/verify-persistence.sh` em PostgreSQL real foi relatado pelo agente no PR; não é o mesmo comando da CI padrão.
+- **B04:** [PR #10](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/10), merge `3cd2bde`. O responsável técnico confirmou execução local bem-sucedida; o agente registrou 14 testes, incluindo 3 de PostgreSQL real. [CI](https://github.com/RobsonSilverioSantos/srm-credit-engine/actions/runs/44814020563) aprovou backend (executando `scripts/test-cadastro-postgres.sh`) e frontend. A autorização real depende da S01.
+- **B05:** [PR #11](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/11), merge `21c649b`. [CI](https://github.com/RobsonSilverioSantos/srm-credit-engine/actions/runs/44814145711) aprovada; o agente registra execução local do script `./scripts/verify-taxas-postgres.sh`. Atenção na futura B06: estratégias B03 ainda têm spreads fixos, portanto a integração deve utilizar a versão elegível obtida da B05.
+- **Próximas tarefas desbloqueadas:** S01 (P0), D01 (P1) e B09 (P1). A B06 depende de S01 integrada. Branches novas devem derivar de `origin/develop` atualizado, em worktrees exclusivos.
 
 ## Sequenciamento para evitar trabalho acumulado
 
