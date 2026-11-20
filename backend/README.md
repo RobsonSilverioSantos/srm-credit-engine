@@ -76,3 +76,19 @@ verificações `:dominio:verificarFronteiraHexagonal` e
 `:aplicacao:verificarFronteiraHexagonal`. Elas validam os artefatos resolvidos nos
 classpaths de compilação e execução do núcleo. O teste HTTP não substitui a
 checagem com PostgreSQL real pelos comandos acima.
+
+## Precificação
+
+O domínio oferece `MotorPrecificacao`, com estratégias para duplicata mercantil
+e cheque pré-datado. Taxa base e spreads são frações decimais mensais; o prazo
+é um inteiro positivo e o valor de face deve ser positivo e representável em
+centavos. A taxa base deve ser não negativa. A potência é calculada sem
+arredondamento intermediário e o VP em BRL é arredondado para duas casas com
+HALF_EVEN; o deságio é a diferença entre face e VP. Quando informada, a cotação
+positiva em BRL por USD converte o VP BRL já arredondado, também com HALF_EVEN
+em duas casas. A ausência da cotação representa cálculo somente em BRL.
+
+O motor aceita uma lista de estratégias com modalidades únicas para extensão,
+sem dependência de framework ou persistência. A seleção de taxas e cotações
+vigentes não faz parte deste cálculo; elas são fornecidas pelo chamador. Os
+testes unitários da precificação ficam em `app`, usando o JUnit já configurado.
