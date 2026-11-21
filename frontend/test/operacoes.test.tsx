@@ -27,9 +27,9 @@ function criarPorta() {
   } satisfies PortaOperacoes
 }
 
-async function iniciar(operacoes: PortaOperacoes) {
+async function iniciar(operacoes: PortaOperacoes, locale = 'en-US') {
   const user = userEvent.setup()
-  render(<ThemeProvider theme={tema}><Aplicacao operacoes={operacoes} /></ThemeProvider>)
+  render(<ThemeProvider theme={tema}><Aplicacao operacoes={operacoes} locale={locale} /></ThemeProvider>)
   await user.type(screen.getByLabelText(/E-mail/), 'operador@example.com')
   await user.type(screen.getByLabelText(/Senha/), 'senha')
   await user.click(screen.getByRole('button', { name: 'Entrar' }))
@@ -73,7 +73,7 @@ test('descarta respostas antigas e não cadastra durante a prévia', async () =>
   const campo = screen.getByLabelText(/Valor de face em BRL/)
   await user.clear(campo)
   await user.type(campo, '200000.00')
-  await screen.findByText('Valor presente: BRL 92859.94')
+  await screen.findByText(/Valor presente:.*92,859\.94/)
   resolverPrimeira({ ...simulacao, valorPresenteBrl: '1.00' })
   await waitFor(() => expect(porta.simular).toHaveBeenCalledTimes(2))
   expect(screen.queryByText('Valor presente: BRL 1.00')).not.toBeInTheDocument()
@@ -86,7 +86,7 @@ test('cadastra após prévia e mantém a chave na retentativa após expiração'
   porta.liquidar.mockRejectedValueOnce(new ErroOperacao('Sessão expirada. Entre novamente.', 401))
   const user = await iniciar(porta)
   await preencher(user)
-  await screen.findByText('Valor presente: BRL 92859.94')
+  await screen.findByText(/Valor presente:.*92,859\.94/)
   await user.click(screen.getByRole('button', { name: 'Cadastrar recebível' }))
   expect(porta.cadastrarRecebivel).toHaveBeenCalledWith('jwt', {
     cedenteId: 'cedente-1', modalidade: 'DUPLICATA_MERCANTIL', valorFaceBrl: '100000.00', prazoMeses: 3, vencimento: null,
@@ -98,7 +98,7 @@ test('cadastra após prévia e mantém a chave na retentativa após expiração'
   await user.click(screen.getByRole('button', { name: 'Entrar' }))
   await user.click(await screen.findByRole('button', { name: 'Confirmar liquidação' }))
   await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Liquidar' }))
-  await screen.findByText('Valor presente: BRL 92000.01')
+  await screen.findByText(/Valor presente:.*92,000\.01/)
   expect(porta.cadastrarRecebivel).toHaveBeenCalledTimes(1)
   expect(porta.liquidar).toHaveBeenCalledTimes(2)
   expect(porta.liquidar.mock.calls[0]?.[3]).toBeTruthy()
@@ -110,7 +110,7 @@ test('bloqueia novo cadastro quando a resposta do servidor é incerta', async ()
   porta.cadastrarRecebivel.mockRejectedValueOnce(new ErroOperacao('Falha de conexão.'))
   const user = await iniciar(porta)
   await preencher(user)
-  await screen.findByText('Valor presente: BRL 92859.94')
+  await screen.findByText(/Valor presente:.*92,859\.94/)
   await user.click(screen.getByRole('button', { name: 'Cadastrar recebível' }))
   expect(await screen.findByText(/O resultado do cadastro é incerto/)).toBeVisible()
   expect(screen.getByRole('button', { name: 'Cadastrar recebível' })).toBeDisabled()
@@ -123,7 +123,7 @@ test('cadastra cedente e permite nova tentativa de simulação indisponível', a
     .mockResolvedValue([{ id: 'cedente-2', nome: 'Novo', documento: '456', ativo: true }])
   porta.simular.mockRejectedValueOnce(new ErroOperacao('Serviço indisponível.', 503))
   const user = userEvent.setup()
-  render(<ThemeProvider theme={tema}><Aplicacao operacoes={porta} /></ThemeProvider>)
+  render(<ThemeProvider theme={tema}><Aplicacao operacoes={porta} locale="en-US" /></ThemeProvider>)
   await user.type(screen.getByLabelText(/E-mail/), 'operador@example.com')
   await user.type(screen.getByLabelText(/Senha/), 'senha')
   await user.click(screen.getByRole('button', { name: 'Entrar' }))
@@ -137,6 +137,24 @@ test('cadastra cedente e permite nova tentativa de simulação indisponível', a
   await user.type(screen.getByLabelText(/Prazo em meses/), '1')
   expect(await screen.findByText(/Serviço indisponível/)).toBeVisible()
   await user.click(screen.getByRole('button', { name: 'Tentar novamente' }))
-  await screen.findByText('Valor presente: BRL 92859.94')
+  await screen.findByText(/Valor presente:.*92,859\.94/)
   expect(porta.simular).toHaveBeenCalledTimes(2)
+})
+
+test('normaliza entrada pt-BR para decimal canônico antes da simulação e cadastro', async () => {
+  const porta = criarPorta()
+  const user = await iniciar(porta, 'pt-BR')
+  await user.click(screen.getByRole('combobox', { name: 'Cedente' }))
+  await user.click(screen.getByRole('option', { name: 'Empresa — 123' }))
+  await user.type(screen.getByLabelText(/Valor de face em BRL/), '1.234,5')
+  await user.type(screen.getByLabelText(/Prazo em meses/), '3')
+  await screen.findByText(/Valor presente:.*92\.859,94/)
+  expect(porta.simular).toHaveBeenCalledWith(
+    'jwt',
+    expect.objectContaining({ valorFaceBrl: '1234.50' }),
+    expect.any(AbortSignal),
+  )
+  expect(screen.getByLabelText(/Valor de face em BRL/)).toHaveValue('1.234,5')
+  await user.click(screen.getByRole('button', { name: 'Cadastrar recebível' }))
+  expect(porta.cadastrarRecebivel).toHaveBeenCalledWith('jwt', expect.objectContaining({ valorFaceBrl: '1234.50' }))
 })

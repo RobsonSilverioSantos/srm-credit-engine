@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { CssBaseline } from '@mui/material'
 import { ThemeProvider } from '@mui/material/styles'
 import { bff } from './infraestrutura/bff'
+import { idiomaNavegador } from './infraestrutura/idiomaNavegador'
 import { Aplicacao } from './apresentacao/Aplicacao'
 import { tema } from './tema/tema'
 
@@ -13,7 +14,7 @@ createRoot(raiz).render(
   <StrictMode>
     <ThemeProvider theme={tema}>
       <CssBaseline />
-      <Aplicacao operacoes={bff} />
+      <Aplicacao operacoes={bff} locale={idiomaNavegador()} />
     </ThemeProvider>
   </StrictMode>,
 )

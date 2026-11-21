@@ -69,10 +69,11 @@ function renderizar(ui: React.ReactNode) {
 test('filtros e paginação são enviados ao servidor; snapshots mantêm os valores recebidos', async () => {
   const user = userEvent.setup()
   const porta = { consultar: vi.fn(async (pedido: ConsultaExtrato) => ({ ...pagina, pagina: pedido.pagina, tamanho: pedido.tamanho })) }
-  renderizar(<PaginaExtrato porta={porta} token="jwt" aoExpirar={vi.fn()} />)
-  expect(await screen.findByText('USD 17094.67')).toBeVisible()
+  renderizar(<PaginaExtrato porta={porta} token="jwt" locale="pt-BR" aoExpirar={vi.fn()} />)
+  expect(await screen.findByText(/17\.094,67/)).toBeVisible()
   await user.click(screen.getByText('Detalhes'))
-  expect(screen.getByText('5.4321')).toBeVisible()
+  expect(screen.getByText('5,4321')).toBeVisible()
+  expect(screen.getByText('1,00%')).toBeVisible()
   await user.click(screen.getByRole('button', { name: 'Próxima página' }))
   await waitFor(() => expect(porta.consultar).toHaveBeenLastCalledWith(expect.objectContaining({ pagina: 1, tamanho: 20 }), 'jwt', expect.any(AbortSignal)))
   expect(await screen.findByText('21–25 de 25')).toBeVisible()
@@ -100,19 +101,19 @@ test('ignora respostas antigas mesmo quando o adaptador não respeita abort', as
   const porta = { consultar: vi.fn()
     .mockImplementationOnce(() => new Promise<Pagina>((resolve) => { resolverPrimeira = resolve }))
     .mockResolvedValueOnce({ ...pagina, itens: [] , total: 0 }) }
-  renderizar(<PaginaExtrato porta={porta} token="jwt" aoExpirar={vi.fn()} />)
+  renderizar(<PaginaExtrato porta={porta} token="jwt" locale="pt-BR" aoExpirar={vi.fn()} />)
   expect(screen.getByRole('status')).toHaveTextContent('Carregando')
   await user.click(screen.getByRole('button', { name: 'Aplicar filtros' }))
   expect(await screen.findByText('Nenhuma liquidação encontrada')).toBeVisible()
   await act(async () => resolverPrimeira(pagina))
-  expect(screen.queryByText('USD 17094.67')).not.toBeInTheDocument()
+  expect(screen.queryByText(/17\.094,67/)).not.toBeInTheDocument()
   expect(screen.getByText('Nenhuma liquidação encontrada')).toBeVisible()
 })
 
 test('impede período invertido e aplica datas inclusivas ao corrigir', async () => {
   const user = userEvent.setup()
   const porta = { consultar: vi.fn().mockResolvedValue({ ...pagina, itens: [], total: 0 }) }
-  renderizar(<PaginaExtrato porta={porta} token="jwt" aoExpirar={vi.fn()} />)
+  renderizar(<PaginaExtrato porta={porta} token="jwt" locale="pt-BR" aoExpirar={vi.fn()} />)
   await screen.findByText('Nenhuma liquidação encontrada')
   fireEvent.change(screen.getByLabelText('Data inicial (UTC)'), { target: { value: '2026-03-10' } })
   fireEvent.change(screen.getByLabelText('Data final (UTC)'), { target: { value: '2026-03-01' } })
@@ -131,10 +132,10 @@ test('exibe erro e permite retentativa; ajusta página fora do total atualizado'
     .mockResolvedValueOnce(pagina)
     .mockResolvedValueOnce({ ...pagina, itens: [], pagina: 1, total: 1 })
     .mockResolvedValueOnce({ ...pagina, total: 1 }) }
-  renderizar(<PaginaExtrato porta={porta} token="jwt" aoExpirar={vi.fn()} />)
+  renderizar(<PaginaExtrato porta={porta} token="jwt" locale="pt-BR" aoExpirar={vi.fn()} />)
   expect(await screen.findByRole('alert')).toHaveTextContent('Serviço indisponível')
   await user.click(screen.getByRole('button', { name: 'Tentar novamente' }))
-  expect(await screen.findByText('USD 17094.67')).toBeVisible()
+  expect(await screen.findByText(/17\.094,67/)).toBeVisible()
   await user.click(screen.getByRole('button', { name: 'Próxima página' }))
   await waitFor(() => expect(porta.consultar).toHaveBeenCalledTimes(4))
   expect(await screen.findByText('1–1 de 1')).toBeVisible()
@@ -144,7 +145,7 @@ test('expiração abandona dados e solicita nova autenticação', async () => {
   const user = userEvent.setup()
   const autenticacao = { autenticar: vi.fn().mockResolvedValue('jwt') }
   const porta = { consultar: vi.fn().mockRejectedValue(new SessaoExpirada()) }
-  renderizar(<AcessoExtrato autenticacao={autenticacao} porta={porta} />)
+  renderizar(<AcessoExtrato autenticacao={autenticacao} porta={porta} locale="pt-BR" />)
   await user.type(screen.getByRole('textbox', { name: 'E-mail' }), 'operador@example.com')
   await user.type(screen.getByLabelText(/Senha/), 'senha')
   await user.click(screen.getByRole('button', { name: 'Entrar' }))

@@ -58,6 +58,12 @@ consultas de páginas diferentes podem deslocar registros.
 Os valores financeiros e os snapshots históricos são exibidos conforme
 recebidos do backend, sem recálculo no frontend.
 
+A apresentação usa `navigator.languages` e `pt-BR` como fallback. Valores,
+taxas e cotações são formatados somente para exibição, preservando as strings
+decimais do BFF. O campo de valor aceita os separadores de `pt-BR` e `en-US`,
+valida agrupamento/escala e envia ao BFF uma string decimal canônica com ponto
+decimal; nenhum cálculo financeiro é realizado no navegador.
+
 A tela permanece como entrada independente para evitar conflitos entre
 as implementações paralelas F01 e F03. A integração posterior deverá
 compartilhar a sessão autenticada, conectar a navegação e reutilizar

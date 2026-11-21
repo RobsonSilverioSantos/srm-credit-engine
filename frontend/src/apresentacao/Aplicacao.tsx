@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { Box, Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Stack, Typography } from '@mui/material'
 import { cadastrarParaLiquidacao, confirmarLiquidacao, ErroOperacao, mensagemErro, type PortaOperacoes } from '../aplicacao/operacoes'
-import type { Cedente, EntradaSimulacao, IntencaoLiquidacao, Liquidacao, Modalidade, Moeda, Sessao, Simulacao } from '../dominio/operacoes'
+import type { Cedente, IntencaoLiquidacao, Liquidacao, Modalidade, Moeda, Sessao, Simulacao } from '../dominio/operacoes'
 import { CampoFormulario } from '../tema/componentes/CampoFormulario'
 import { Carregando, EstadoVazio, Mensagem } from '../tema/componentes/Feedback'
 import { Painel } from '../tema/componentes/Painel'
+import { formatarMonetario, formatarPercentual, formatarCotacao, normalizarEntradaMonetaria } from '../dominio/formatacaoMonetaria'
 
 const grade = { display: 'grid', gap: 2, gridTemplateColumns: { xs: 'minmax(0, 1fr)', sm: 'repeat(2, minmax(0, 1fr))' } }
 const modalidades = [
@@ -13,9 +14,9 @@ const modalidades = [
 ]
 const moedas = [{ valor: 'BRL', rotulo: 'BRL' }, { valor: 'USD', rotulo: 'USD' }]
 
-type Props = { operacoes: PortaOperacoes }
+type Props = { operacoes: PortaOperacoes; locale: string }
 
-export function Aplicacao({ operacoes }: Props) {
+export function Aplicacao({ operacoes, locale }: Props) {
   const [sessao, setSessao] = useState<Sessao | null>(null)
   const [email, setEmail] = useState('')
   const [identidade, setIdentidade] = useState('')
@@ -73,7 +74,7 @@ export function Aplicacao({ operacoes }: Props) {
         </Painel>
       )}
       <Box hidden={!sessao}>
-        <PainelOperacoes operacoes={operacoes} token={sessao?.token ?? null} tratarErro={tratarErro} />
+        <PainelOperacoes operacoes={operacoes} token={sessao?.token ?? null} tratarErro={tratarErro} locale={locale} />
       </Box>
     </Box>
   )
@@ -82,7 +83,7 @@ export function Aplicacao({ operacoes }: Props) {
 type PainelProps = Props & { token: string | null; tratarErro: (erro: unknown) => string }
 type Previa = { entrada: string; dados: Simulacao }
 
-function PainelOperacoes({ operacoes, token, tratarErro }: PainelProps) {
+function PainelOperacoes({ operacoes, token, tratarErro, locale }: PainelProps) {
   const [cedentes, setCedentes] = useState<Cedente[] | null>(null)
   const [erroCedentes, setErroCedentes] = useState('')
   const [atualizacao, setAtualizacao] = useState(0)
@@ -107,10 +108,11 @@ function PainelOperacoes({ operacoes, token, tratarErro }: PainelProps) {
   const [liquidacao, setLiquidacao] = useState<Liquidacao | null>(null)
   const trava = useRef(false)
 
-  const valido = /^[0-9]{1,17}(\.[0-9]{1,2})?$/.test(valor) && /[1-9]/.test(valor)
+  const entradaMonetaria = normalizarEntradaMonetaria(valor, locale)
+  const valorCanonico = entradaMonetaria.valida ? entradaMonetaria.valorCanonico : ''
+  const valido = entradaMonetaria.valida
     && /^[1-9][0-9]*$/.test(prazo) && Number(prazo) <= 2147483647
-  const entrada: EntradaSimulacao = { modalidade, valorFaceBrl: valor, prazoMeses: Number(prazo), moeda }
-  const chaveEntrada = JSON.stringify(entrada)
+  const chaveEntrada = JSON.stringify({ modalidade, valorFaceBrl: valorCanonico, prazoMeses: Number(prazo), moeda })
 
   useEffect(() => {
     if (!token) return
@@ -128,7 +130,12 @@ function PainelOperacoes({ operacoes, token, tratarErro }: PainelProps) {
     const controlador = new AbortController()
     const timer = window.setTimeout(() => {
       setEstadoPrevia('carregando')
-      operacoes.simular(token, { modalidade, valorFaceBrl: valor, prazoMeses: Number(prazo), moeda }, controlador.signal).then((dados) => {
+      operacoes.simular(token, {
+        modalidade,
+        valorFaceBrl: valorCanonico,
+        prazoMeses: Number(prazo),
+        moeda,
+      }, controlador.signal).then((dados) => {
         if (!controlador.signal.aborted) {
           setPrevia({ entrada: chaveEntrada, dados })
           setEstadoPrevia('pronto')
@@ -142,7 +149,7 @@ function PainelOperacoes({ operacoes, token, tratarErro }: PainelProps) {
       })
     }, 500)
     return () => { window.clearTimeout(timer); controlador.abort() }
-  }, [operacoes, token, valido, chaveEntrada, modalidade, valor, prazo, moeda, pendente, incerto, liquidacao, tentativaPrevia, tratarErro])
+  }, [operacoes, token, valido, chaveEntrada, modalidade, valorCanonico, prazo, moeda, pendente, incerto, liquidacao, tentativaPrevia, tratarErro])
 
   function alterou() {
     setPrevia(null)
@@ -183,7 +190,7 @@ function PainelOperacoes({ operacoes, token, tratarErro }: PainelProps) {
     try {
       const chave = crypto.randomUUID()
       const intencao = await cadastrarParaLiquidacao(operacoes, token, {
-        cedenteId, modalidade, valorFaceBrl: valor, prazoMeses: Number(prazo), vencimento: vencimento || null,
+        cedenteId, modalidade, valorFaceBrl: valorCanonico, prazoMeses: Number(prazo), vencimento: vencimento || null,
       }, moeda, chave)
       setPendente(intencao)
       setSucesso('Recebível cadastrado. Confirme a liquidação para prosseguir.')
@@ -244,7 +251,12 @@ function PainelOperacoes({ operacoes, token, tratarErro }: PainelProps) {
           <CampoFormulario label="Modalidade" value={modalidade} opcoes={modalidades} disabled={bloqueado}
             onChange={(e) => { setModalidade(e.target.value as Modalidade); alterou() }} />
           <CampoFormulario label="Valor de face em BRL" value={valor} required disabled={bloqueado}
-            helperText="Use ponto decimal, por exemplo 1000.00." onChange={(e) => { setValor(e.target.value); alterou() }} />
+            type="text" inputMode="decimal"
+            helperText={valor && !entradaMonetaria.valida
+              ? entradaMonetaria.erro
+              : locale.toLowerCase().startsWith('en') ? 'Example: 1,234.56.' : 'Exemplo: 1.234,56.'}
+            erro={valor && !entradaMonetaria.valida ? entradaMonetaria.erro : undefined}
+            onChange={(e) => { setValor(e.target.value); alterou() }} />
           <CampoFormulario label="Prazo em meses" value={prazo} required disabled={bloqueado} type="number"
             slotProps={{ htmlInput: { min: 1, step: 1 } }} onChange={(e) => { setPrazo(e.target.value); alterou() }} />
           <CampoFormulario label="Moeda de pagamento" value={moeda} opcoes={moedas} disabled={bloqueado}
@@ -256,7 +268,7 @@ function PainelOperacoes({ operacoes, token, tratarErro }: PainelProps) {
         {valido && estadoPrevia === 'vazio' && !pendente && !incerto && !liquidacao && <Carregando rotulo="Aguardando simulação…" />}
         {estadoPrevia === 'carregando' && <Carregando rotulo="Simulando…" />}
         {estadoPrevia === 'erro' && <Mensagem severity="error">{erroPrevia} <Button onClick={() => { alterou(); setTentativaPrevia((n) => n + 1) }}>Tentar novamente</Button></Mensagem>}
-        {previaAtual && <Valores dados={previaAtual} />}
+        {previaAtual && <Valores dados={previaAtual} locale={locale} />}
         <Box><Button variant="contained" disabled={bloqueado || !cedenteId || !previaAtual || estadoPrevia !== 'pronto'}
           onClick={cadastrarRecebivel}>Cadastrar recebível</Button></Box>
       </Painel>
@@ -269,7 +281,7 @@ function PainelOperacoes({ operacoes, token, tratarErro }: PainelProps) {
       </Painel>}
       {liquidacao && <Painel id="resultado" titulo="Liquidação confirmada">
         <Typography>Identificador: {liquidacao.liquidacaoId}</Typography>
-        <Valores dados={liquidacao} />
+        <Valores dados={liquidacao} locale={locale} />
         <Box><Button onClick={() => {
           setPendente(null); setLiquidacao(null); setValor(''); setPrazo(''); setVencimento('')
           setPrevia(null); setEstadoPrevia('vazio'); setSucesso(''); setErro('')
@@ -284,15 +296,15 @@ function PainelOperacoes({ operacoes, token, tratarErro }: PainelProps) {
   )
 }
 
-function Valores({ dados }: { dados: Simulacao | Liquidacao }) {
+function Valores({ dados, locale }: { dados: Simulacao | Liquidacao; locale: string }) {
   return <Stack spacing={0.5} aria-label="Valores retornados pelo servidor">
-    <Typography>Valor presente: BRL {dados.valorPresenteBrl}</Typography>
-    <Typography>Deságio: BRL {dados.desagioBrl}</Typography>
-    <Typography>Pagamento: {dados.moeda} {dados.valorPagamento}</Typography>
+    <Typography>Valor presente: {formatarMonetario(dados.valorPresenteBrl, 'BRL', locale)}</Typography>
+    <Typography>Deságio: {formatarMonetario(dados.desagioBrl, 'BRL', locale)}</Typography>
+    <Typography>Pagamento: {formatarMonetario(dados.valorPagamento, dados.moeda, locale)}</Typography>
     {'taxaBaseMensal' in dados && <>
-      <Typography>Taxa base mensal (fração): {dados.taxaBaseMensal}</Typography>
-      <Typography>Spread mensal (fração): {dados.spreadMensal}</Typography>
-      {dados.cotacaoBrlPorUsd && <Typography>Cotação BRL/USD: {dados.cotacaoBrlPorUsd}</Typography>}
+      <Typography>Taxa base mensal: {formatarPercentual(dados.taxaBaseMensal, locale)}</Typography>
+      <Typography>Spread mensal: {formatarPercentual(dados.spreadMensal, locale)}</Typography>
+      {dados.cotacaoBrlPorUsd && <Typography>Cotação BRL/USD: {formatarCotacao(dados.cotacaoBrlPorUsd, locale)}</Typography>}
       <Typography>Referência: {dados.referencia}</Typography>
       {dados.cotacaoValidaAte && <Typography>Cotação válida até: {dados.cotacaoValidaAte}</Typography>}
     </>}
