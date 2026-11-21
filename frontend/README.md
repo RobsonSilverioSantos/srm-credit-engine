@@ -43,6 +43,27 @@ O cadastro de recebível não é idempotente. Se seu resultado for incerto,
 o painel bloqueia novas tentativas e orienta o operador a consultar o
 estado da operação no servidor antes de prosseguir.
 
+## Identificação de cedentes (B14)
+
+No cadastro, informe o país por código ISO alpha-2 e selecione o tipo de
+documento. O país sugere o tipo, que pode ser alterado: `BR` exige `CNPJ`;
+países estrangeiros exigem `OUTRO`. Combinações incompatíveis bloqueiam o
+envio. A sintaxe do código é verificada localmente, mas somente o servidor
+confirma se o país é aceito.
+
+O CNPJ numérico ou alfanumérico recebe máscara contextual, inclusive na
+colagem; entradas inválidas não são limpas silenciosamente. O frontend verifica
+o formato, não os dígitos verificadores: o backend faz a validação definitiva.
+`OUTRO` aceita de 1 a 32 letras ASCII ou números, em maiúsculas, sem espaços
+ou pontuação. É um identificador **não verificado**, não uma validação fiscal.
+Alterar país ou tipo preserva o texto para correção.
+
+O BFF recebe `nome`, `documento`, `pais` e `tipoDocumento`; a organização vem
+da autenticação, nunca do formulário. Cedentes legados com país e tipo nulos
+continuam selecionáveis e aparecem como desconhecidos. Erros 400 orientam
+conferir os campos; 409 informa possível duplicidade ou outro conflito, sem
+presumir sua causa.
+
 ## Administração de usuários (F04)
 
 Depois de autenticar na tela principal, MASTER e ADMIN podem administrar os

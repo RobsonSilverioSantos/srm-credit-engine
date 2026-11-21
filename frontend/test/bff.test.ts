@@ -52,3 +52,29 @@ test('autentica no endpoint próprio e trata 401 e indisponibilidade de rede', a
   await expect(bff.listarCedentes('jwt')).rejects.toMatchObject({ status: 401 })
   await expect(bff.listarCedentes('jwt')).rejects.toThrow('Não foi possível conectar')
 })
+
+test('contrato de cedente B14 envia somente campos autorizados e preserva legado', async () => {
+  const legado = { id: 'legado', nome: 'Antigo', documento: '123', ativo: true, pais: null, tipoDocumento: null, documentoCanonico: null, statusDocumento: 'DESCONHECIDO' }
+  const novo = { id: 'novo', nome: 'Novo', documento: 'AB123', ativo: true, pais: 'US', tipoDocumento: 'OUTRO', documentoCanonico: 'AB123', statusDocumento: 'NAO_VERIFICADO' }
+  const fetchMock = vi.fn().mockResolvedValueOnce(new Response(JSON.stringify(novo), { status: 201 }))
+    .mockResolvedValueOnce(new Response(JSON.stringify([legado, novo]), { status: 200 }))
+  vi.stubGlobal('fetch', fetchMock)
+  const entrada = { nome: 'Novo', documento: 'AB123', pais: 'US', tipoDocumento: 'OUTRO' as const, organizacaoId: 'nao-enviar' }
+  expect(await bff.cadastrarCedente('jwt', entrada)).toEqual(novo)
+  expect(fetchMock.mock.calls[0]).toEqual(['/bff/v1/cedentes', {
+    method: 'POST', headers: { Authorization: 'Bearer jwt', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ nome: 'Novo', documento: 'AB123', pais: 'US', tipoDocumento: 'OUTRO' }),
+  }])
+  expect(await bff.listarCedentes('jwt')).toEqual([legado, novo])
+})
+
+test('rejeita resposta B14 incompleta e propaga erros 400 e 409', async () => {
+  const fetchMock = vi.fn().mockResolvedValueOnce(new Response(JSON.stringify({ id: '1', nome: 'X', documento: '123', ativo: true }), { status: 201 }))
+    .mockResolvedValueOnce(new Response('', { status: 400 }))
+    .mockResolvedValueOnce(new Response('', { status: 409 }))
+  vi.stubGlobal('fetch', fetchMock)
+  const entrada = { nome: 'X', documento: '123', pais: 'US', tipoDocumento: 'OUTRO' } as const
+  await expect(bff.cadastrarCedente('jwt', entrada)).rejects.toThrow('Resposta inválida')
+  await expect(bff.cadastrarCedente('jwt', entrada)).rejects.toMatchObject({ status: 400 })
+  await expect(bff.cadastrarCedente('jwt', entrada)).rejects.toMatchObject({ status: 409 })
+})

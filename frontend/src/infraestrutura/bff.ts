@@ -8,6 +8,10 @@ function objeto(valor: unknown): valor is Record<string, unknown> {
 function cedente(valor: unknown): valor is Cedente {
   return objeto(valor) && typeof valor.id === 'string' && valor.id.length > 0
     && typeof valor.nome === 'string' && typeof valor.documento === 'string' && typeof valor.ativo === 'boolean'
+    && (typeof valor.pais === 'string' || valor.pais === null)
+    && (typeof valor.tipoDocumento === 'string' || valor.tipoDocumento === null)
+    && (typeof valor.documentoCanonico === 'string' || valor.documentoCanonico === null)
+    && (valor.statusDocumento === 'VALIDADO_DV' || valor.statusDocumento === 'NAO_VERIFICADO' || valor.statusDocumento === 'DESCONHECIDO')
 }
 
 function valores(valor: Record<string, unknown>): boolean {
@@ -75,8 +79,8 @@ export const bff: PortaOperacoes = {
     return { token: resposta.accessToken, expiraEm: inicio + resposta.expiresIn * 1000 }
   },
   listarCedentes: (token) => requisitar('/bff/v1/cedentes', (valor): valor is Cedente[] => Array.isArray(valor) && valor.every(cedente), {}, token),
-  cadastrarCedente: (token, nome, documento) => requisitar('/bff/v1/cedentes', cedente, {
-    method: 'POST', body: JSON.stringify({ nome, documento }),
+  cadastrarCedente: (token, { nome, documento, pais, tipoDocumento }) => requisitar('/bff/v1/cedentes', cedente, {
+    method: 'POST', body: JSON.stringify({ nome, documento, pais, tipoDocumento }),
   }, token),
   async simular(token, entrada: EntradaSimulacao, signal) {
     const resultado = await requisitar('/bff/v1/simulacoes', simulacao, {

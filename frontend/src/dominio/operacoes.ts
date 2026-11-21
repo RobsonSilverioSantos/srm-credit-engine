@@ -20,7 +20,13 @@ export type Simulacao = {
   cotacaoValidaAte: string | null
 }
 
-export type Cedente = { id: string; nome: string; documento: string; ativo: boolean }
+export type TipoDocumento = 'CNPJ' | 'OUTRO'
+export type EntradaCedente = { nome: string; documento: string; pais: string; tipoDocumento: TipoDocumento }
+export type Cedente = {
+  id: string; nome: string; documento: string; ativo: boolean
+  pais: string | null; tipoDocumento: string | null; documentoCanonico: string | null
+  statusDocumento: 'VALIDADO_DV' | 'NAO_VERIFICADO' | 'DESCONHECIDO'
+}
 export type EntradaRecebivel = Omit<EntradaSimulacao, 'moeda'> & {
   cedenteId: string
   vencimento: string | null

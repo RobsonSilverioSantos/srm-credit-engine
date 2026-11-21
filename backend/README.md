@@ -68,6 +68,36 @@ ambientes. A configuração Compose não é destinada à produção.
 
 ## Persistência e migrations
 
+### B14 — documentos empresariais
+
+Veja [contratos, migração segura e evidências B14](docs/B14_DOCUMENTOS_CEDENTES.md).
+`documento` continua no POST/GET; `pais` e `tipoDocumento` são opcionais **juntos**.
+POST sem ambos agora significa BR/CNPJ e exige dois DVs válidos. Isto não
+reclassifica histórico: registros existentes continuam `DESCONHECIDO`, sem país,
+tipo ou canônico. Para identificador sem validador fiscal, envie país estrangeiro
+ISO alpha-2 válido, `tipoDocumento: "OUTRO"` e 1–32 caracteres ASCII `[A-Z0-9]`; resposta
+`NAO_VERIFICADO`, sem confirmação fiscal. CNPJ validado apenas em formato/DV
+retorna `VALIDADO_DV`, não prova de situação cadastral.
+
+V5 aborta atomicamente diante de colisões normalizadas históricas e bloqueia
+novas possíveis coincidências para reconciliação humana, sem fusão de cedentes.
+Planeje janela de manutenção: a migration bloqueia a tabela para DDL/inventário.
+O Compose limita logs PostgreSQL para não expor statements, parâmetros ou
+detalhes de erros com documentos. Bancos externos precisam da mesma política;
+não habilite logging de SQL/payload em DEBUG/TRACE.
+
+Verificação real, banco isolado e cleanup automático (script sem bit executável):
+
+```sh
+bash scripts/test-cadastro-postgres.sh
+bash scripts/test-cadastro-postgres.sh clean check
+```
+
+O primeiro executa `./gradlew clean build` (inclui checks/testes e bootJar);
+o segundo executa exatamente `./gradlew clean check`. Sem esse harness ou
+`SRM_TEST_POSTGRES=true` com credenciais reais, os testes PostgreSQL são
+ignorados e um build verde **não** comprova as garantias B14.
+
 O adaptador `app` executa Flyway na inicialização; os arquivos versionados ficam
 em `app/src/main/resources/db/migration`. Não edite uma versão já aplicada:
 adicione uma nova migration para evoluir o esquema.
@@ -485,7 +515,7 @@ TOKEN="$(jq -n --arg email "$EMAIL" --arg password "$SENHA" \
     http://127.0.0.1:8080/api/v1/auth/token | jq -er .accessToken)"
 unset SENHA
 CEDENTE="$(curl -fsS -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
-  -d '{"nome":"Cedente exemplo","documento":"exemplo-unico"}' \
+  -d '{"nome":"Cedente exemplo","documento":"12ABC34501DE35"}' \
   http://127.0.0.1:8080/api/v1/cedentes | jq -er .id)"
 RECEBIVEL="$(jq -n --arg cedente "$CEDENTE" \
   '{cedenteId:$cedente,modalidade:"DUPLICATA_MERCANTIL",valorFaceBrl:"100000.00",prazoMeses:3}' | \
