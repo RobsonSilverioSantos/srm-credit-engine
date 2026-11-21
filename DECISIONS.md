@@ -1,6 +1,6 @@
 # DECISIONS.md — Decisões vigentes no novo repositório
 
-**Versão:** 2.3 (bootstrap do repositório novo, 20/11/2026). O repositório anterior possui histórico técnico documentado em `AI_USAGE.md`. Esta versão é a autoridade normativa **deste novo repositório**, não uma declaração de que código foi migrado.
+**Versão:** 2.4 (baseline do novo repositório em 20/11/2026; ADR-023 registrada em 21/11/2026 após integração da B14). O repositório anterior possui histórico técnico documentado em `AI_USAGE.md`. Este índice é a autoridade normativa **deste novo repositório**, não uma declaração de migração de código ou homologação por autoridades externas.
 
 | ID | Decisão | Justificativa / limites |
 |---|---|---|
@@ -26,10 +26,11 @@
 | ADR-020 | **Proposta de alta escala independente — pendente** | A proposta anterior foi rejeitada; nenhum HLD está aprovado. Elaborar futuramente com o responsável técnico e ChatGPT, sem agente e sem vínculo de dependência com o MVP. `docs/exercicios/ALTA_ESCALA_STATUS.md` é apenas marcador de pendência |
 | ADR-021 | PRs devem justificar escolhas e ensinar raciocínio | Modelo obrigatório com motivação, alternativas, testes executados, riscos e explicação didática; o agente publica PR, o responsável aprova/integra |
 | ADR-022 | **Controles compensatórios de branches em repositório privado sem GitHub Pro** | Rulesets/branch protection não disponíveis na configuração atual (API retornou 403 exigindo GitHub Pro ou repositório público); adotar GitHub Actions para fechar PRs indevidos para `main`, hook local para recusar push direto em `main`/`develop` e instruções explícitas dos agentes. Controles preventivos parciais, não equivalentes a proteção no servidor. Ver `docs/adr/ADR-022-controles-github-free.md` |
+| ADR-023 | Validação documental verificável apenas para `BR/CNPJ` numérico/alfanumérico; identificadores estrangeiros `OUTRO` admitidos como `NAO_VERIFICADO` | Validação de formato/DV do CNPJ **não comprova existência, situação ativa ou regularidade fiscal**. País e tipo são explícitos; `BR/OUTRO` e CNPJ estrangeiro são rejeitados, legado permanece `DESCONHECIDO`; sem validação fiscal internacional. Ver `docs/adr/ADR-023-identificacao-empresarial-por-pais-e-documento.md` e PR #56 |
 
 ## Critérios de arquitetura e defesa
 
-- **ADRs completos:** este índice mantém decisões concisas; análise de opções, rejeições, consequências e gatilhos de mudança em `docs/adr/`. A decisão ADR-005 é detalhada em `docs/adr/ADR-005-monolito-modular-vs-microservicos.md`.
+- **ADRs completos:** este índice mantém decisões concisas; análise de opções, rejeições, consequências e gatilhos de mudança em `docs/adr/`. A ADR-005 é detalhada em `docs/adr/ADR-005-monolito-modular-vs-microservicos.md`; a política de documento de cedentes na ADR-023 foi registrada a partir da implementação B14 integrada pelo PR #56, sem atribuir validação fiscal a identificadores estrangeiros.
 - **EDA:** documento de evolução opcional do fluxo do MVP; não prometer broker ou pagamento externo implementados.
 - **Alta escala:** exercício arquitetural **independente e ainda não produzido**. Não confundir a futura proposta com ADRs do MVP, nem marcar como atendido o requisito de 1 milhão/min.
 - **Git Flow:** escolha aprovada pelos PRs pequenos e revisáveis, custo de autonomia dos agentes e necessidade de auditoria. A justificativa versus trunk-based/GitHub Flow aparece no README; processos paralelos devem usar worktrees para isolamento.
