@@ -6,10 +6,16 @@ import { CampoFormulario } from '../tema/componentes/CampoFormulario'
 import { Mensagem } from '../tema/componentes/Feedback'
 import { Painel } from '../tema/componentes/Painel'
 import { TabelaDados, type EstadoTabela } from '../tema/componentes/TabelaDados'
+import { formatarCotacao, formatarMonetario, formatarPercentual } from '../dominio/formatacaoMonetaria'
 
 const filtrosIniciais: FiltrosExtrato = { inicio: '', fim: '', cedenteId: '', moeda: '' }
 
-export function PaginaExtrato({ porta, token, aoExpirar }: { porta: PortaExtrato; token: string; aoExpirar: () => void }) {
+export function PaginaExtrato({ porta, token, aoExpirar, locale }: {
+  porta: PortaExtrato
+  token: string
+  aoExpirar: () => void
+  locale: string
+}) {
   const [filtros, setFiltros] = useState(filtrosIniciais)
   const [validado, setValidado] = useState(false)
   const [consulta, setConsulta] = useState<ConsultaExtrato>({ ...filtrosIniciais, pagina: 0, tamanho: 20 })
@@ -92,15 +98,17 @@ export function PaginaExtrato({ porta, token, aoExpirar }: { porta: PortaExtrato
             { id: 'id', rotulo: 'ID da liquidação', cabecalhoLinha: true, renderizar: (item) => item.liquidacaoId },
             { id: 'cedente', rotulo: 'ID do cedente', renderizar: (item) => item.cedenteId },
             { id: 'modalidade', rotulo: 'Modalidade', renderizar: (item) => item.modalidade },
-            { id: 'pagamento', rotulo: 'Pagamento', alinhar: 'right', renderizar: (item) => `${item.moeda} ${item.valorPagamento}` },
+            { id: 'pagamento', rotulo: 'Pagamento', alinhar: 'right', renderizar: (item) => formatarMonetario(item.valorPagamento, item.moeda, locale) },
             { id: 'detalhes', rotulo: 'Snapshot', renderizar: (item) => <details><summary>Detalhes</summary>
               <Box component="dl" sx={{ minWidth: 260 }}>
                 {([
                   ['Recebível', item.recebivelId], ['Versão do recebível', item.versaoRecebivel], ['Prazo (meses)', item.prazoMeses],
-                  ['Valor de face BRL', item.valorFaceBrl], ['Valor presente BRL', item.valorPresenteBrl], ['Deságio BRL', item.desagioBrl],
-                  ['Taxa base ID', item.taxaBaseId], ['Taxa base mensal', item.taxaBaseMensal], ['Taxa base vigente em', item.taxaBaseVigenteEm],
-                  ['Spread ID', item.spreadId], ['Spread mensal', item.spreadMensal], ['Spread vigente em', item.spreadVigenteEm],
-                  ...(item.cotacaoCambialId !== null ? [['Cotação ID', item.cotacaoCambialId], ['BRL por unidade', item.taxaBrlPorUnidade], ['Cotação vigente em', item.cotacaoVigenteEm], ['Cotação válida até', item.cotacaoValidaAte]] : []),
+                  ['Valor de face BRL', formatarMonetario(item.valorFaceBrl, 'BRL', locale)],
+                  ['Valor presente BRL', formatarMonetario(item.valorPresenteBrl, 'BRL', locale)],
+                  ['Deságio BRL', formatarMonetario(item.desagioBrl, 'BRL', locale)],
+                  ['Taxa base ID', item.taxaBaseId], ['Taxa base mensal', formatarPercentual(item.taxaBaseMensal, locale)], ['Taxa base vigente em', item.taxaBaseVigenteEm],
+                  ['Spread ID', item.spreadId], ['Spread mensal', formatarPercentual(item.spreadMensal, locale)], ['Spread vigente em', item.spreadVigenteEm],
+                  ...(item.cotacaoCambialId !== null ? [['Cotação ID', item.cotacaoCambialId], ['BRL por unidade', item.taxaBrlPorUnidade === null ? 'Não informado' : formatarCotacao(item.taxaBrlPorUnidade, locale)], ['Cotação vigente em', item.cotacaoVigenteEm], ['Cotação válida até', item.cotacaoValidaAte]] : []),
                 ] as const).map(([nome, valor]) => <Box key={nome}><Typography component="dt" fontWeight={700}>{nome}</Typography><Typography component="dd" sx={{ ml: 0, overflowWrap: 'anywhere' }}>{valor ?? 'Não informado'}</Typography></Box>)}
               </Box>
             </details> },
@@ -116,7 +124,7 @@ export function PaginaExtrato({ porta, token, aoExpirar }: { porta: PortaExtrato
   )
 }
 
-export function AcessoExtrato({ autenticacao, porta }: { autenticacao: PortaAutenticacao; porta: PortaExtrato }) {
+export function AcessoExtrato({ autenticacao, porta, locale }: { autenticacao: PortaAutenticacao; porta: PortaExtrato; locale: string }) {
   const [token, setToken] = useState('')
   const [email, setEmail] = useState('')
   const [senha, setSenha] = useState('')
@@ -140,7 +148,7 @@ export function AcessoExtrato({ autenticacao, porta }: { autenticacao: PortaAute
   }
 
   return <Container component="main" maxWidth="lg" sx={{ py: { xs: 3, md: 5 } }}>
-    {token ? <PaginaExtrato porta={porta} token={token} aoExpirar={() => { setToken(''); setErro('Sessão expirada. Entre novamente.') }} /> :
+    {token ? <PaginaExtrato porta={porta} token={token} locale={locale} aoExpirar={() => { setToken(''); setErro('Sessão expirada. Entre novamente.') }} /> :
       <Stack component="form" onSubmit={entrar} spacing={2} sx={{ maxWidth: 420 }}>
         <Typography variant="h1">Acesso ao extrato</Typography>
         {erro && <Mensagem severity="error">{erro}</Mensagem>}
