@@ -269,9 +269,10 @@ testes unitários da precificação ficam em `app`, usando o JUnit já configura
 
 `TaxasPorta` permite registrar manualmente versões de taxa base, spread por
 modalidade e cotação BRL por USD, e consultar os dados para um snapshot.
-Não há endpoint de manutenção nem carga automática de valores: o chamador deve
-registrar os dados e, futuramente, garantir autorização. Registros existentes
-nunca são atualizados; vigências futuras podem ser cadastradas antecipadamente.
+Não há endpoint de manutenção nem carga automática de valores: o registro é
+realizado por operação controlada fora da interface HTTP, com acesso restrito
+à infraestrutura de demonstração. Registros existentes nunca são atualizados;
+vigências futuras podem ser cadastradas antecipadamente.
 A escala máxima é 10 casas, sem arredondamento na gravação; vigências aceitam
 precisão de microssegundos, como no PostgreSQL.
 
@@ -343,7 +344,7 @@ ocorrem na mesma transação; falhas desfazem tudo. A atualização condicional 
 organização, status e versão incrementa a versão somente se a versão lida ainda
 for válida; zero linhas é conflito. É equivalente ao controle de versão
 otimista para esta operação JDBC, mas **não usa literalmente `@Version` JPA**,
-conforme a divergência da ADR-010 a ser revisada por humano. A constraint
+distinguindo-se da anotação JPA `@Version` citada na ADR-010. A constraint
 UNIQUE por recebível é defesa adicional, não substituto da versão.
 
 O instante truncado a microssegundos é o corte UTC da seleção e o
@@ -351,9 +352,9 @@ O instante truncado a microssegundos é o corte UTC da seleção e o
 O relógio é verificado antes e depois do UPDATE, inclusive após eventual
 espera por concorrência; cotação expirada provoca rollback. O tempo entre a
 última verificação e o commit não é limitado: o instante registrado é o corte
-da decisão, não o horário físico do commit. B07 deve ampliar os testes de
-interleavings e falhas; caso o negócio exija cotação válida até o commit
-físico, essa semântica precisa ser decidida e implementada separadamente.
+da decisão, não o horário físico do commit. Os testes de concorrência e falhas
+da B07 verificam a semântica implementada, mas não comprovam validade cambial
+até o instante físico do commit. Essa garantia não integra o contrato atual.
 
 Os testes PostgreSQL da B06 integram o comando `bash scripts/test-cadastro-postgres.sh`.
 
@@ -402,23 +403,23 @@ indisponibilidade transitória são 503: não há preço inventado ou fallback.
 
 OpenAPI JSON está em `/v3/api-docs` e Swagger UI em `/swagger-ui/index.html`.
 A documentação é pública; os endpoints de negócio continuam protegidos. No
-Swagger, informe o token JWT no botão **Authorize**. O extrato ainda não faz
-parte desta versão. O springdoc 3.0.3 é da linha para
-Spring Boot 4.0; a geração dos dois prefixos é verificada no teste HTTP real.
+Swagger, informe o token JWT no botão **Authorize**. O extrato está disponível
+nos dois prefixos, conforme a seção **Extrato de liquidações**. O springdoc
+3.0.3 é da linha para Spring Boot 4.0; a geração dos dois prefixos é
+verificada no teste HTTP real.
 
 **Manutenção global:** a S01 não define privilégios administrativos globais.
 Não há endpoint HTTP para criar taxas, spreads ou cotações; autenticação de
 usuário organizacional não confere tal privilégio. Os registros continuam
 disponíveis pela porta interna B05 para operação controlada fora do navegador,
-com acesso restrito ao PostgreSQL. Manutenção HTTP futura exige identidade e
-permissão administrativa persistentes, provisionamento e auditoria próprios.
-Esta lacuna impede demonstrar pelo navegador a atualização manual exigida no
-enunciado, até decisão e implementação separadas.
+com acesso restrito ao PostgreSQL. A atualização manual de taxas e cotações
+não está disponível pelo navegador neste MVP; as operações demonstrativas
+dependem do provisionamento controlado do histórico financeiro.
 
 ### Fluxo de exemplo com curl
 
 Inicie o PostgreSQL e a aplicação conforme **Configuração local**, **Executar**
-e **Autenticação local** acima, incluindo segredo JWT e usuário provisionado.
+e **Autenticação e gestão de usuários** acima, incluindo segredo JWT e usuário provisionado.
 Para o exemplo USD, o operador precisa previamente registrar taxa base,
 spread e cotação vigentes pela operação administrativa controlada da B05;
 sem eles a liquidação retorna 503. Os comandos abaixo exigem `jq` e usam o
