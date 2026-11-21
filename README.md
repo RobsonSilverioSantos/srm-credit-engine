@@ -219,6 +219,17 @@ dependências do lockfile e `npm run lint`, `npm test` e `npm run build`
 passaram; Vitest reportou 4 arquivos e 21 testes aprovados. Esses são resultados
 locais desta sessão, não testes manuais de ponta a ponta.
 
+**Aferição manual adicional em 21/11/2026:** o responsável técnico confirmou que
+**C1 (R$ 92.859,94), C2 (R$ 23.337,77) e C3 (US$ 17.094,67)**
+coincidiram com o enunciado até os centavos na **pré-simulação pela interface**.
+C1 e C2 são **relatos de conferência humana** sem captura individual versionada;
+C3 foi conferido também em **captura visual compartilhada**, com valor presente
+BRL R$ 92.859,94, deságio R$ 7.140,06 e câmbio de demonstração 5,4321 BRL/USD.
+Ver [registro de validação dos golden cases](docs/validacao/VALIDACAO_GOLDEN_CASES_C1_C2_C3_2026-11-21.md)
+e [AI_USAGE.md](AI_USAGE.md#AFERICAO-MANUAL-01--golden-cases-c1-c2-e-c3-pela-interface-21112026).
+Esta aferição é distinta da regressão automatizada D03 e **não comprova
+liquidação bancária nem homologação de produção**.
+
 As implementações que compõem a baseline foram integradas por PRs revisados e
 integrados pelo responsável técnico: [B07 #19](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/19),
 [B08 #20](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/20),

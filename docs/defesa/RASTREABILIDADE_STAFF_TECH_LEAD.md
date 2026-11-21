@@ -1,9 +1,10 @@
 # Rastreabilidade — expectativas Staff / Tech Lead
 
-**Avaliação documental de partida:** 20/11/2026. **Atualização de evidências de Git/PR:** 20/11/2026; documentos e PRs não substituem execução independente de testes. Diferenciar **arquivo existente**, **revisão humana pendente**, **implementação futura** e **evidência operacional real**. Esta tabela não declara conclusão do desenvolvimento.
+**Avaliação documental de partida:** 20/11/2026. **Atualização de evidências:** 21/11/2026, com aferição manual de C1–C3 pelo responsável técnico; documentos e PRs não substituem execução independente de testes. Diferenciar **arquivo existente**, **revisão humana pendente**, **implementação futura** e **evidência operacional real**. Esta tabela não declara conclusão do desenvolvimento.
 
-| Critério do enunciado | Onde encontrar | Estado em 20/11/2026 | Evidência exigida na defesa |
+| Critério do enunciado | Onde encontrar | Estado e evidências registradas | Evidência exigida na defesa |
 |---|---|---|---|
+| Golden cases — corretude financeira C1–C3 | `backend/app/src/test/kotlin/br/com/srm/creditengine/precificacao/PrecificacaoTest.kt`, [registro manual 21/11/2026](../validacao/VALIDACAO_GOLDEN_CASES_C1_C2_C3_2026-11-21.md), `AI_USAGE.md` (AFERICAO-MANUAL-01) | **3/3 resultados coincidentes nos centavos informados pelo responsável**; C3 também confirmado em captura React; C1/C2 sem captura individual; testes Kotlin versionados e regressão D03 separados | Apresentar valores C1 = R$ 92.859,94, C2 = R$ 23.337,77, C3 = US$ 17.094,67, explicar premissas e `HALF_EVEN`; não afirmar homologação, liquidação real ou execução CI nesta coleta |
 | SQL versus NoSQL | `docs/adr/ADR-018-postgresql-vs-nosql.md` e `DECISIONS.md` | ADR redigido; validação humana pendente | alternativas, integridade, custos e critérios de revisão |
 | Monólito versus microserviços | `docs/adr/ADR-005-monolito-modular-vs-microservicos.md` | ADR redigido; validação humana pendente | fronteira ACID, trade-offs e modularização |
 | Síncrono versus eventos | `docs/adr/ADR-019-sincrono-vs-eventos.md` | ADR redigido; validação humana pendente | qual transação permanece síncrona e por quê |
@@ -21,7 +22,7 @@
 
 ## Checklist para a entrega
 
-- [x] Golden cases C1–C3 passaram na regressão backend local com PostgreSQL descartável; ver `AI_USAGE.md` — D03.
+- [x] Golden cases C1–C3 possuem testes de regressão backend documentados em `AI_USAGE.md` — D03 — e foram **conferidos manualmente pela interface** pelo responsável em 21/11/2026: C1/C2 por relato e C3 por relato/captura visual; ver [registro de aferição](../validacao/VALIDACAO_GOLDEN_CASES_C1_C2_C3_2026-11-21.md). A captura C3 demonstra a **pré-simulação**, não a liquidação.
 - [x] Liquidação concorrente, idempotência, rollback e isolamento incluídos na regressão local com PostgreSQL real e na evidência do PR [#19](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/19).
 - [x] Setup e checks locais reproduzidos; CI remota dos PRs [#7](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/7), [#25](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/25), [#26](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/26) e PR D03 passaram. A execução mais recente registrada é [#44850079836](https://github.com/RobsonSilverioSantos/srm-credit-engine/actions/runs/44850079836) no commit `cbdbd20`; falhas anteriores do mesmo teste frontend estão documentadas e devem ser avaliadas pelo revisor.
 - [ ] C4 nível 1/2 validado de acordo com a implementação final.
@@ -36,7 +37,7 @@
 ## Roteiro de defesa técnica — evidência, demonstração e limites
 
 1. **Delimitar o que está sendo defendido.** Apresentar `SPEC.md` e `DECISIONS.md`: trata-se de MVP demonstrativo, sem transferência bancária, com premissas financeiras ainda não homologadas pelo negócio. Não apresentar o C4 como arquitetura de alta escala.
-2. **Demonstrar precisão financeira.** Mostrar os testes C1–C3 e seus valores esperados. Explicar que o frontend exibe valores do backend e não calcula montantes. A evidência local da regressão backend está registrada em `AI_USAGE.md`; ela não homologa as premissas de negócio.
+2. **Demonstrar precisão financeira.** Mostrar os testes C1–C3 e seus valores esperados (C1 R$ 92.859,94; C2 R$ 23.337,77; C3 US$ 17.094,67). O responsável confirmou **3/3 pela UI** em 21/11/2026, com captura compartilhada do C3; a [aferição manual](../validacao/VALIDACAO_GOLDEN_CASES_C1_C2_C3_2026-11-21.md) separa C1/C2 (relato) de C3 (captura). Explicar que frontend exibe valores do backend e não calcula montantes; testes Kotlin e execução D03 são evidências diferentes. Nenhum desses resultados, isoladamente, homologa premissas financeiras de produção.
 3. **Explicar a simulação pré-cadastro.** Percorrer o BFF/API e os testes de [B08-S01 #23](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/23): a prévia é indicativa, não persiste recebível/liquidação e não reserva taxa/câmbio.
 4. **Provar integridade transacional.** Executar `cd backend && bash scripts/test-cadastro-postgres.sh` em ambiente local com Docker. A execução D03 reportou 70 testes, sem falhas, erros ou ignorados; o banco temporário é removido pelo script. Usar [B07 #19](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/19) para localizar os cenários de concorrência, replay idempotente, rollback e isolamento. Distinguir a regressão atualmente reexecutada do relato original do PR.
 5. **Apresentar contratos e extrato.** Relacionar BFF/API e OpenAPI ao [B08 #20](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/20), e filtros/paginação server-side aos [B08-E01 #22](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/22) e [F03 #25](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/25). Os filtros de datas seguem dias inclusivos em UTC; paginação por offset pode deslocar registros entre consultas.
