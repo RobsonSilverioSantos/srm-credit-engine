@@ -274,10 +274,22 @@ testes unitários da precificação ficam em `app`, usando o JUnit já configura
 
 `TaxasPorta` permite registrar manualmente versões de taxa base, spread por
 modalidade e cotação BRL por USD, e consultar os dados para um snapshot.
-Não há endpoint de manutenção nem carga automática de valores: o registro é
-realizado por operação controlada fora da interface HTTP, com acesso restrito
-à infraestrutura de demonstração. Registros existentes nunca são atualizados;
-vigências futuras podem ser cadastradas antecipadamente.
+Não há endpoint HTTP de manutenção financeira. Em execução independente,
+o histórico precisa ser provisionado por operação controlada fora do navegador,
+com acesso restrito à infraestrutura de demonstração.
+
+**Exceção explícita — stack Docker local:** o overlay `compose.full.yaml`
+ativa o perfil `demo` e `SRM_DEMO_BOOTSTRAP_TAXAS=true`. O bootstrap
+`BootstrapTaxasDemo` cria somente os valores ausentes entre os registros
+vigentes: base `0.0100000000`, spread de duplicata `0.0150000000` e de
+cheque pré-datado `0.0250000000`. Também cria cotação fictícia BRL/USD
+`5.4321000000` (golden case C3) se não houver cotação válida. O câmbio
+de demonstração expira em 30 minutos por padrão, não se renova durante a
+execução e pode ganhar uma nova versão fictícia na próxima inicialização.
+O processo opera dentro de uma transação com trava de inicialização para
+evitar duplicações concorrentes; nunca altera ou elimina registros antigos.
+Sem perfil `demo` **e** a propriedade explícita, nada é carregado.
+Não utilizar essas taxas fictícias em produção.
 A escala máxima é 10 casas, sem arredondamento na gravação; vigências aceitam
 precisão de microssegundos, como no PostgreSQL.
 
