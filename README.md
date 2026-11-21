@@ -85,12 +85,20 @@ use um terminal interativo:
 - Windows PowerShell: `.\scripts\bootstrap-master.ps1` (ou
   `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\bootstrap-master.ps1`).
 
-O comando executa o **JAR dentro de um contêiner com TTY**, não `gradlew
-bootRun`, e solicita UUID de organização, e-mail e senha do MASTER
-(12 a 72 bytes UTF-8), sem exibir a senha. Use o UUID demonstrativo acima.
-Só é permitido um MASTER por organização; se ele já existir, não tente
-reprovisioná-lo. Depois, entre pela interface principal para criar ADMIN e
-OPERADOR, conforme a hierarquia S02/F04.
+O comando executa o **JAR dentro de um contêiner com TTY**, não
+`gradlew bootRun`, e solicita UUID de organização, e-mail, senha
+(12 a 72 bytes UTF-8) e confirmação, sem exibir a senha.
+Se o UUID, o e-mail, o tamanho da senha ou a confirmação estiverem inválidos,
+o terminal informa a restrição e permite corrigir o campo sem reiniciar
+o provisionamento. A senha não é registrada nos logs nem em argumentos.
+
+Use o UUID demonstrativo acima e aguarde a mensagem `MASTER provisionado.`
+antes de tentar entrar. Só é permitido um MASTER por organização; se ele
+já existir, não tente reprovisioná-lo nem apagar os dados.
+Após atualizar o código do provisionamento, reconstrua os contêineres
+com o comando normal de inicialização antes de executá-lo.
+Depois, entre pela interface principal para criar ADMIN e OPERADOR,
+conforme a hierarquia S02/F04.
 
 **Taxas e cotações não são criadas pela inicialização.** Para simular e
 liquidar, prepare taxa base, spreads e (se for pagar em USD) cotação vigente
