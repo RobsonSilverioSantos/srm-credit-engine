@@ -1,5 +1,6 @@
 package br.com.srm.creditengine.seguranca.adaptador.saida
 
+import br.com.srm.creditengine.usuarios.dominio.PerfilUsuario
 import java.sql.ResultSet
 import java.util.UUID
 import org.springframework.jdbc.core.JdbcTemplate
@@ -16,10 +17,11 @@ class UsuarioAutenticavel(
     val organizacaoId: UUID,
     private val email: String,
     private val senhaHash: String,
+    private val perfil: PerfilUsuario,
     private val habilitado: Boolean,
 ) : UserDetails {
     override fun getAuthorities(): Collection<GrantedAuthority> =
-        listOf(SimpleGrantedAuthority("ROLE_USER"))
+        listOf(SimpleGrantedAuthority("ROLE_USER"), SimpleGrantedAuthority("ROLE_${perfil.name}"))
 
     override fun getPassword(): String = senhaHash
 
@@ -42,7 +44,8 @@ class UsuarioJdbc(
         val emailNormalizado = username.trim()
         val usuario = jdbc.query(
             """
-            SELECT u.id, u.organizacao_id, u.email, u.senha_hash, u.ativo, o.ativa AS organizacao_ativa
+            SELECT u.id, u.organizacao_id, u.email, u.senha_hash, u.perfil,
+                   u.ativo, o.ativa AS organizacao_ativa
             FROM usuarios u
             JOIN organizacoes o ON o.id = u.organizacao_id
             WHERE lower(u.email) = lower(?)
@@ -61,6 +64,7 @@ class UsuarioJdbc(
             rs.getObject("organizacao_id", UUID::class.java),
             rs.getString("email"),
             rs.getString("senha_hash"),
+            PerfilUsuario.valueOf(rs.getString("perfil")),
             rs.getBoolean("ativo") && rs.getBoolean("organizacao_ativa"),
         )
     }
