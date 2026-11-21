@@ -5,6 +5,7 @@
 ## Arquitetura e domínio
 
 - Kotlin + Spring Boot/Gradle Kotlin DSL + PostgreSQL/Flyway; monólito modular; hexagonal também em React/TypeScript.
+- **Convenção Kotlin obrigatória:** um único tipo top-level nomeado por arquivo (`class`, `data class`, `enum class`, `interface`, `fun interface`, `object` e `typealias`); nome do arquivo igual ao tipo. Funções top-level sem tipo ficam em arquivo descritivo próprio; não agrupar DTOs, exceções ou portas somente por conveniência. Tipos aninhados genuínos não exigem arquivos adicionais. A tarefa B13 consolida o legado e adiciona verificação automática. Nenhuma refatoração autoriza alterar contratos ou regras financeiras.
 - Modelo em pt-BR: `Organizacao`/`organizacaoId`/`organizacao_id` define o escopo de autenticação, autorização e isolamento. `Cedente` é a entidade de negócio que cede o recebível, vinculada à organização. Não confundir cedente com organização nem criar entidade adicional para a parte compradora neste MVP.
 - Auth local Spring Security/BCrypt + token assinado, segredos em ambiente, organização **somente da identidade validada**; nenhum Keycloak ou federação no MVP.
 - `BigDecimal`, HALF_EVEN e golden cases C1–C3; spreads e taxas em fracões, JSON como strings. Estratégias separadas da persistência.
