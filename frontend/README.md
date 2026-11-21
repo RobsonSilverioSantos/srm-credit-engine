@@ -13,22 +13,63 @@ npm test
 npm run build
 ```
 
-Inicie também o backend em `localhost:8080`, seguindo `backend/README.md`. O
-servidor Vite encaminha `/api` e `/bff` ao backend; em produção, configure o
-proxy da mesma origem para esses caminhos e use HTTPS.
 
-Abra a URL exibida pelo Vite e entre com um usuário local já cadastrado no
-backend. A organização é determinada pelo token validado pelo servidor. O
-painel simula sem persistir e sem reservar taxas; após a prévia, permite
-cadastrar o recebível e confirmar sua liquidação. Valores e taxas são exibidos
-como strings retornadas pelo backend, sem cálculo financeiro no navegador.
+Inicie também o backend em `localhost:8080`, seguindo `backend/README.md`.
+Em desenvolvimento, o Vite encaminha `/api` e `/bff` para
+`http://localhost:8080`. Em produção, publique ambas as rotas na mesma
+origem do frontend, utilizando HTTPS e um proxy reverso.
 
-Uma chave de idempotência é mantida em memória para as retentativas da mesma
-liquidação, inclusive após expiração e novo login na mesma conta. Ela não
-sobrevive ao recarregamento ou fechamento da página: anote o identificador do
-recebível e verifique seu estado no servidor antes de iniciar outra operação.
-Cadastro de recebível não é idempotente; se seu resultado for incerto, o painel
-bloqueia novas tentativas e orienta a consulta ao servidor.
+## Painel de simulação e liquidação (F01)
+
+Abra a URL principal exibida pelo Vite e autentique-se com um usuário
+local previamente cadastrado no backend.
+
+A organização é determinada pelo token JWT validado pelo servidor.
+
+O painel permite simular um recebível sem persistir dados ou reservar taxas.
+Após a simulação indicativa, o operador pode cadastrar o recebível e
+confirmar sua liquidação.
+
+Os valores financeiros e as taxas são exibidos conforme retornados pelo
+backend, sem cálculos financeiros no navegador.
+
+Uma chave de idempotência é mantida em memória para as tentativas da mesma
+liquidação, inclusive após expiração da sessão e nova autenticação na mesma
+conta. Essa chave não sobrevive ao recarregamento ou fechamento da página.
+
+O cadastro de recebível não é idempotente. Se seu resultado for incerto,
+o painel bloqueia novas tentativas e orienta o operador a consultar o
+estado da operação no servidor antes de prosseguir.
+
+## Extrato de liquidações (F03)
+
+Acesse `/extrato.html` para utilizar o extrato de liquidações.
+
+O extrato possui autenticação própria nesta etapa, mantendo o token JWT
+somente em memória. Respostas HTTP 401 exigem nova autenticação.
+
+O extrato consome o BFF e permite filtrar liquidações por período, cedente
+(UUID) e moeda. Os filtros de datas seguem o contrato atual da API,
+que considera dias inclusivos em UTC.
+
+A paginação e a ordenação são realizadas no servidor. Inserções entre
+consultas de páginas diferentes podem deslocar registros.
+
+Os valores financeiros e os snapshots históricos são exibidos conforme
+recebidos do backend, sem recálculo no frontend.
+
+A tela permanece como entrada independente para evitar conflitos entre
+as implementações paralelas F01 e F03. A integração posterior deverá
+compartilhar a sessão autenticada, conectar a navegação e reutilizar
+a porta `PortaExtrato` na `PaginaExtrato`.
+
+## Catálogo de componentes
+
+A URL principal também poderá disponibilizar o catálogo fictício de
+componentes conforme a configuração de navegação e build integrada.
+Os dados do catálogo são exclusivamente demonstrativos e não devem
+ser utilizados como fonte para operações financeiras reais.
+
 
 ## Reutilizar
 
@@ -53,11 +94,24 @@ bloqueia novas tentativas e orienta a consulta ao servidor.
 
 ## Fronteiras
 
-`main.tsx` injeta o adaptador BFF (`infraestrutura/`) na interface. Tipos de
-operação ficam em `dominio/`; portas e coordenação da confirmação, em
-`aplicacao/`; HTTP e validação das respostas ficam em `infraestrutura/`. A
-apresentação não executa HTTP nem aritmética monetária. O catálogo visual e
-seu adaptador em memória permanecem isolados para demonstração e testes.
+
+`main.tsx` compõe os adaptadores HTTP do BFF (`infraestrutura/`), as portas e os casos de uso (`aplicacao/`) e a apresentação da F01.
+
+`extrato.tsx` compõe os adaptadores HTTP de autenticação e consulta, as portas e a apresentação independente da F03.
+
+As duas implementações seguem as mesmas fronteiras da arquitetura hexagonal:
+
+- **Domínio (`dominio/`):** define tipos e contratos de dados, sem dependências de React, HTTP ou infraestrutura.
+- **Aplicação (`aplicacao/`):** define portas, validações e coordenação dos casos de uso, sem conhecer os detalhes dos adaptadores.
+- **Infraestrutura (`infraestrutura/`):** implementa as portas e a comunicação HTTP com o BFF, incluindo validação das respostas.
+- **Apresentação (`apresentacao/`):** implementa componentes e interações de interface, sem realizar chamadas HTTP diretamente nem cálculos financeiros.
+
+O catálogo visual permanece isolado para demonstração e testes, utilizando dados fictícios. Seus mocks não devem ser utilizados nas operações reais da F01 ou F03.
+
+O ESLint bloqueia imports diretos indevidos entre as camadas.
+
+A integração futura entre F01 e F03 deverá compartilhar a sessão autenticada e a navegação, preservando a separação das portas e dos adaptadores.
+
 
 Preferiu-se MUI Core a CSS/componentes próprios para aproveitar semântica,
 foco e controles já implementados. `Table` substitui a necessidade de um Data
