@@ -9,7 +9,7 @@ import br.com.srm.creditengine.liquidacao.aplicacao.porta.saida.IdentidadeLiquid
 import br.com.srm.creditengine.liquidacao.aplicacao.porta.saida.TransacaoLiquidacao
 import br.com.srm.creditengine.liquidacao.dominio.ConflitoLiquidacao
 import br.com.srm.creditengine.liquidacao.dominio.MoedaPagamento
-import br.com.srm.creditengine.liquidacao.dominio.ResultadoLiquidacao
+import br.com.srm.creditengine.liquidacao.aplicacao.porta.entrada.ResultadoOperacaoLiquidacao
 import br.com.srm.creditengine.precificacao.dominio.Modalidades
 import br.com.srm.creditengine.taxas.adaptador.saida.HistoricoFinanceiroJdbc
 import br.com.srm.creditengine.taxas.aplicacao.ManterEConsultarTaxas
@@ -127,11 +127,11 @@ class IntegridadeB07PostgresTest {
         val estado = jdbc.queryForMap("SELECT status, versao FROM recebiveis WHERE id = ?", id)
         assertThat(estado["status"]).isEqualTo("LIQUIDADO")
         assertThat(estado["versao"]).isEqualTo(1L)
-        assertThat(jdbc.queryForObject("SELECT versao_recebivel FROM liquidacoes WHERE id = ?", Long::class.java, vencedor.second.liquidacaoId)).isEqualTo(1L)
+        assertThat(jdbc.queryForObject("SELECT versao_recebivel FROM liquidacoes WHERE id = ?", Long::class.java, vencedor.second.liquidacao.liquidacaoId)).isEqualTo(1L)
         assertThat(jdbc.queryForObject("SELECT chave FROM idempotencia WHERE organizacao_id = ? AND situacao = 'CONCLUIDA' AND liquidacao_id = ?",
-            String::class.java, f.org, vencedor.second.liquidacaoId)).isEqualTo(vencedor.first)
+            String::class.java, f.org, vencedor.second.liquidacao.liquidacaoId)).isEqualTo(vencedor.first)
         assertThat(jdbc.queryForObject("SELECT count(*) FROM auditoria_liquidacoes WHERE organizacao_id = ? AND liquidacao_id = ?",
-            Int::class.java, f.org, vencedor.second.liquidacaoId)).isEqualTo(1)
+            Int::class.java, f.org, vencedor.second.liquidacao.liquidacaoId)).isEqualTo(1)
         listOf("liquidacoes", "idempotencia", "auditoria_liquidacoes").forEach { assertThat(f.contar(it)).isEqualTo(1) }
     }
 
@@ -159,19 +159,92 @@ class IntegridadeB07PostgresTest {
         val linha = jdbc.queryForMap("""SELECT l.id, l.recebivel_id, l.moeda_pagamento, l.valor_presente_brl,
             l.desagio_brl, l.valor_pagamento, i.resposta_http, i.situacao, r.status
             FROM liquidacoes l JOIN idempotencia i ON i.liquidacao_id = l.id AND i.organizacao_id = l.organizacao_id
-            JOIN recebiveis r ON r.id = l.recebivel_id WHERE l.id = ?""", primeiro.liquidacaoId)
-        assertThat(linha["id"]).isEqualTo(primeiro.liquidacaoId)
-        assertThat(linha["recebivel_id"]).isEqualTo(primeiro.recebivelId)
-        assertThat(linha["moeda_pagamento"]).isEqualTo(primeiro.moeda.name)
-        assertThat(linha["valor_presente_brl"] as BigDecimal).isEqualByComparingTo(primeiro.valorPresenteBrl)
-        assertThat(linha["desagio_brl"] as BigDecimal).isEqualByComparingTo(primeiro.desagioBrl)
-        assertThat(linha["valor_pagamento"] as BigDecimal).isEqualByComparingTo(primeiro.valorPagamento)
-        assertThat((linha["resposta_http"] as Number).toInt()).isEqualTo(primeiro.statusHttp)
+            JOIN recebiveis r ON r.id = l.recebivel_id WHERE l.id = ?""", primeiro.liquidacao.liquidacaoId)
+        assertThat(linha["id"]).isEqualTo(primeiro.liquidacao.liquidacaoId)
+        assertThat(linha["recebivel_id"]).isEqualTo(primeiro.liquidacao.recebivelId)
+        assertThat(linha["moeda_pagamento"]).isEqualTo(primeiro.liquidacao.moeda.name)
+        assertThat(linha["valor_presente_brl"] as BigDecimal).isEqualByComparingTo(primeiro.liquidacao.valorPresenteBrl)
+        assertThat(linha["desagio_brl"] as BigDecimal).isEqualByComparingTo(primeiro.liquidacao.desagioBrl)
+        assertThat(linha["valor_pagamento"] as BigDecimal).isEqualByComparingTo(primeiro.liquidacao.valorPagamento)
+        assertThat((linha["resposta_http"] as Number).toInt()).isEqualTo(primeiro.metadado)
         assertThat(linha["situacao"]).isEqualTo("CONCLUIDA")
         assertThat(linha["status"]).isEqualTo("LIQUIDADO")
         listOf("liquidacoes", "idempotencia", "auditoria_liquidacoes").forEach { assertThat(f.contar(it)).isEqualTo(1) }
         assertThrows<ConflitoLiquidacao> { f.servico().liquidar(comando.copy(recebivelId = f.recebivel())) }
         assertThrows<ConflitoLiquidacao> { f.servico().liquidar(comando.copy(moeda = MoedaPagamento.BRL)) }
+    }
+
+    @Test
+    fun `reserva historica concorrente preserva metadado no conflito e no replay`() {
+        val f = Fixture()
+        val original = f.servico().liquidar(ComandoLiquidacao(f.recebivel(), MoedaPagamento.BRL, "original"))
+        val id = f.recebivel()
+        val liquidacaoId = UUID.randomUUID()
+        val comando = ComandoLiquidacao(id, MoedaPagamento.BRL, "historico")
+        val hash = MessageDigest.getInstance("SHA-256").digest(
+            "LIQUIDAR_RECEBIVEL\n$id\nBRL".toByteArray(StandardCharsets.UTF_8),
+        )
+        dataSource.connection.use { conexao ->
+            conexao.autoCommit = false
+            try {
+                conexao.prepareStatement("""INSERT INTO liquidacoes
+                    (id, organizacao_id, recebivel_id, modalidade, valor_face_brl, prazo_meses, versao_recebivel,
+                     taxa_base_id, taxa_base_mensal, taxa_base_vigente_em, spread_id, spread_mensal, spread_vigente_em,
+                     valor_presente_brl, desagio_brl, moeda_pagamento, cotacao_cambial_id, taxa_brl_por_unidade,
+                     cotacao_vigente_em, cotacao_valida_ate, valor_pagamento, liquidada_em)
+                    SELECT ?, organizacao_id, ?, modalidade, valor_face_brl, prazo_meses, versao_recebivel,
+                     taxa_base_id, taxa_base_mensal, taxa_base_vigente_em, spread_id, spread_mensal, spread_vigente_em,
+                     valor_presente_brl, desagio_brl, moeda_pagamento, cotacao_cambial_id, taxa_brl_por_unidade,
+                     cotacao_vigente_em, cotacao_valida_ate, valor_pagamento, liquidada_em
+                    FROM liquidacoes WHERE id = ?""").use {
+                    it.setObject(1, liquidacaoId)
+                    it.setObject(2, id)
+                    it.setObject(3, original.liquidacao.liquidacaoId)
+                    check(it.executeUpdate() == 1)
+                }
+                conexao.prepareStatement("UPDATE recebiveis SET status = 'LIQUIDADO', versao = 1 WHERE id = ?").use {
+                    it.setObject(1, id)
+                    check(it.executeUpdate() == 1)
+                }
+                conexao.prepareStatement("""INSERT INTO idempotencia
+                    (id, organizacao_id, tipo_operacao, chave, hash_requisicao, situacao, liquidacao_id,
+                     resposta_http, resposta_corpo, concluido_em)
+                    SELECT ?, organizacao_id, tipo_operacao, ?, ?, 'CONCLUIDA', ?, 202,
+                        jsonb_set(jsonb_set(resposta_corpo, '{liquidacaoId}', to_jsonb(CAST(? AS text))),
+                                  '{recebivelId}', to_jsonb(CAST(? AS text))), CURRENT_TIMESTAMP
+                    FROM idempotencia WHERE organizacao_id = ? AND chave = 'original'""").use {
+                    it.setObject(1, UUID.randomUUID())
+                    it.setString(2, comando.chaveIdempotencia)
+                    it.setBytes(3, hash)
+                    it.setObject(4, liquidacaoId)
+                    it.setString(5, liquidacaoId.toString())
+                    it.setString(6, id.toString())
+                    it.setObject(7, f.org)
+                    check(it.executeUpdate() == 1)
+                }
+                val pid = conexao.createStatement().use { s -> s.executeQuery("SELECT pg_backend_pid()").use { r -> r.next(); r.getInt(1) } }
+                val executor = Executors.newSingleThreadExecutor()
+                try {
+                    val futuro = executor.submit<ResultadoOperacaoLiquidacao> { f.servico().liquidar(comando) }
+                    aguardarBloqueio(pid) { futuro.isDone }
+                    conexao.commit()
+                    val resultado = futuro.get(20, TimeUnit.SECONDS)
+                    assertThat(resultado.metadado).isEqualTo(202)
+                    assertThat(resultado.liquidacao.liquidacaoId).isEqualTo(liquidacaoId)
+                    assertThat(resultado.liquidacao.recebivelId).isEqualTo(id)
+                    assertThat(f.servico().liquidar(comando)).isEqualTo(resultado)
+                    assertThat(f.contar("liquidacoes")).isEqualTo(2)
+                    assertThat(f.contar("idempotencia")).isEqualTo(2)
+                    assertThat(f.contar("auditoria_liquidacoes")).isEqualTo(1)
+                } finally {
+                    conexao.rollback()
+                    executor.shutdownNow()
+                    check(executor.awaitTermination(10, TimeUnit.SECONDS))
+                }
+            } finally {
+                conexao.rollback()
+            }
+        }
     }
 
     @Test
@@ -210,10 +283,10 @@ class IntegridadeB07PostgresTest {
         ))
         val comando = ComandoLiquidacao(f.recebivel(), MoedaPagamento.USD, "c3")
         val c3 = f.servico().liquidar(comando)
-        assertThat(c1.valorPresenteBrl).isEqualByComparingTo("92859.94")
-        assertThat(c1.desagioBrl).isEqualByComparingTo("7140.06")
-        assertThat(c2.valorPresenteBrl).isEqualByComparingTo("23337.77")
-        assertThat(c3.valorPagamento).isEqualByComparingTo("17094.67")
+        assertThat(c1.liquidacao.valorPresenteBrl).isEqualByComparingTo("92859.94")
+        assertThat(c1.liquidacao.desagioBrl).isEqualByComparingTo("7140.06")
+        assertThat(c2.liquidacao.valorPresenteBrl).isEqualByComparingTo("23337.77")
+        assertThat(c3.liquidacao.valorPagamento).isEqualByComparingTo("17094.67")
         val snapshots = jdbc.queryForList("SELECT * FROM liquidacoes WHERE organizacao_id = ? ORDER BY id", f.org)
         val futuro = f.instante.plusSeconds(1)
         f.taxas.registrarTaxaBase(BigDecimal("0.02"), futuro)
@@ -221,14 +294,14 @@ class IntegridadeB07PostgresTest {
         f.taxas.registrarCotacao(BigDecimal("6.00"), futuro)
         assertThat(f.servico().liquidar(comando)).isEqualTo(c3)
         val mutacoes = listOf(
-            "UPDATE liquidacoes SET valor_pagamento = 1 WHERE id = '${c3.liquidacaoId}'",
-            "DELETE FROM liquidacoes WHERE id = '${c3.liquidacaoId}'",
-            "UPDATE auditoria_liquidacoes SET evento = 'ALTERADO' WHERE liquidacao_id = '${c3.liquidacaoId}'",
-            "DELETE FROM auditoria_liquidacoes WHERE liquidacao_id = '${c3.liquidacaoId}'",
-            "UPDATE idempotencia SET resposta_http = 200 WHERE liquidacao_id = '${c3.liquidacaoId}'",
-            "UPDATE taxas_base SET taxa_mensal = 0.1 WHERE id = (SELECT taxa_base_id FROM liquidacoes WHERE id = '${c3.liquidacaoId}')",
-            "UPDATE spreads_recebiveis SET spread_mensal = 0.1 WHERE id = (SELECT spread_id FROM liquidacoes WHERE id = '${c3.liquidacaoId}')",
-            "DELETE FROM cotacoes_cambiais WHERE id = (SELECT cotacao_cambial_id FROM liquidacoes WHERE id = '${c3.liquidacaoId}')",
+            "UPDATE liquidacoes SET valor_pagamento = 1 WHERE id = '${c3.liquidacao.liquidacaoId}'",
+            "DELETE FROM liquidacoes WHERE id = '${c3.liquidacao.liquidacaoId}'",
+            "UPDATE auditoria_liquidacoes SET evento = 'ALTERADO' WHERE liquidacao_id = '${c3.liquidacao.liquidacaoId}'",
+            "DELETE FROM auditoria_liquidacoes WHERE liquidacao_id = '${c3.liquidacao.liquidacaoId}'",
+            "UPDATE idempotencia SET resposta_http = 200 WHERE liquidacao_id = '${c3.liquidacao.liquidacaoId}'",
+            "UPDATE taxas_base SET taxa_mensal = 0.1 WHERE id = (SELECT taxa_base_id FROM liquidacoes WHERE id = '${c3.liquidacao.liquidacaoId}')",
+            "UPDATE spreads_recebiveis SET spread_mensal = 0.1 WHERE id = (SELECT spread_id FROM liquidacoes WHERE id = '${c3.liquidacao.liquidacaoId}')",
+            "DELETE FROM cotacoes_cambiais WHERE id = (SELECT cotacao_cambial_id FROM liquidacoes WHERE id = '${c3.liquidacao.liquidacaoId}')",
         )
         mutacoes.forEach { sql ->
             val erro = assertThrows<DataAccessException> { jdbc.update(sql) }
@@ -250,7 +323,7 @@ class IntegridadeB07PostgresTest {
         val servico = ServicoLiquidacao(IdentidadeConfiavel { IdentidadeLiquidacao(f.org, f.usuario) },
             RecebiveisJdbc(jdbc), repositorioNoLimite, taxasNoLimite, repositorioNoLimite, noLimite)
         val confirmado = servico.liquidar(ComandoLiquidacao(idAceito, MoedaPagamento.USD, "limite"))
-        assertThat(confirmado.valorPagamento).isEqualByComparingTo("17094.67")
+        assertThat(confirmado.liquidacao.valorPagamento).isEqualByComparingTo("17094.67")
 
         val outro = Fixture()
         val idRejeitado = outro.recebivel()
@@ -286,7 +359,7 @@ class IntegridadeB07PostgresTest {
                 val pid = bloqueador.createStatement().use { s -> s.executeQuery("SELECT pg_backend_pid()").use { r -> r.next(); r.getInt(1) } }
                 val executor = Executors.newSingleThreadExecutor()
                 try {
-                    val futuro = executor.submit<ResultadoLiquidacao> {
+                    val futuro = executor.submit<ResultadoOperacaoLiquidacao> {
                         f.servico(transacao = repositorio).liquidar(ComandoLiquidacao(id, MoedaPagamento.USD, "espera"))
                     }
                     aguardarBloqueio(pid) { futuro.isDone }
@@ -329,7 +402,7 @@ class IntegridadeB07PostgresTest {
                 val pid = bloqueador.createStatement().use { s -> s.executeQuery("SELECT pg_backend_pid()").use { r -> r.next(); r.getInt(1) } }
                 val executor = Executors.newSingleThreadExecutor()
                 try {
-                    val futuro = executor.submit<ResultadoLiquidacao> { f.servico().liquidar(comando) }
+                    val futuro = executor.submit<ResultadoOperacaoLiquidacao> { f.servico().liquidar(comando) }
                     aguardarBloqueio(pid) { futuro.isDone }
                     bloqueador.rollback()
                     val resultado = futuro.get(20, TimeUnit.SECONDS)

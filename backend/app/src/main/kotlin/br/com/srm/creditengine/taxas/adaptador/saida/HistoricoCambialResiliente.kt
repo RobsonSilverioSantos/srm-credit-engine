@@ -17,8 +17,6 @@ import java.util.concurrent.TimeoutException
 import org.springframework.dao.TransientDataAccessException
 import org.springframework.transaction.support.TransactionSynchronizationManager
 
-class ConsultaCambialIndisponivel(message: String, cause: Throwable) : IllegalStateException(message, cause)
-
 class HistoricoCambialResiliente(
     private val historico: HistoricoFinanceiroPorta,
     private val timeout: Duration,

@@ -22,9 +22,6 @@ import org.springframework.web.bind.annotation.RestControllerAdvice
 import org.springframework.web.server.ResponseStatusException
 import org.springframework.web.servlet.resource.NoResourceFoundException
 
-data class ErroHttp(val codigo: String, val mensagem: String)
-class RecursoNaoEncontrado : RuntimeException()
-
 @RestControllerAdvice
 class ErrosHttp {
     private val logger = LoggerFactory.getLogger(ErrosHttp::class.java)

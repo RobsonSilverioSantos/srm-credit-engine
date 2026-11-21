@@ -103,14 +103,14 @@ class LiquidacaoPostgresTest {
         val comando = ComandoLiquidacao(f.recebivel(), MoedaPagamento.USD, "c3")
         assertThrows<IllegalArgumentException> { comando.copy(chaveIdempotencia = " ") }
         val c3 = f.servico().liquidar(comando)
-        assertThat(c1.valorPresenteBrl).isEqualByComparingTo("92859.94")
-        assertThat(c1.desagioBrl).isEqualByComparingTo("7140.06")
-        assertThat(c2.valorPagamento).isEqualByComparingTo("23337.77")
-        assertThat(c2.desagioBrl).isEqualByComparingTo("1662.23")
-        assertThat(c3.valorPresenteBrl).isEqualByComparingTo("92859.94")
-        assertThat(c3.valorPagamento).isEqualByComparingTo("17094.67")
-        assertThat(c3.desagioBrl).isEqualByComparingTo("7140.06")
-        val snapshot = jdbc.queryForMap("SELECT * FROM liquidacoes WHERE id = ?", c3.liquidacaoId)
+        assertThat(c1.liquidacao.valorPresenteBrl).isEqualByComparingTo("92859.94")
+        assertThat(c1.liquidacao.desagioBrl).isEqualByComparingTo("7140.06")
+        assertThat(c2.liquidacao.valorPagamento).isEqualByComparingTo("23337.77")
+        assertThat(c2.liquidacao.desagioBrl).isEqualByComparingTo("1662.23")
+        assertThat(c3.liquidacao.valorPresenteBrl).isEqualByComparingTo("92859.94")
+        assertThat(c3.liquidacao.valorPagamento).isEqualByComparingTo("17094.67")
+        assertThat(c3.liquidacao.desagioBrl).isEqualByComparingTo("7140.06")
+        val snapshot = jdbc.queryForMap("SELECT * FROM liquidacoes WHERE id = ?", c3.liquidacao.liquidacaoId)
         assertThat(snapshot["taxa_base_id"]).isEqualTo(f.base)
         assertThat(snapshot["spread_id"]).isEqualTo(f.spread)
         assertThat(snapshot["cotacao_cambial_id"]).isEqualTo(f.cotacao)
@@ -128,15 +128,15 @@ class LiquidacaoPostgresTest {
         assertThat((snapshot["spread_vigente_em"] as java.sql.Timestamp).toInstant()).isEqualTo(f.instante)
         assertThat((snapshot["cotacao_vigente_em"] as java.sql.Timestamp).toInstant()).isEqualTo(f.instante)
         val validade = jdbc.queryForObject("SELECT cotacao_valida_ate FROM liquidacoes WHERE id = ?",
-            OffsetDateTime::class.java, c3.liquidacaoId)
+            OffsetDateTime::class.java, c3.liquidacao.liquidacaoId)
         assertThat(validade?.toInstant()).isEqualTo(f.instante.plusSeconds(1800))
         val replay = jdbc.queryForMap("""SELECT resposta_http, resposta_corpo->>'valorPagamento' AS valor,
-            resposta_corpo->>'moeda' AS moeda FROM idempotencia WHERE liquidacao_id = ?""", c3.liquidacaoId)
+            resposta_corpo->>'moeda' AS moeda FROM idempotencia WHERE liquidacao_id = ?""", c3.liquidacao.liquidacaoId)
         assertThat((replay["resposta_http"] as Number).toInt()).isEqualTo(201)
         assertThat(replay["valor"]).isEqualTo("17094.67")
         assertThat(replay["moeda"]).isEqualTo("USD")
         assertThrows<DataAccessException> {
-            jdbc.update("UPDATE liquidacoes SET valor_pagamento = 1 WHERE id = ?", c3.liquidacaoId)
+            jdbc.update("UPDATE liquidacoes SET valor_pagamento = 1 WHERE id = ?", c3.liquidacao.liquidacaoId)
         }
         assertThat(jdbc.queryForObject("SELECT versao FROM recebiveis WHERE id = ?", Long::class.java, comando.recebivelId)).isEqualTo(1L)
         assertThat(f.contar("liquidacoes")).isEqualTo(3)
@@ -159,8 +159,8 @@ class LiquidacaoPostgresTest {
         val outro = fixture()
         assertThrows<RecebivelNaoEncontrado> { outro.servico().liquidar(comando) }
         val resultado = f.servico(relogio = clock).liquidar(comando)
-        assertThat(resultado.valorPresenteBrl).isEqualByComparingTo("83961.93")
-        assertThat(jdbc.queryForObject("SELECT spread_mensal FROM liquidacoes WHERE id = ?", BigDecimal::class.java, resultado.liquidacaoId))
+        assertThat(resultado.liquidacao.valorPresenteBrl).isEqualByComparingTo("83961.93")
+        assertThat(jdbc.queryForObject("SELECT spread_mensal FROM liquidacoes WHERE id = ?", BigDecimal::class.java, resultado.liquidacao.liquidacaoId))
             .isEqualByComparingTo("0.05")
     }
 
@@ -178,7 +178,7 @@ class LiquidacaoPostgresTest {
         val estado = jdbc.queryForMap("SELECT status, versao FROM recebiveis WHERE id = ?", id)
         assertThat(estado["status"]).isEqualTo("DISPONIVEL")
         assertThat(estado["versao"]).isEqualTo(0L)
-        assertThat(f.servico().liquidar(comando).recebivelId).isEqualTo(id)
+        assertThat(f.servico().liquidar(comando).liquidacao.recebivelId).isEqualTo(id)
     }
 
     @Test
@@ -300,7 +300,7 @@ class LiquidacaoPostgresTest {
         val executor = Executors.newFixedThreadPool(2)
         try {
             val tarefas = (1..2).map {
-                executor.submit<br.com.srm.creditengine.liquidacao.dominio.ResultadoLiquidacao> {
+                executor.submit<br.com.srm.creditengine.liquidacao.aplicacao.porta.entrada.ResultadoOperacaoLiquidacao> {
                     f.servico(transacao = coordenada).liquidar(comando)
                 }
             }
@@ -328,7 +328,7 @@ class LiquidacaoPostgresTest {
         try {
             val tarefas = MoedaPagamento.entries.map { moeda ->
                 executor.submit<Result<UUID>> {
-                    runCatching { f.servico(transacao = coordenada).liquidar(ComandoLiquidacao(id, moeda, "mesma")).liquidacaoId }
+                    runCatching { f.servico(transacao = coordenada).liquidar(ComandoLiquidacao(id, moeda, "mesma")).liquidacao.liquidacaoId }
                 }
             }
             val resultados = tarefas.map { it.get(20, TimeUnit.SECONDS) }
@@ -356,7 +356,7 @@ class LiquidacaoPostgresTest {
         try {
             val tarefas = listOf("a", "b").map { chave ->
                 executor.submit<Result<UUID>> {
-                    runCatching { f.servico(transacao = coordenada).liquidar(ComandoLiquidacao(id, MoedaPagamento.BRL, chave)).liquidacaoId }
+                    runCatching { f.servico(transacao = coordenada).liquidar(ComandoLiquidacao(id, MoedaPagamento.BRL, chave)).liquidacao.liquidacaoId }
                 }
             }
             val resultados = tarefas.map { it.get(20, TimeUnit.SECONDS) }

@@ -5,6 +5,7 @@ import br.com.srm.creditengine.liquidacao.aplicacao.porta.saida.IdentidadeLiquid
 import br.com.srm.creditengine.liquidacao.aplicacao.porta.saida.AuditoriaLiquidacao
 import br.com.srm.creditengine.liquidacao.aplicacao.porta.saida.PersistenciaLiquidacao
 import br.com.srm.creditengine.liquidacao.aplicacao.porta.saida.TransacaoLiquidacao
+import br.com.srm.creditengine.liquidacao.aplicacao.porta.entrada.ResultadoOperacaoLiquidacao
 import br.com.srm.creditengine.liquidacao.dominio.ConflitoLiquidacao
 import br.com.srm.creditengine.liquidacao.dominio.Liquidacao
 import br.com.srm.creditengine.liquidacao.dominio.MoedaPagamento
@@ -28,7 +29,7 @@ class LiquidacaoJdbc(
 ) : IdempotenciaLiquidacao, TransacaoLiquidacao, PersistenciaLiquidacao, AuditoriaLiquidacao {
     private fun Instant.utc(): OffsetDateTime = atOffset(ZoneOffset.UTC)
 
-    override fun consultar(organizacaoId: UUID, chave: String, hash: ByteArray): ResultadoLiquidacao? {
+    override fun consultar(organizacaoId: UUID, chave: String, hash: ByteArray): ResultadoOperacaoLiquidacao? {
         val resultado = jdbc.query(
             """SELECT i.hash_requisicao, i.situacao, i.resposta_http,
                       i.resposta_corpo->>'liquidacaoId' AS liquidacao_id,
@@ -45,11 +46,14 @@ class LiquidacaoJdbc(
                     throw ConflitoLiquidacao("Chave de idempotência já usada com outro comando")
                 }
                 check(rs.getString("situacao") == "CONCLUIDA") { "Reserva de idempotência não concluída" }
-                ResultadoLiquidacao(
-                    UUID.fromString(rs.getString("liquidacao_id")), UUID.fromString(rs.getString("recebivel_id")),
-                    MoedaPagamento.valueOf(rs.getString("moeda")), rs.getBigDecimal("vp"),
-                    rs.getBigDecimal("desagio"), rs.getBigDecimal("pagamento"),
-                    Instant.parse(rs.getString("liquidada_em")), rs.getInt("resposta_http"),
+                ResultadoOperacaoLiquidacao(
+                    ResultadoLiquidacao(
+                        UUID.fromString(rs.getString("liquidacao_id")), UUID.fromString(rs.getString("recebivel_id")),
+                        MoedaPagamento.valueOf(rs.getString("moeda")), rs.getBigDecimal("vp"),
+                        rs.getBigDecimal("desagio"), rs.getBigDecimal("pagamento"),
+                        Instant.parse(rs.getString("liquidada_em")),
+                    ),
+                    rs.getInt("resposta_http"),
                 )
             }, organizacaoId, chave,
         ).singleOrNull()
@@ -62,7 +66,7 @@ class LiquidacaoJdbc(
         chave: String,
         hash: ByteArray,
         liquidacao: Liquidacao,
-    ): ResultadoLiquidacao {
+    ): ResultadoOperacaoLiquidacao {
         var novaConfirmacao = false
         val resultado = checkNotNull(transacao.execute {
             val organizacao = identidade.organizacaoId
@@ -102,13 +106,13 @@ class LiquidacaoJdbc(
                        'valorPresenteBrl', CAST(? AS text), 'desagioBrl', CAST(? AS text),
                        'valorPagamento', CAST(? AS text), 'liquidadaEm', CAST(? AS text)),
                    concluido_em = CURRENT_TIMESTAMP WHERE id = ?""",
-                resultado.liquidacaoId, resultado.statusHttp, resultado.liquidacaoId.toString(),
+                resultado.liquidacaoId, 201, resultado.liquidacaoId.toString(),
                 resultado.recebivelId.toString(), resultado.moeda.name, resultado.valorPresenteBrl.toPlainString(),
                 resultado.desagioBrl.toPlainString(), resultado.valorPagamento.toPlainString(),
                 resultado.liquidadaEm.toString(), reserva,
             )
             novaConfirmacao = true
-            resultado
+            ResultadoOperacaoLiquidacao(resultado, 201)
         })
         if (novaConfirmacao) aoConfirmarAposCommit(identidade, liquidacao)
         return resultado

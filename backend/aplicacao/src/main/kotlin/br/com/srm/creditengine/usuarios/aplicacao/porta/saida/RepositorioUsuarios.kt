@@ -1,13 +1,8 @@
 package br.com.srm.creditengine.usuarios.aplicacao.porta.saida
 
-import br.com.srm.creditengine.usuarios.dominio.IdentidadeUsuario
 import br.com.srm.creditengine.usuarios.dominio.PerfilUsuario
 import br.com.srm.creditengine.usuarios.dominio.UsuarioOrganizacional
 import java.util.UUID
-
-fun interface ContextoUsuario {
-    fun identidade(): IdentidadeUsuario
-}
 
 interface RepositorioUsuarios {
     fun buscar(organizacaoId: UUID, usuarioId: UUID): UsuarioOrganizacional?
@@ -22,8 +17,4 @@ interface RepositorioUsuarios {
         perfil: PerfilUsuario,
         ativo: Boolean,
     ): Boolean
-}
-
-fun interface CodificadorSenha {
-    fun codificar(senha: String): String
 }

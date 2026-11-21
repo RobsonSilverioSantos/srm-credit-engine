@@ -19,6 +19,8 @@ import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
+import java.nio.charset.StandardCharsets
+import java.security.MessageDigest
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
@@ -26,6 +28,9 @@ import java.time.LocalDate
 import java.time.ZoneOffset
 import java.time.temporal.ChronoUnit
 import java.util.UUID
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -170,6 +175,81 @@ class ContratosHttpPostgresTest {
         val depois = get("/api/v1/extrato", tokenA).tree()["itens"]
             .find { it["liquidacaoId"] == item["liquidacaoId"] }
         assertThat(depois).isEqualTo(item)
+    }
+
+    @Test
+    fun `liquidacoes concorrentes pela API e BFF retornam 201 e 409`() {
+        val instante = Instant.now().truncatedTo(ChronoUnit.MICROS)
+        taxas.registrarTaxaBase(BigDecimal("0.01"), instante)
+        taxas.registrarSpread(Modalidades.DUPLICATA_MERCANTIL, BigDecimal("0.015"), instante)
+        val cedente = criarCedente("/api/v1")["id"].asText()
+        val recebivel = criarRecebivel("/api/v1", cedente)["id"].asText()
+        val inicio = CountDownLatch(1)
+        val executor = Executors.newFixedThreadPool(2)
+        try {
+            val respostas = listOf("api", "bff").map { prefixo ->
+                executor.submit<HttpResponse<String>> {
+                    check(inicio.await(10, TimeUnit.SECONDS))
+                    post("/$prefixo/v1/recebiveis/$recebivel/liquidacoes", tokenA, """{"moeda":"BRL"}""", prefixo)
+                }
+            }
+            inicio.countDown()
+            assertThat(respostas.map { it.get(30, TimeUnit.SECONDS).statusCode() }).containsExactlyInAnyOrder(201, 409)
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM liquidacoes WHERE organizacao_id = ? AND recebivel_id = ?",
+                Int::class.java, orgA, UUID.fromString(recebivel))).isEqualTo(1)
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM auditoria_liquidacoes WHERE organizacao_id = ?",
+                Int::class.java, orgA)).isEqualTo(1)
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM idempotencia WHERE organizacao_id = ? AND situacao = 'CONCLUIDA'",
+                Int::class.java, orgA)).isEqualTo(1)
+        } finally {
+            executor.shutdownNow()
+            check(executor.awaitTermination(10, TimeUnit.SECONDS))
+        }
+    }
+
+    @Test
+    fun `replay de resposta historica preserva status e corpo na API e BFF`() {
+        val instante = Instant.now().truncatedTo(ChronoUnit.MICROS)
+        taxas.registrarTaxaBase(BigDecimal("0.01"), instante)
+        taxas.registrarSpread(Modalidades.DUPLICATA_MERCANTIL, BigDecimal("0.015"), instante)
+        val cedente = criarCedente("/api/v1")["id"].asText()
+        val primeiroId = criarRecebivel("/api/v1", cedente)["id"].asText()
+        val primeiro = post("/api/v1/recebiveis/$primeiroId/liquidacoes", tokenA, """{"moeda":"BRL"}""", "original")
+        assertThat(primeiro.statusCode()).isEqualTo(201)
+        val id = UUID.fromString(criarRecebivel("/api/v1", cedente)["id"].asText())
+        val liquidacaoId = UUID.randomUUID()
+        jdbc.update("""INSERT INTO liquidacoes
+            (id, organizacao_id, recebivel_id, modalidade, valor_face_brl, prazo_meses, versao_recebivel,
+             taxa_base_id, taxa_base_mensal, taxa_base_vigente_em, spread_id, spread_mensal, spread_vigente_em,
+             valor_presente_brl, desagio_brl, moeda_pagamento, cotacao_cambial_id, taxa_brl_por_unidade,
+             cotacao_vigente_em, cotacao_valida_ate, valor_pagamento, liquidada_em)
+            SELECT ?, organizacao_id, ?, modalidade, valor_face_brl, prazo_meses, versao_recebivel,
+             taxa_base_id, taxa_base_mensal, taxa_base_vigente_em, spread_id, spread_mensal, spread_vigente_em,
+             valor_presente_brl, desagio_brl, moeda_pagamento, cotacao_cambial_id, taxa_brl_por_unidade,
+             cotacao_vigente_em, cotacao_valida_ate, valor_pagamento, liquidada_em
+            FROM liquidacoes WHERE id = ?""", liquidacaoId, id, UUID.fromString(primeiro.tree()["liquidacaoId"].asText()))
+        jdbc.update("UPDATE recebiveis SET status = 'LIQUIDADO', versao = 1 WHERE id = ?", id)
+        val hash = MessageDigest.getInstance("SHA-256").digest(
+            "LIQUIDAR_RECEBIVEL\n$id\nBRL".toByteArray(StandardCharsets.UTF_8),
+        )
+        jdbc.update("""INSERT INTO idempotencia
+            (id, organizacao_id, tipo_operacao, chave, hash_requisicao, situacao, liquidacao_id,
+             resposta_http, resposta_corpo, concluido_em)
+            SELECT ?, organizacao_id, tipo_operacao, 'historico', ?, 'CONCLUIDA', ?, 202,
+                jsonb_set(jsonb_set(resposta_corpo, '{liquidacaoId}', to_jsonb(CAST(? AS text))),
+                          '{recebivelId}', to_jsonb(CAST(? AS text))), CURRENT_TIMESTAMP
+            FROM idempotencia WHERE organizacao_id = ? AND chave = 'original'""",
+            UUID.randomUUID(), hash, liquidacaoId, liquidacaoId.toString(), id.toString(), orgA)
+        val armazenado = jdbc.queryForObject(
+            "SELECT resposta_corpo::text FROM idempotencia WHERE organizacao_id = ? AND chave = 'historico'",
+            String::class.java, orgA,
+        )
+        val api = post("/api/v1/recebiveis/$id/liquidacoes", tokenA, """{"moeda":"BRL"}""", "historico")
+        val bff = post("/bff/v1/recebiveis/$id/liquidacoes", tokenA, """{"moeda":"BRL"}""", "historico")
+        assertThat(api.statusCode()).isEqualTo(202)
+        assertThat(bff.statusCode()).isEqualTo(202)
+        assertThat(api.tree()).isEqualTo(json.readTree(armazenado))
+        assertThat(bff.body()).isEqualTo(api.body())
     }
 
     @Test
@@ -390,6 +470,14 @@ class ContratosHttpPostgresTest {
             .endsWith("/LiquidacaoResposta")
         assertThat(operacao["responses"].has("200")).isFalse()
         listOf("api", "bff").forEach { prefixo ->
+            listOf(
+                "/$prefixo/v1/simulacoes",
+                "/$prefixo/v1/cedentes",
+                "/$prefixo/v1/recebiveis",
+                "/$prefixo/v1/recebiveis/{id}/liquidacoes",
+            ).forEach { caminho ->
+                assertThat(doc["paths"][caminho]["post"]["tags"].map { it.asText() }).containsExactly("contratos-http")
+            }
             val simulacao = doc["paths"]["/$prefixo/v1/simulacoes"]["post"]
             assertThat(simulacao["requestBody"]["content"]["application/json"]["schema"]["\$ref"].asText())
                 .endsWith("/SimulacaoEntrada")

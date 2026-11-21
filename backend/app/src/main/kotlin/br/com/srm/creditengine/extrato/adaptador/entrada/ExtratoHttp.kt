@@ -16,46 +16,19 @@ import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 
-data class ItemExtratoResposta(
-    val liquidacaoId: UUID,
-    val recebivelId: UUID,
-    val cedenteId: UUID,
-    val modalidade: String,
-    val valorFaceBrl: String,
-    val prazoMeses: Int,
-    val versaoRecebivel: Long,
-    val taxaBaseId: UUID,
-    val taxaBaseMensal: String,
-    val taxaBaseVigenteEm: String,
-    val spreadId: UUID,
-    val spreadMensal: String,
-    val spreadVigenteEm: String,
-    val valorPresenteBrl: String,
-    val desagioBrl: String,
-    val moeda: String,
-    val cotacaoCambialId: UUID?,
-    val taxaBrlPorUnidade: String?,
-    val cotacaoVigenteEm: String?,
-    val cotacaoValidaAte: String?,
-    val valorPagamento: String,
-    val liquidadaEm: String,
-)
-
-data class PaginaExtratoResposta(val itens: List<ItemExtratoResposta>, val pagina: Int, val tamanho: Int, val total: Long)
-
-private fun ItemExtrato.resposta() = ItemExtratoResposta(
-    liquidacaoId, recebivelId, cedenteId, modalidade, valorFaceBrl.toPlainString(), prazoMeses, versaoRecebivel,
-    taxaBaseId, taxaBaseMensal.toPlainString(), taxaBaseVigenteEm.toString(), spreadId, spreadMensal.toPlainString(),
-    spreadVigenteEm.toString(), valorPresenteBrl.toPlainString(), desagioBrl.toPlainString(), moeda.name,
-    cotacaoCambialId, taxaBrlPorUnidade?.toPlainString(), cotacaoVigenteEm?.toString(),
-    cotacaoValidaAte?.toString(), valorPagamento.toPlainString(), liquidadaEm.toString(),
-)
-
 @RestController
 @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
 @RequestMapping(value = ["/api/v1", "/bff/v1"])
 @SecurityRequirement(name = "bearerAuth")
 class ExtratoHttp(private val extrato: ObjectProvider<ConsultarExtrato>) {
+    private fun ItemExtrato.resposta() = ItemExtratoResposta(
+        liquidacaoId, recebivelId, cedenteId, modalidade, valorFaceBrl.toPlainString(), prazoMeses, versaoRecebivel,
+        taxaBaseId, taxaBaseMensal.toPlainString(), taxaBaseVigenteEm.toString(), spreadId, spreadMensal.toPlainString(),
+        spreadVigenteEm.toString(), valorPresenteBrl.toPlainString(), desagioBrl.toPlainString(), moeda.name,
+        cotacaoCambialId, taxaBrlPorUnidade?.toPlainString(), cotacaoVigenteEm?.toString(),
+        cotacaoValidaAte?.toString(), valorPagamento.toPlainString(), liquidadaEm.toString(),
+    )
+
     @GetMapping("/extrato")
     @Operation(summary = "Consultar extrato de liquidações",
         description = "Datas inclusivas em UTC; ordenação por liquidação e ID decrescentes.")

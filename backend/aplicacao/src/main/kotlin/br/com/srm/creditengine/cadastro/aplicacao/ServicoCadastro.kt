@@ -10,8 +10,6 @@ import br.com.srm.creditengine.cadastro.dominio.Cedente
 import br.com.srm.creditengine.cadastro.dominio.Recebivel
 import java.util.UUID
 
-class CedenteNaoEncontrado : IllegalArgumentException("Cedente não encontrado na organização")
-
 class ServicoCadastro(
     private val contexto: ContextoOrganizacao,
     private val cedentes: Cedentes,
