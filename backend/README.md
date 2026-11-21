@@ -187,28 +187,33 @@ docker compose up --profile app --detach --wait
 ```
 
 O primeiro MASTER precisa ser provisionado explicitamente, antes do uso da API
-administrativa. Crie primeiro a organização demonstrativa com o bootstrap
-opt-in descrito acima, configure as variáveis de banco e execute no terminal:
+administrativa. Inicie a stack Docker de demonstração pelo procedimento do
+[README principal](../README.md); esse modo cria a organização demonstrativa,
+mas não cria nenhum usuário. Na **raiz do repositório**, em terminal interativo:
 
 ```sh
-(
-  set -a
-  . ./.env
-  set +a
-  export SPRING_DATASOURCE_USERNAME="$SRM_DB_USER"
-  export SPRING_DATASOURCE_PASSWORD="$SRM_DB_PASSWORD"
-  export SPRING_DATASOURCE_URL="jdbc:postgresql://127.0.0.1:${SRM_DB_PORT:-5432}/srm_credit_engine"
-  bash scripts/bootstrap-master.sh
-)
+sh scripts/bootstrap-master.sh
 ```
 
-O comando exige `SRM_JWT_SECRET` já configurado com o mesmo segredo usado pela
-aplicação e conexão PostgreSQL local disponível. Ele inicia a aplicação sem
-servidor HTTP, pede organização, e-mail e senha em um terminal interativo,
-confirma a senha sem exibi-la e grava somente o hash BCrypt. Não há conta ou
-credencial fixa, nem execução automática no startup normal. O banco rejeita um
-segundo MASTER na mesma organização, inclusive após inativação; o usuário MASTER
-nunca pode ser criado pela API/BFF.
+No Windows PowerShell, execute `\.\scripts\bootstrap-master.ps1`. O atalho
+legado `backend/scripts/bootstrap-master.sh` também utiliza o launcher Docker
+interativo; o `gradlew bootRun` não fornece `System.console()` neste caso.
+O provisionamento utiliza a configuração existente em `backend/.env`, incluindo
+as credenciais do PostgreSQL e o mesmo segredo JWT usado pelo backend.
+
+O procedimento solicita UUID da organização, e-mail, senha e confirmação.
+UUID/e-mail inválidos, senha fora de **12 a 72 bytes UTF-8** e confirmação
+divergente são informados no próprio terminal e permitem corrigir a entrada
+sem reiniciar a aplicação. A senha não é exibida, não é passada em argumentos
+e os arrays utilizados na leitura são limpos após cada tentativa.
+A confirmação de sucesso é `MASTER provisionado.`. Só depois dessa mensagem
+o usuário está apto a autenticar na interface principal.
+
+O banco rejeita um segundo MASTER na mesma organização, inclusive após
+inativação; o usuário MASTER nunca pode ser criado pela API/BFF. O provisionamento
+não é executado automaticamente na inicialização normal. Em caso de erro de
+conexão ou MASTER já existente, deve-se diagnosticar a causa; não apagar o
+volume PostgreSQL nem recriar as credenciais para tentar novamente.
 
 Depois do bootstrap, `MASTER` cria `ADMIN` ou `OPERADOR`, e `ADMIN` cria somente
 `OPERADOR`. `GET /api/v1/usuarios/me` retorna a organização, o perfil e as
