@@ -79,8 +79,11 @@ O CI do PR D03 [#29](https://github.com/RobsonSilverioSantos/srm-credit-engine/p
 passou em ambos os jobs no commit inicial `f71eb43` ([execução #44848917116](https://github.com/RobsonSilverioSantos/srm-credit-engine/actions/runs/44848917116)).
 No commit documental `6a61fda`, o backend passou; o frontend falhou uma vez em
 um teste de diálogo e passou após uma única repetição ([execução #44849306596](https://github.com/RobsonSilverioSantos/srm-credit-engine/actions/runs/44849306596)).
-O teste local do frontend passou e nenhum código foi alterado em resposta; a
-causa da falha intermitente não foi estabelecida.
+No head `50d950d`, o backend passou e o mesmo teste frontend voltou a falhar
+([execução #44849740354](https://github.com/RobsonSilverioSantos/srm-credit-engine/actions/runs/44849740354));
+essa execução ficou vermelha. O teste local do frontend passou e nenhum código
+foi alterado em resposta; a causa da falha remota não foi estabelecida. Confira
+o estado do PR antes de integração.
 Os relatos de teste contidos nos PRs são identificados como relatos; não são
 apresentados como execução local do D03.
 
