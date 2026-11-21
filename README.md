@@ -1,7 +1,6 @@
 # SRM Credit Engine
 
-Este repositório é independente do anterior, que permanece como histórico em
-[`AI_USAGE.md`](AI_USAGE.md). O bootstrap do backend não implementa os fluxos de negócio do MVP.
+Implementação demonstrativa do SRM Credit Engine, com backend, frontend e persistência PostgreSQL. A documentação de regras, arquitetura, execução e testes está organizada neste repositório.
 
 ## Visão e stack
 
@@ -145,8 +144,7 @@ cd backend
 ./gradlew clean build
 ```
 
-Use JDK 21. O build inclui testes e verificações hexagonais; o smoke test atual
-não usa PostgreSQL e não substitui testes de integração com banco.
+Use JDK 21. O build local verifica código e fronteiras hexagonais. Para incluir os testes de integração PostgreSQL, execute `bash scripts/test-cadastro-postgres.sh` na pasta `backend`. A CI utiliza esse script e também possui um job de smoke test dos três contêineres Docker Compose; nenhum desses testes substitui a validação manual de ponta a ponta.
 
 ```sh
 cd frontend
@@ -197,10 +195,10 @@ um teste de diálogo e passou após uma única repetição ([execução #4484930
 No head `50d950d`, o backend passou e o mesmo teste frontend voltou a falhar
 ([execução #44849740354](https://github.com/RobsonSilverioSantos/srm-credit-engine/actions/runs/44849740354));
 essa execução ficou vermelha. O teste local do frontend passou e nenhum código
-foi alterado em resposta; a causa da falha remota não foi estabelecida. Confira
-o estado do PR antes de integração. No commit documental `cbdbd20`, os dois jobs
-passaram ([execução #44850079836](https://github.com/RobsonSilverioSantos/srm-credit-engine/actions/runs/44850079836));
-as falhas anteriores permanecem registradas como histórico.
+foi alterado em resposta; a causa da falha remota não foi estabelecida. No commit
+documental `cbdbd20`, os dois jobs passaram ([execução #44850079836](https://github.com/RobsonSilverioSantos/srm-credit-engine/actions/runs/44850079836));
+o PR #29 foi posteriormente integrado com os dois checks aprovados. As falhas
+anteriores permanecem registradas como histórico.
 Os relatos de teste contidos nos PRs são identificados como relatos; não são
 apresentados como execução local do D03.
 
@@ -223,15 +221,9 @@ as telas ainda têm entradas e autenticação independentes, conforme
 6. [`INICIO_GIT.md`](INICIO_GIT.md) — passos para criar `main`, `develop`, worktrees e PRs.
 7. [`PROMPTS_INICIAIS.md`](PROMPTS_INICIAIS.md) — instruções de abertura de sessões dos agentes.
 
-## Exercícios independentes — fora do backlog dos agentes
+## Documentação de arquitetura do MVP
 
-Os três exercícios são **entregáveis anexados ao repositório**, não funcionalidades deste backend nem tarefas do `TASKS.md`:
-
-- [`docs/exercicios/REVIEW.md`](docs/exercicios/REVIEW.md) — code review de um PR TypeScript hipotético, no papel de Tech Lead.
-- [`docs/exercicios/POST_MORTEM_ANEXO_B.md`](docs/exercicios/POST_MORTEM_ANEXO_B.md) — post-mortem hipotético de war room de sustentação; não descreve incidente real no novo MVP.
-- [`docs/exercicios/ALTA_ESCALA_STATUS.md`](docs/exercicios/ALTA_ESCALA_STATUS.md) — **somente marcador de pendência** da proposta arquitetural de 1 milhão de transações por minuto. O desenho anterior foi rejeitado e **não está neste pacote**. O responsável técnico e ChatGPT vão desenvolver a proposta separadamente, sem ocupar agentes.
-
-ADRs sobre escolhas **do MVP** e proposta de EDA evolutiva ficam em `docs/adr/` e `docs/arquitetura/EDA_LIQUIDACAO.md`. O C4 do MVP está em `docs/arquitetura/C4_MVP.md` como **rascunho a validar**, não como arquitetura de alta escala.
+As decisões arquiteturais do sistema estão registradas nos documentos em `docs/adr/`, no [modelo C4](docs/arquitetura/C4_MVP.md) e na [proposta EDA para liquidação](docs/arquitetura/EDA_LIQUIDACAO.md). Esses materiais descrevem escolhas, restrições e possibilidades de evolução da implementação atual, sem representar funcionalidades adicionais executadas.
 
 ## Por que Git Flow simplificado nesta entrega
 
@@ -246,13 +238,13 @@ ADRs sobre escolhas **do MVP** e proposta de EDA evolutiva ficam em `docs/adr/` 
 
 ### Proteção compensatória de branches — restrição de plano (ADR-022)
 
-O repositório é privado e a conta atualmente não dispõe de Rulesets para esta configuração: uma consulta de 20/11/2026 à API retornou HTTP 403 com a orientação de usar GitHub Pro ou tornar o repositório público. **Não tornaremos o repositório público nem adicionaremos despesa exclusivamente para este exercício.**
+O repositório é privado e a conta atualmente não dispõe de Rulesets para esta configuração: uma consulta de 20/11/2026 à API retornou HTTP 403 com a orientação de usar GitHub Pro ou tornar o repositório público. **O repositório permanece privado, sem contratação adicional de proteção para branches.**
 
 - `.github/workflows/guard-main.yml`: ao detectar PR para `main`, permite somente origem `develop` do mesmo repositório; fecha outras origens automaticamente, quando GitHub Actions estiver executando e autorizado.
 - `.githooks/pre-push`: impede pushes locais diretamente para `main` e `develop`, desde que o clone tenha executado `git config core.hooksPath .githooks`. Hooks não se ativam automaticamente com clone/pull.
 - Instruções dos agentes: apenas push em `feature/*`, PR com base `develop`, jamais merge/automerge. O responsável técnico revisa e integra manualmente.
 - **Limitação aceita:** sem Ruleset/branch protection no servidor, esses controles não impedem todos os pushes/merges por CLI, interface ou API. O workflow pode executar depois da tentativa de merge, e hooks podem ser contornados. Não descrever como bloqueio absoluto.
-- **Evidências pendentes:** merge do PR de governança, autorização de execução do GitHub Actions e teste real de PR indevido fechado; ativação do hook local e teste de recusa antes de prosseguir. Ver `docs/adr/ADR-022-controles-github-free.md` e matriz `docs/defesa/RASTREABILIDADE_STAFF_TECH_LEAD.md`.
+- **Evidências de governança:** [PR #1](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/1) e [PR #2](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/2) integraram a configuração inicial; o [PR de teste #3](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/3), direcionado indevidamente a `main`, foi fechado automaticamente pelo workflow. A recusa do hook local foi registrada na baseline. A ausência de Ruleset no servidor continua sendo limitação documentada em `docs/adr/ADR-022-controles-github-free.md`.
 
 ## Agentes e governança
 
@@ -263,7 +255,7 @@ O repositório é privado e a conta atualmente não dispõe de Rulesets para est
 
 ## Defesa Staff / Tech Lead
 
-ADRs: `docs/adr/ADR-005-*.md`, `ADR-018-*.md`, `ADR-019-*.md`; EDA: `docs/arquitetura/EDA_LIQUIDACAO.md`; matriz: `docs/defesa/RASTREABILIDADE_STAFF_TECH_LEAD.md`. O design para 1 milhão/min permanece **pendente e independente**. Nenhum documento atesta benchmark executado. Keycloak e deploy em nuvem são cortes conscientes por prazo, justificados em `DECISIONS.md`.
+ADRs: `docs/adr/ADR-005-*.md`, `ADR-018-*.md` e `ADR-019-*.md`; EDA: `docs/arquitetura/EDA_LIQUIDACAO.md`; matriz de rastreabilidade: `docs/defesa/RASTREABILIDADE_STAFF_TECH_LEAD.md`. Não há benchmark de escala executado. A ausência de Keycloak e de deploy em nuvem integra os limites do MVP, registrados em `DECISIONS.md`.
 
 **Bootstrap:** este repositório já foi criado e versionado. Para reproduzir a
 configuração inicial em outro repositório, consulte [`INICIO_GIT.md`](INICIO_GIT.md);
