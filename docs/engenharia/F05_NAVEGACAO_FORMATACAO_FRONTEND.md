@@ -13,6 +13,7 @@
 - `frontend/src/extrato.tsx` monta `AcessoExtrato` em `extrato.html` com login independente; porém `PaginaExtrato` já recebe `token`, `porta` e `aoExpirar`, permitindo reutilização dentro de sessão principal.
 - `LayoutAdministrativo.tsx` é um exemplo para **catálogo visual** de componentes (o menu diz “Design system”), não navegação operacional; deve ser adaptado ou reaproveitado sem transformar a navegação real num catálogo.
 - O resultado atual apresenta `Identificador: {liquidacao.liquidacaoId}`.
+- A cotação demonstrativa é armazenada como decimal canônico, por exemplo `5.4321000000`; a exibição ao operador deve apresentar `1 USD = R$ 5,4321` em `pt-BR`, sem zeros artificiais da escala de armazenamento. O hotfix da apresentação é rastreado em PR próprio; a F05 deve preservá-lo.
 
 ## Escopo da entrega
 
@@ -22,6 +23,12 @@
 - Preservar digitação natural de números e centavos, backspace, seleção, cursor/caret, texto colado com separadores, teclado móvel, composição e colagem. Não bloquear o preenchimento de valores válidos quando o usuário está editando.
 - Pode-se usar apresentação formatada no **blur** e texto editável sem símbolo no **focus** se máscara permanente tornar o cursor instável; a experiência precisa ser previsível, documentada e testada. Não enviar `R$`, pontos ou vírgulas no JSON canônico.
 - Manter `normalizarEntradaMonetaria` e seus testes como base do contrato; enviar `valorFaceBrl` **string decimal canônica**, sem usar `Number`, `parseFloat` nem `float` para cálculo financeiro. Preservar 17 dígitos inteiros, até dois decimais, validações e formatos pt-BR/en-US.
+
+### 1A. Cotação cambial em escala de apresentação
+
+- Na visualização da simulação e liquidação, **não usar formatação monetária de centavos** para cotação BRL/USD: taxa é razão entre moedas e pode exigir mais que duas casas.
+- Apresentar claramente a direção **`1 USD = R$ 5,4321`** para a string canônica `5.4321000000` com locale `pt-BR`; em `en-US`, apresentar separador decimal correspondente `5.4321`. Usar ao menos **quatro casas decimais**, remover zeros à direita **somente após a quarta casa** e preservar todas as casas adicionais significativas, sem arredondar o valor usado no motor financeiro.
+- O formatter trabalha sobre string decimal, sem `Number`/`parseFloat`, e jamais altera a cotação original recebida do servidor, os contratos financeiros ou a precisão de `BigDecimal`. Preservar este ajuste caso tenha sido integrado antes da implementação da F05.
 
 ### 2. Datas e fuso com semântica correta
 
@@ -65,6 +72,7 @@
 ## Matriz de testes e critérios de aceite
 
 - [ ] `pt-BR`: entrada `25000` / `25000,0` / `25.000,00` exibe **`R$ 25.000,00`** em estado formatado e envia `25000.00` ao BFF; `en-US` equivalente; centavos, muitos dígitos e valores inválidos sem uso de ponto flutuante.
+- [ ] Cotação `5.4321000000` exibe **`1 USD = R$ 5,4321`** em `pt-BR`; `en-US` exibe separador decimal de seu locale. Exibir ao menos 4 casas, eliminar zeros não significativos após a quarta, preservar precisão maior quando presente e evitar arredondar para 2 casas.
 - [ ] Edição, cursor/caret, backspace, colagem, blur/focus e teclado móvel testados em React Testing Library; acessibilidade e uso mobile.
 - [ ] UTC `2026-11-21T21:15:58.766998Z` exibe horário local correto para `America/Sao_Paulo` (18:15:58), com zona identificável e preservação ISO para auditoria; cenário adicional envolvendo outra zona.
 - [ ] “Referência da simulação” e “Data/hora da liquidação” não se confundem; snapshot e cotação expirada exibem instante correto; filtros do extrato continuam UTC.
