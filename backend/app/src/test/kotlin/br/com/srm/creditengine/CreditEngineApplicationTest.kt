@@ -7,7 +7,10 @@ import java.net.http.HttpResponse
 import java.time.Duration
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.extension.ExtendWith
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.boot.test.system.CapturedOutput
+import org.springframework.boot.test.system.OutputCaptureExtension
 import org.springframework.boot.test.web.server.LocalServerPort
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.context.ApplicationContext
@@ -28,6 +31,7 @@ import br.com.srm.creditengine.cadastro.aplicacao.porta.entrada.Cadastro
     ],
 )
 @Import(CreditEngineApplicationTest.DatabaseMock::class)
+@ExtendWith(OutputCaptureExtension::class)
 class CreditEngineApplicationTest {
     @TestConfiguration(proxyBeanMethods = false)
     class DatabaseMock {
@@ -41,21 +45,34 @@ class CreditEngineApplicationTest {
     private var port: Int = 0
 
     @Test
-    fun `inicia o backend e publica somente o estado de saude`() {
+    fun `publica health e protege as metricas com autenticacao`() {
         val health = get("/actuator/health")
         assertThat(health.statusCode()).isEqualTo(200)
         assertThat(health.body()).isEqualTo("""{"status":"UP"}""")
         assertThat(get("/actuator/env").statusCode()).isEqualTo(401)
+        assertThat(get("/actuator/metrics/srm.liquidacoes.confirmadas").statusCode()).isEqualTo(401)
         assertThat(get("/api/v1/cedentes").statusCode()).isEqualTo(401)
         assertThat(context.getBeansOfType(Cadastro::class.java)).isEmpty()
     }
 
-    private fun get(path: String): HttpResponse<String> {
-        val request = HttpRequest.newBuilder(URI.create("http://127.0.0.1:$port$path"))
+    @Test
+    fun `gera correlacao por requisicao e inclui no log estruturado`(output: CapturedOutput) {
+        val response = get("/actuator/health", "id-controlado-pelo-cliente")
+        val correlationId = response.headers().firstValue("X-Correlation-Id").orElseThrow()
+
+        assertThat(correlationId).matches("[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}")
+        assertThat(correlationId).isNotEqualTo("id-controlado-pelo-cliente")
+        assertThat(output.toString()).contains("\"correlationId\":\"$correlationId\"")
+        assertThat(output.toString()).contains("\"event\":\"http.request.completed\"")
+        assertThat(output.toString()).doesNotContain("id-controlado-pelo-cliente")
+    }
+
+    private fun get(path: String, correlationId: String? = null): HttpResponse<String> {
+        val builder = HttpRequest.newBuilder(URI.create("http://127.0.0.1:$port$path"))
             .timeout(Duration.ofSeconds(5))
             .GET()
-            .build()
-        return HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString())
+        if (correlationId != null) builder.header("X-Correlation-Id", correlationId)
+        return HttpClient.newHttpClient().send(builder.build(), HttpResponse.BodyHandlers.ofString())
     }
 
     companion object {

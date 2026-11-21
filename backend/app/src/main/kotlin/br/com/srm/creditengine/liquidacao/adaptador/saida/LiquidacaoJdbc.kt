@@ -23,11 +23,13 @@ class LiquidacaoJdbc(
     private val jdbc: JdbcTemplate,
     private val transacao: TransactionTemplate,
     private val relogio: Clock,
+    private val aoConfirmarAposCommit: (IdentidadeLiquidacao, Liquidacao) -> Unit = { _, _ -> },
+    private val aoReproduzir: () -> Unit = {},
 ) : IdempotenciaLiquidacao, TransacaoLiquidacao, PersistenciaLiquidacao, AuditoriaLiquidacao {
     private fun Instant.utc(): OffsetDateTime = atOffset(ZoneOffset.UTC)
 
-    override fun consultar(organizacaoId: UUID, chave: String, hash: ByteArray): ResultadoLiquidacao? =
-        jdbc.query(
+    override fun consultar(organizacaoId: UUID, chave: String, hash: ByteArray): ResultadoLiquidacao? {
+        val resultado = jdbc.query(
             """SELECT i.hash_requisicao, i.situacao, i.resposta_http,
                       i.resposta_corpo->>'liquidacaoId' AS liquidacao_id,
                       i.resposta_corpo->>'recebivelId' AS recebivel_id,
@@ -51,57 +53,66 @@ class LiquidacaoJdbc(
                 )
             }, organizacaoId, chave,
         ).singleOrNull()
+        if (resultado != null) aoReproduzir()
+        return resultado
+    }
 
     override fun confirmar(
         identidade: IdentidadeLiquidacao,
         chave: String,
         hash: ByteArray,
         liquidacao: Liquidacao,
-    ): ResultadoLiquidacao = checkNotNull(transacao.execute {
-        val organizacao = identidade.organizacaoId
-        val reserva = UUID.randomUUID()
-        val inserida = jdbc.update(
-            """INSERT INTO idempotencia (id, organizacao_id, tipo_operacao, chave, hash_requisicao)
-               VALUES (?, ?, 'LIQUIDAR_RECEBIVEL', ?, ?) ON CONFLICT (organizacao_id, tipo_operacao, chave) DO NOTHING""",
-            reserva, organizacao, chave, hash,
-        )
-        if (inserida == 0) {
-            return@execute checkNotNull(consultar(organizacao, chave, hash)) {
-                "Reserva de idempotência desapareceu"
+    ): ResultadoLiquidacao {
+        var novaConfirmacao = false
+        val resultado = checkNotNull(transacao.execute {
+            val organizacao = identidade.organizacaoId
+            val reserva = UUID.randomUUID()
+            val inserida = jdbc.update(
+                """INSERT INTO idempotencia (id, organizacao_id, tipo_operacao, chave, hash_requisicao)
+                   VALUES (?, ?, 'LIQUIDAR_RECEBIVEL', ?, ?) ON CONFLICT (organizacao_id, tipo_operacao, chave) DO NOTHING""",
+                reserva, organizacao, chave, hash,
+            )
+            if (inserida == 0) {
+                return@execute checkNotNull(consultar(organizacao, chave, hash)) {
+                    "Reserva de idempotência desapareceu"
+                }
             }
-        }
-        val recebivel = liquidacao.recebivel
-        check(recebivel.organizacaoId == organizacao) { "Organização inconsistente" }
-        val limite = liquidacao.taxas.cotacaoValidaAte
-        if (limite != null && relogio.instant() > limite) {
-            throw DadosFinanceirosIndisponiveis("Cotação BRL/USD venceu antes da liquidação")
-        }
-        if (!atualizarRecebivel(liquidacao)) throw ConflitoLiquidacao("Recebível alterado ou já liquidado")
-        if (limite != null && relogio.instant() > limite) {
-            throw DadosFinanceirosIndisponiveis("Cotação BRL/USD venceu durante a liquidação")
-        }
-        val taxas = liquidacao.taxas
-        val precificacao = liquidacao.precificacao
-        inserir(liquidacao)
-        val resultado = ResultadoLiquidacao(
-            liquidacao.id, recebivel.id, liquidacao.moeda, precificacao.valorPresenteBrl,
-            precificacao.desagioBrl, liquidacao.valorPagamento, taxas.referencia,
-        )
-        registrar(identidade, liquidacao)
-        jdbc.update(
-            """UPDATE idempotencia SET situacao = 'CONCLUIDA', liquidacao_id = ?, resposta_http = ?,
-               resposta_corpo = jsonb_build_object(
-                   'liquidacaoId', CAST(? AS text), 'recebivelId', CAST(? AS text), 'moeda', CAST(? AS text),
-                   'valorPresenteBrl', CAST(? AS text), 'desagioBrl', CAST(? AS text),
-                   'valorPagamento', CAST(? AS text), 'liquidadaEm', CAST(? AS text)),
-               concluido_em = CURRENT_TIMESTAMP WHERE id = ?""",
-            resultado.liquidacaoId, resultado.statusHttp, resultado.liquidacaoId.toString(),
-            resultado.recebivelId.toString(), resultado.moeda.name, resultado.valorPresenteBrl.toPlainString(),
-            resultado.desagioBrl.toPlainString(), resultado.valorPagamento.toPlainString(),
-            resultado.liquidadaEm.toString(), reserva,
-        )
-        resultado
-    })
+            val recebivel = liquidacao.recebivel
+            check(recebivel.organizacaoId == organizacao) { "Organização inconsistente" }
+            val limite = liquidacao.taxas.cotacaoValidaAte
+            if (limite != null && relogio.instant() > limite) {
+                throw DadosFinanceirosIndisponiveis("Cotação BRL/USD venceu antes da liquidação")
+            }
+            if (!atualizarRecebivel(liquidacao)) throw ConflitoLiquidacao("Recebível alterado ou já liquidado")
+            if (limite != null && relogio.instant() > limite) {
+                throw DadosFinanceirosIndisponiveis("Cotação BRL/USD venceu durante a liquidação")
+            }
+            val taxas = liquidacao.taxas
+            val precificacao = liquidacao.precificacao
+            inserir(liquidacao)
+            val resultado = ResultadoLiquidacao(
+                liquidacao.id, recebivel.id, liquidacao.moeda, precificacao.valorPresenteBrl,
+                precificacao.desagioBrl, liquidacao.valorPagamento, taxas.referencia,
+            )
+            registrar(identidade, liquidacao)
+            jdbc.update(
+                """UPDATE idempotencia SET situacao = 'CONCLUIDA', liquidacao_id = ?, resposta_http = ?,
+                   resposta_corpo = jsonb_build_object(
+                       'liquidacaoId', CAST(? AS text), 'recebivelId', CAST(? AS text), 'moeda', CAST(? AS text),
+                       'valorPresenteBrl', CAST(? AS text), 'desagioBrl', CAST(? AS text),
+                       'valorPagamento', CAST(? AS text), 'liquidadaEm', CAST(? AS text)),
+                   concluido_em = CURRENT_TIMESTAMP WHERE id = ?""",
+                resultado.liquidacaoId, resultado.statusHttp, resultado.liquidacaoId.toString(),
+                resultado.recebivelId.toString(), resultado.moeda.name, resultado.valorPresenteBrl.toPlainString(),
+                resultado.desagioBrl.toPlainString(), resultado.valorPagamento.toPlainString(),
+                resultado.liquidadaEm.toString(), reserva,
+            )
+            novaConfirmacao = true
+            resultado
+        })
+        if (novaConfirmacao) aoConfirmarAposCommit(identidade, liquidacao)
+        return resultado
+    }
 
     override fun atualizarRecebivel(liquidacao: Liquidacao): Boolean {
         val recebivel = liquidacao.recebivel

@@ -11,6 +11,11 @@ spring:
   flyway:
     locations: classpath:db/migration
 
+logging:
+  structured:
+    format:
+      console: logstash
+
 security:
   jwt:
     secret: ${SRM_JWT_SECRET}
@@ -24,7 +29,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health
+        include: health,metrics
   endpoint:
     health:
       show-details: never
