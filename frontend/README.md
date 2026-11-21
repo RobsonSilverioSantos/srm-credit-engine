@@ -41,6 +41,22 @@ O cadastro de recebível não é idempotente. Se seu resultado for incerto,
 o painel bloqueia novas tentativas e orienta o operador a consultar o
 estado da operação no servidor antes de prosseguir.
 
+## Administração de usuários (F04)
+
+Depois de autenticar na tela principal, MASTER e ADMIN podem administrar os
+usuários permitidos para sua organização. As permissões e os perfis disponíveis
+vêm de `/bff/v1/usuarios/me`; o servidor continua sendo a autoridade de acesso.
+MASTER pode criar ADMIN e OPERADOR; ADMIN pode criar somente OPERADOR. OPERADOR
+não recebe a interface administrativa. A listagem, criação e alteração de status
+usam os endpoints do BFF, que obtém a organização da identidade autenticada.
+
+A tela não oferece cadastro público, criação de MASTER ou seleção de
+`organizacaoId`. Senhas iniciais ficam somente no estado transitório do formulário
+e são limpas após a submissão. Erros 401 solicitam nova autenticação; 403 e 409
+são apresentados como mensagens de acesso ou conflito. Inativar exige confirmação.
+O formulário verifica formato e tamanho mínimo/máximo antes de enviar; a API
+revalida os campos e continua sendo a autoridade final.
+
 ## Extrato de liquidações (F03)
 
 Acesse `/extrato.html` para utilizar o extrato de liquidações.
@@ -104,6 +120,12 @@ ser utilizados como fonte para operações financeiras reais.
 `main.tsx` compõe os adaptadores HTTP do BFF (`infraestrutura/`), as portas e os casos de uso (`aplicacao/`) e a apresentação da F01.
 
 `extrato.tsx` compõe os adaptadores HTTP de autenticação e consulta, as portas e a apresentação independente da F03.
+
+A F04 reutiliza a sessão em memória da entrada principal. `infraestrutura/bffUsuarios.ts`
+implementa `PortaGestaoUsuarios`; `aplicacao/gestaoUsuarios.ts` valida capacidades
+antes de chamar a porta, e `apresentacao/PaginaAdministracaoUsuarios.tsx` compõe
+a tela MUI. O BFF continua responsável pela autorização definitiva e pelo
+isolamento por organização.
 
 As duas implementações seguem as mesmas fronteiras da arquitetura hexagonal:
 
