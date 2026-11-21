@@ -6,16 +6,6 @@ import java.math.BigDecimal
 import java.time.LocalDate
 import java.util.UUID
 
-data class NovoCedente(val nome: String, val documento: String)
-
-data class NovoRecebivel(
-    val cedenteId: UUID,
-    val modalidade: String,
-    val valorFaceBrl: BigDecimal,
-    val prazoMeses: Int,
-    val vencimento: LocalDate? = null,
-)
-
 interface Cadastro {
     fun cadastrarCedente(comando: NovoCedente): Cedente
     fun buscarCedente(id: UUID): Cedente?

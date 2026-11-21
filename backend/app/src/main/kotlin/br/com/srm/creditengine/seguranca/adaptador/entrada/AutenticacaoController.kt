@@ -17,14 +17,6 @@ import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.server.ResponseStatusException
 
-class TokenRequest(val email: String, val password: String)
-
-data class TokenResponse(
-    val accessToken: String,
-    val tokenType: String,
-    val expiresIn: Long,
-)
-
 @RestController
 @RequestMapping("/api/v1/auth")
 class AutenticacaoController(

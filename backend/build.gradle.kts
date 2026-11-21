@@ -21,6 +21,36 @@ subprojects {
     }
 }
 
+val classpathCompiladorKotlin = files(provider {
+    project(":dominio").configurations.getByName("kotlinCompilerClasspath")
+})
+val compilarVerificadorKotlin = tasks.register<JavaCompile>("compilarVerificadorTiposKotlin") {
+    setSource(files("scripts/VerificarTiposKotlin.java"))
+    classpath = classpathCompiladorKotlin
+    destinationDirectory = layout.buildDirectory.dir("verificador-tipos-kotlin")
+    sourceCompatibility = "21"
+    targetCompatibility = "21"
+    options.release = 21
+}
+val verificarTiposKotlin = tasks.register<JavaExec>("verificarTiposKotlin") {
+    group = "verification"
+    description = "Verifica tipos top-level Kotlin de produção com o parser do compilador."
+    dependsOn(compilarVerificadorKotlin)
+    classpath = files(compilarVerificadorKotlin.flatMap { it.destinationDirectory }, classpathCompiladorKotlin)
+    mainClass = "VerificarTiposKotlin"
+    val fontes = listOf("dominio", "aplicacao", "app").map {
+        layout.projectDirectory.dir("$it/src/main/kotlin")
+    }
+    inputs.files(fontes.map { fileTree(it) { include("**/*.kt") } })
+    args(fontes.map { it.asFile.absolutePath })
+}
+tasks.named("check") { dependsOn(verificarTiposKotlin) }
+subprojects {
+    plugins.withId("org.jetbrains.kotlin.jvm") {
+        tasks.named("check") { dependsOn(verificarTiposKotlin) }
+    }
+}
+
 mapOf(":dominio" to emptySet(), ":aplicacao" to setOf(":dominio")).forEach { (camada, permitidos) ->
     val modulo = project(camada)
     modulo.plugins.withId("org.jetbrains.kotlin.jvm") {

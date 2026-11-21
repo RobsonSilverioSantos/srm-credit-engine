@@ -72,7 +72,7 @@ class SegurancaPostgresTest {
 
         @GetMapping("/test/liquidar/{id}")
         fun liquidar(@PathVariable id: UUID): Map<String, UUID> =
-            mapOf("id" to liquidar.liquidar(ComandoLiquidacao(id, MoedaPagamento.BRL, "teste")).liquidacaoId)
+            mapOf("id" to liquidar.liquidar(ComandoLiquidacao(id, MoedaPagamento.BRL, "teste")).liquidacao.liquidacaoId)
 
         @GetMapping("/test/recebiveis/{id}")
         fun recebivel(@PathVariable id: UUID): ResponseEntity<Any> =
@@ -81,7 +81,7 @@ class SegurancaPostgresTest {
         @GetMapping("/test/b07/liquidar/{id}/{chave}")
         fun liquidarB07(@PathVariable id: UUID, @PathVariable chave: String): ResponseEntity<Any> =
             try {
-                ResponseEntity.ok(liquidar.liquidar(ComandoLiquidacao(id, MoedaPagamento.BRL, chave)))
+                ResponseEntity.ok(liquidar.liquidar(ComandoLiquidacao(id, MoedaPagamento.BRL, chave)).liquidacao)
             } catch (_: RecebivelNaoEncontrado) {
                 ResponseEntity.notFound().build()
             } catch (_: ConflitoLiquidacao) {

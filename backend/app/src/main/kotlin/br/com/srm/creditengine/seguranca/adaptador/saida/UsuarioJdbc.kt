@@ -5,36 +5,10 @@ import java.sql.ResultSet
 import java.util.UUID
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.jdbc.core.RowMapper
-import org.springframework.security.core.GrantedAuthority
-import org.springframework.security.core.authority.SimpleGrantedAuthority
 import org.springframework.security.core.userdetails.UserDetails
 import org.springframework.security.core.userdetails.UserDetailsService
 import org.springframework.security.core.userdetails.UsernameNotFoundException
 import org.springframework.stereotype.Service
-
-class UsuarioAutenticavel(
-    val id: UUID,
-    val organizacaoId: UUID,
-    private val email: String,
-    private val senhaHash: String,
-    private val perfil: PerfilUsuario,
-    private val habilitado: Boolean,
-) : UserDetails {
-    override fun getAuthorities(): Collection<GrantedAuthority> =
-        listOf(SimpleGrantedAuthority("ROLE_USER"), SimpleGrantedAuthority("ROLE_${perfil.name}"))
-
-    override fun getPassword(): String = senhaHash
-
-    override fun getUsername(): String = email
-
-    override fun isAccountNonExpired(): Boolean = true
-
-    override fun isAccountNonLocked(): Boolean = true
-
-    override fun isCredentialsNonExpired(): Boolean = true
-
-    override fun isEnabled(): Boolean = habilitado
-}
 
 @Service
 class UsuarioJdbc(

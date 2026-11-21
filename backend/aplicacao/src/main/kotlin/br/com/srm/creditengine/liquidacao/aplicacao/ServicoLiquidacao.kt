@@ -4,6 +4,7 @@ import br.com.srm.creditengine.cadastro.aplicacao.porta.saida.Recebiveis
 import br.com.srm.creditengine.cadastro.dominio.StatusRecebivel
 import br.com.srm.creditengine.liquidacao.aplicacao.porta.entrada.ComandoLiquidacao
 import br.com.srm.creditengine.liquidacao.aplicacao.porta.entrada.LiquidarRecebivel
+import br.com.srm.creditengine.liquidacao.aplicacao.porta.entrada.ResultadoOperacaoLiquidacao
 import br.com.srm.creditengine.liquidacao.aplicacao.porta.saida.IdempotenciaLiquidacao
 import br.com.srm.creditengine.liquidacao.aplicacao.porta.saida.IdentidadeConfiavel
 import br.com.srm.creditengine.liquidacao.aplicacao.porta.saida.TransacaoLiquidacao
@@ -11,7 +12,6 @@ import br.com.srm.creditengine.liquidacao.dominio.ConflitoLiquidacao
 import br.com.srm.creditengine.liquidacao.dominio.Liquidacao
 import br.com.srm.creditengine.liquidacao.dominio.MoedaPagamento
 import br.com.srm.creditengine.liquidacao.dominio.RecebivelNaoEncontrado
-import br.com.srm.creditengine.liquidacao.dominio.ResultadoLiquidacao
 import br.com.srm.creditengine.precificacao.aplicacao.precificarComTaxas
 import br.com.srm.creditengine.taxas.aplicacao.porta.entrada.TaxasPorta
 import java.nio.charset.StandardCharsets
@@ -28,7 +28,7 @@ class ServicoLiquidacao(
     private val transacao: TransacaoLiquidacao,
     private val relogio: Clock,
 ) : LiquidarRecebivel {
-    override fun liquidar(comando: ComandoLiquidacao): ResultadoLiquidacao {
+    override fun liquidar(comando: ComandoLiquidacao): ResultadoOperacaoLiquidacao {
         val usuario = identidade.identidade()
         val hash = MessageDigest.getInstance("SHA-256").digest(
             "LIQUIDAR_RECEBIVEL\n${comando.recebivelId}\n${comando.moeda.name}".toByteArray(StandardCharsets.UTF_8),

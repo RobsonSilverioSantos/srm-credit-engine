@@ -26,75 +26,6 @@ import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
 import tools.jackson.databind.JsonNode
 
-data class UsuarioEntrada(
-    val email: String,
-    @field:Schema(description = "Senha de 12 a 72 bytes UTF-8")
-    val senha: String,
-    @field:Schema(allowableValues = ["ADMIN", "OPERADOR"])
-    val perfil: String,
-)
-
-data class StatusUsuarioEntrada(val ativo: Boolean)
-
-data class UsuarioResposta(
-    val id: UUID,
-    val email: String,
-    val perfil: String,
-    val ativo: Boolean,
-)
-
-data class CapacidadesUsuarioResposta(
-    val perfisCriaveis: List<String>,
-    val podeListarUsuarios: Boolean,
-    val podeAlterarStatus: Boolean,
-)
-
-data class MinhaContaResposta(
-    val id: UUID,
-    val organizacaoId: UUID,
-    val email: String,
-    val perfil: String,
-    val ativo: Boolean,
-    val capacidades: CapacidadesUsuarioResposta,
-)
-
-private fun UsuarioOrganizacional.resposta() = UsuarioResposta(
-    id = id,
-    email = email,
-    perfil = perfil.name,
-    ativo = ativo,
-)
-
-private fun MinhaConta.resposta() = MinhaContaResposta(
-    id = usuario.id,
-    organizacaoId = usuario.organizacaoId,
-    email = usuario.email,
-    perfil = usuario.perfil.name,
-    ativo = usuario.ativo,
-    capacidades = CapacidadesUsuarioResposta(
-        perfisCriaveis = perfisCriaveis.map(PerfilUsuario::name),
-        podeListarUsuarios = podeListarUsuarios,
-        podeAlterarStatus = podeAlterarStatus,
-    ),
-)
-
-private fun JsonNode.validarCampos(vararg permitidos: String) {
-    require(isObject && propertyNames().all { it in permitidos }) { "Objeto ou campos inválidos" }
-}
-
-private fun JsonNode.texto(nome: String): String {
-    val campo = get(nome)
-    require(campo != null && campo.isString) { "Campo inválido" }
-    return campo.stringValue()
-}
-
-private fun uuid(valor: String): UUID {
-    require(valor.matches(Regex("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"))) {
-        "UUID inválido"
-    }
-    return UUID.fromString(valor)
-}
-
 @RestController
 @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
 @RequestMapping(value = ["/api/v1", "/bff/v1"])
@@ -109,13 +40,50 @@ private fun uuid(valor: String): UUID {
 class UsuariosHttp(
     private val gestao: GestaoUsuarios,
 ) {
+    private fun UsuarioOrganizacional.resposta() = UsuarioResposta(
+        id = id,
+        email = email,
+        perfil = perfil.name,
+        ativo = ativo,
+    )
+
+    private fun MinhaConta.resposta() = MinhaContaResposta(
+        id = usuario.id,
+        organizacaoId = usuario.organizacaoId,
+        email = usuario.email,
+        perfil = usuario.perfil.name,
+        ativo = usuario.ativo,
+        capacidades = CapacidadesUsuarioResposta(
+            perfisCriaveis = perfisCriaveis.map(PerfilUsuario::name),
+            podeListarUsuarios = podeListarUsuarios,
+            podeAlterarStatus = podeAlterarStatus,
+        ),
+    )
+
+    private fun JsonNode.validarCampos(vararg permitidos: String) {
+        require(isObject && propertyNames().all { it in permitidos }) { "Objeto ou campos inválidos" }
+    }
+
+    private fun JsonNode.texto(nome: String): String {
+        val campo = get(nome)
+        require(campo != null && campo.isString) { "Campo inválido" }
+        return campo.stringValue()
+    }
+
+    private fun uuid(valor: String): UUID {
+        require(valor.matches(Regex("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"))) {
+            "UUID inválido"
+        }
+        return UUID.fromString(valor)
+    }
+
     @GetMapping("/usuarios/me")
     @Operation(summary = "Consultar identidade e capacidades do usuário autenticado")
     fun minhaConta(): MinhaContaResposta = gestao.minhaConta().resposta()
 
     @GetMapping("/usuarios")
     @Operation(summary = "Listar usuários administráveis da própria organização")
-    fun listar(): List<UsuarioResposta> = gestao.listar().map(UsuarioOrganizacional::resposta)
+    fun listar(): List<UsuarioResposta> = gestao.listar().map { it.resposta() }
 
     @PostMapping("/usuarios")
     @ResponseStatus(HttpStatus.CREATED)

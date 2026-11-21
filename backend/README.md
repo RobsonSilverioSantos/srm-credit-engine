@@ -143,6 +143,22 @@ verificações `:dominio:verificarFronteiraHexagonal` e
 classpaths de compilação e execução do núcleo. O teste HTTP não substitui a
 checagem com PostgreSQL real pelos comandos abaixo.
 
+O `check` também executa `verificarTiposKotlin`: o parser do compilador Kotlin
+já usado pelo projeto identifica declarações top-level de produção nos três
+módulos. Cada arquivo pode conter no máximo um tipo nomeado, com nome igual ao
+arquivo; tipos aninhados não são contados. Arquivos sem tipos, como os de
+funções top-level, são permitidos. A verificação não avalia se tipos foram
+aninhados artificialmente nem se o nome de um arquivo só de funções é descritivo.
+É necessário um JDK completo para compilar o verificador.
+
+Na B13, a porta Kotlin `LiquidarRecebivel` passou a retornar
+`ResultadoOperacaoLiquidacao`, que contém o resultado de domínio e metadado
+opaco de replay; consumidores Kotlin precisam adaptar a assinatura. A mudança
+retira HTTP do domínio sem alterar os contratos API/BFF. O adaptador JDBC
+continua reconstruindo os campos conhecidos do JSON histórico: campos adicionais
+ou representações alternativas não são preservados literalmente, limitação
+preexistente do replay.
+
 ## Cadastro e isolamento
 
 Os comandos de cadastro não recebem organização. `ServicoCadastro` obtém a
