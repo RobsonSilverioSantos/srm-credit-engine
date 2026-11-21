@@ -51,6 +51,28 @@ A taxa PTAX de fechamento é **diária**, não sofre automaticamente a janela gl
 - Timeouts, retries limitados com backoff, limite de concorrência, diagnóstico e monitoramento; falhas transitórias não repetem inserts financeiros, e falhas permanentes não são mascaradas.
 - Não incluir segredo, JWT, documento fiscal ou payload de cliente em logs de integração.
 
+## 5A. Registro manual de cotação (API/BFF — escopo B15)
+
+A porta `TaxasPorta.registrarCotacao(taxaBrlPorUsd, vigenteEm)` **já existe** na aplicação, mas não está exposta em REST/BFF e não registra proveniência, autor ou justificativa. A B15 deve evoluir esse caso de uso sem romper seus testes e oferecer **cadastro manual seguro**, além da sincronização PTAX.
+
+- Implementar endpoint autenticado de inclusão manual no `/api/v1` e `/bff/v1` (rota proposta `POST /cotacoes-cambiais/manuais`, sujeita a revisão de contrato/OpenAPI). Exigir autorização em backend, não apenas ocultação no frontend: política proposta `MASTER` e `ADMIN`; `OPERADOR` não pode publicar cotações. Reutilizar o modelo RBAC S02 de forma explícita, documentando privilégios e isolamento.
+- Entrada: par `BRL/USD` (fixo no MVP), taxa BRL por 1 USD como **string decimal positiva** validada com `BigDecimal`, lado/convenção quando aplicável, `vigenteEm` explícito e precisão compatível com PostgreSQL, validade/expiração **segundo política MANUAL**, e **justificativa obrigatória**. Não aceitar origem informada livremente pelo cliente: o servidor grava `MANUAL` a partir do endpoint confiável.
+- Auditar **identidade do autor autenticado**, momento do cadastro, motivo e origem, e manter snapshots financeiros anteriores imutáveis. Corrigir entrada errada por **nova versão**; não implementar `UPDATE`/`DELETE` no histórico imutável.
+- Rejeitar cotação não positiva, acima da escala/precisão suportada, vigência inválida, campo desconhecido, duplicidade de vigência e ausência de autorização. Responder `201` na inclusão, `400` para dados inválidos, `401`/`403` para autenticação/RBAC e `409` em conflitos pertinentes; jamais ignorar conflito nem sobrescrever taxa publicada.
+- Disponibilizar consulta autenticada e paginada ao **histórico de cotações**, inclusive origem `BCB_PTAX`, `MANUAL` e `DEMO`, validade, lado, data, autor/justificativa quando autorizado; evitar revelar dados de auditoria a perfis sem permissão.
+- A política de precedência entre **PTAX e MANUAL** precisa ser definida formalmente: cotação manual **não deve substituir automaticamente** PTAX na simulação ou liquidação. Adotar somente preferência de origem aprovada e explícita (por configuração confiável ou contrato de caso de uso com autorização), nunca `ORDER BY vigente_em` misturando fontes sem critério. Sem fallback MANUAL→DEMO ou PTAX→MANUAL silencioso.
+- A fonte `MANUAL` pode ter janela de elegibilidade/validade própria: não aplicar automaticamente a TTL intradiária de 30 minutos nem a política de calendário PTAX. Definir duração ou expiração por decisão documentada; cotações antigas são históricas, não elegíveis indefinidamente.
+- A operação de inclusão manual não pode chamar o BCB nem interferir na transação ACID de liquidação. Limitar abuso, controlar concorrência e registrar eventos operacionais sem vazar JWT/segredos.
+- **A interface de entrada** pertence à **F06**, posterior à integração B15 e F05; B15 entrega e testa API/BFF com contratos OpenAPI e fixtures, permitindo a F06 integrar-se sem inventar endpoints.
+
+### Testes adicionais de manutenção manual
+
+- [ ] Inclusão manual `201` com entrada decimal textual, autor e motivo gravados; validação `400` por taxa inválida/escala/tempo/motivo, `409` por conflitos.
+- [ ] `401`/`403`/RBAC com MASTER, ADMIN e OPERADOR, ausência de bypass BFF e origem fixada pelo backend; autoria confiável no snapshot.
+- [ ] Cotação MANUAL e BCB_PTAX coexistentes: seleção por fonte explicitamente aprovada, sem substituição silenciosa; origem e justificativa persistidas.
+- [ ] Histórico somente inclusão e paginação; novos registros não reprecificam liquidações existentes; testes PostgreSQL de unicidade, concorrência e auditoria.
+- [ ] Contrato API/BFF/OpenAPI atualizado, sem endpoint `UPDATE` ou `DELETE` de cotação; testes seguros para o frontend F06.
+
 ## 6. Modos de execução e aferição
 
 - **DEMO/C3:** manter a opção explícita de usar exatamente **5,4321 BRL/USD** em testes/fonte mock, para reproduzir **C3 = US$ 17.094,67** sem depender de cotações de mercado. A fonte utilizada deve ser distinguível de PTAX e a política de elegibilidade deve estar documentada.
@@ -78,6 +100,7 @@ A taxa PTAX de fechamento é **diária**, não sofre automaticamente a janela gl
 2. **Defasagem máxima:** duração ou dias úteis permitidos para último fechamento e regras para feriados/falhas prolongadas, precisam ser aprovados e parametrizados.
 3. **Disponibilidade/publicação:** como considerar a data/hora exata de divulgação e eventual revisão de boletim; verificar semântica oficial e definir proteção contra look-ahead.
 4. **Atualização:** agendamento e/ou acionamento sob autorização; critério de sincronização inicial sem sobrecarregar o BCB.
+6. **Operação manual:** política de autorização, validade da fonte MANUAL e precedência frente à PTAX; jamais assumir sobreposição automática.
 5. **Manutenção de legado:** como etiquetar cotações históricas sem proveniência; não falsificar que vieram do BCB.
 
 É permitido iniciar investigação/planejamento de desenho sobre a B15 depois da liberação, mas **não concluir implementação sem essas decisões**.
