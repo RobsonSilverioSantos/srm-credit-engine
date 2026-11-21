@@ -75,7 +75,16 @@ export function formatarPercentual(fracao: string, locale: string): string {
 }
 
 export function formatarCotacao(valor: string, locale: string): string {
-  return partesDecimalLocalizado(valor, locale).map((parte) => parte.value).join('')
+  const correspondencia = /^(-?)([0-9]+)(?:\.([0-9]+))?$/.exec(valor)
+  if (!correspondencia) throw new Error('Valor decimal canônico inválido.')
+
+  // Exibir no mínimo quatro casas (PTAX) e remover apenas zeros à direita
+  // além da quarta casa. Dígitos significativos adicionais são preservados.
+  // A formatação não altera a string recebida nem arredonda a taxa financeira.
+  const fracao = (correspondencia[3] ?? '').padEnd(4, '0')
+  const fracaoExibida = fracao.slice(0, 4) + fracao.slice(4).replace(/0+$/, '')
+  const valorExibido = `${correspondencia[1] ?? ''}${correspondencia[2]}.${fracaoExibida}`
+  return partesDecimalLocalizado(valorExibido, locale).map((parte) => parte.value).join('')
 }
 
 function arredondarDecimal(valor: string, escala: number): string {

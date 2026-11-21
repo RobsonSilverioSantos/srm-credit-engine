@@ -379,7 +379,7 @@ function Valores({ dados, locale }: { dados: Simulacao | Liquidacao; locale: str
     {'taxaBaseMensal' in dados && <>
       <Typography>Taxa base mensal: {formatarPercentual(dados.taxaBaseMensal, locale)}</Typography>
       <Typography>Spread mensal: {formatarPercentual(dados.spreadMensal, locale)}</Typography>
-      {dados.cotacaoBrlPorUsd && <Typography>Cotação BRL/USD: {formatarCotacao(dados.cotacaoBrlPorUsd, locale)}</Typography>}
+      {dados.cotacaoBrlPorUsd && <Typography>Cotação: 1 USD = R$ {formatarCotacao(dados.cotacaoBrlPorUsd, locale)}</Typography>}
       <Typography>Referência: {dados.referencia}</Typography>
       {dados.cotacaoValidaAte && <Typography>Cotação válida até: {dados.cotacaoValidaAte}</Typography>}
     </>}

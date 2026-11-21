@@ -36,9 +36,24 @@ test('formata BRL/USD com arredondamento HALF_EVEN e preserva magnitudes grandes
     .toBe('$123,456,789,012,345,678.99')
 })
 
-test('formata percentuais e cotações sem reduzir a escala decimal', () => {
+test('formata percentuais sem arredondar a escala original', () => {
   expect(formatarPercentual('0.0100000000', 'pt-BR')).toBe('1,00000000%')
   expect(formatarPercentual('0.0150000000', 'en-US')).toBe('1.50000000%')
-  expect(formatarCotacao('1234.5000', 'pt-BR')).toBe('1.234,5000')
-  expect(formatarCotacao('1234.5000', 'en-US')).toBe('1,234.5000')
+})
+
+test.each([
+  ['5.4321000000', 'pt-BR', '5,4321'],
+  ['5.4321000000', 'en-US', '5.4321'],
+  ['1234.5000', 'pt-BR', '1.234,5000'],
+  ['1234.5000', 'en-US', '1,234.5000'],
+  ['5', 'pt-BR', '5,0000'],
+  ['5.4321230000', 'pt-BR', '5,432123'],
+  ['5.0000000009', 'pt-BR', '5,0000000009'],
+  ['123456789012345678.1234567890', 'en-US', '123,456,789,012,345,678.123456789'],
+])('formata cotacao %s em %s sem zeros residuais nem perda de precisao', (valor, locale, esperado) => {
+  expect(formatarCotacao(valor, locale)).toBe(esperado)
+})
+
+test('rejeita cotacao sem representacao decimal canonica', () => {
+  expect(() => formatarCotacao('5,4321', 'pt-BR')).toThrow('Valor decimal canônico inválido.')
 })
