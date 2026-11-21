@@ -155,15 +155,13 @@ O bootstrap é idempotente por ID, não cria usuário, credencial ou contexto de
 identidade e fica desabilitado por padrão. O ID demonstrativo é
 `00000000-0000-4000-8000-000000000001`.
 
-## Autenticação local e usuários de teste/demonstração
+## Autenticação e gestão de usuários
 
-A aplicação expõe somente `POST /api/v1/auth/token` para autenticação local.
-Ela carrega usuários e organizações ativas do PostgreSQL, verifica senhas com
-BCrypt e emite tokens bearer HS256 de curta duração. Cada requisição protegida
-valida assinatura, algoritmo fixo, emissor, expiração, usuário e organização;
-também confirma que o usuário continua ativo e vinculado àquela organização
-ativa. `ContextoOrganizacao` lê o escopo do principal validado da requisição.
-Não existe endpoint público para criar usuários.
+A aplicação autentica pelo `POST /api/v1/auth/token`, usando BCrypt e tokens
+bearer HS256 de curta duração. Cada requisição protegida valida assinatura,
+algoritmo fixo, emissor, expiração, usuário e organização; também confirma no
+PostgreSQL que o usuário e a organização continuam ativos. Portanto, um token
+emitido antes da inativação do usuário passa a receber `401`.
 
 Configure um segredo novo fora do repositório antes de iniciar a aplicação. A
 ausência de segredo ou um valor menor que 256 bits impede a inicialização.
@@ -177,38 +175,43 @@ export SRM_DB_USER SRM_DB_PASSWORD
 docker compose up --profile app --detach --wait
 ```
 
-Para criar um usuário de demonstração, crie primeiro a organização com o
-bootstrap opt-in descrito acima e, então, use uma conexão PostgreSQL de
-operador. `DATABASE_URL` deve apontar para o banco PostgreSQL de demonstração;
-a organização informada deve existir e estar ativa. A role precisa de
-`CONNECT`, `USAGE` no schema e `INSERT` em `usuarios`. O exemplo solicita a
-senha sem exibi-la, gera localmente um hash BCrypt com `htpasswd` e envia
-somente o hash ao banco. O operador escolhe o ID da organização e o e-mail;
-não há credenciais fixas:
+O primeiro MASTER precisa ser provisionado explicitamente, antes do uso da API
+administrativa. Crie primeiro a organização demonstrativa com o bootstrap
+opt-in descrito acima, configure as variáveis de banco e execute no terminal:
 
 ```sh
-set -euo pipefail
-: "${DATABASE_URL:?Set DATABASE_URL to the demonstration PostgreSQL database}"
-trap 'unset SENHA HASH' EXIT
-read -r -p "Organization UUID: " ORGANIZACAO_ID
-read -r -p "Email: " EMAIL
-read -r -s -p "Password: " SENHA; printf '\n'
-HASH="$(printf '%s\n' "$SENHA" | htpasswd -nBi -C 12 "$EMAIL" | cut -d: -f2-)"
-unset SENHA
-psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
-  -v organizacao_id="$ORGANIZACAO_ID" -v email="$EMAIL" -v senha_hash="$HASH" \
-  <<'SQL'
-INSERT INTO usuarios (id, organizacao_id, email, senha_hash)
-VALUES (gen_random_uuid(), :'organizacao_id'::uuid, :'email', :'senha_hash');
-SQL
-unset HASH
+(
+  set -a
+  . ./.env
+  set +a
+  export SPRING_DATASOURCE_USERNAME="$SRM_DB_USER"
+  export SPRING_DATASOURCE_PASSWORD="$SRM_DB_PASSWORD"
+  export SPRING_DATASOURCE_URL="jdbc:postgresql://127.0.0.1:${SRM_DB_PORT:-5432}/srm_credit_engine"
+  bash scripts/bootstrap-master.sh
+)
 ```
 
-Instale o utilitário Apache `htpasswd` se necessário. O heredoc protegido evita
-expansão pelo Bash; o próprio cliente `psql` interpola as variáveis como
-literais SQL, com `organizacao_id` convertida explicitamente para `UUID`.
-Testes de integração criam usuários e senhas aleatórios em cada execução e
-persistem somente hashes BCrypt.
+O comando exige `SRM_JWT_SECRET` já configurado com o mesmo segredo usado pela
+aplicação e conexão PostgreSQL local disponível. Ele inicia a aplicação sem
+servidor HTTP, pede organização, e-mail e senha em um terminal interativo,
+confirma a senha sem exibi-la e grava somente o hash BCrypt. Não há conta ou
+credencial fixa, nem execução automática no startup normal. O banco rejeita um
+segundo MASTER na mesma organização, inclusive após inativação; o usuário MASTER
+nunca pode ser criado pela API/BFF.
+
+Depois do bootstrap, `MASTER` cria `ADMIN` ou `OPERADOR`, e `ADMIN` cria somente
+`OPERADOR`. `GET /api/v1/usuarios/me` retorna a organização, o perfil e as
+capacidades do principal autenticado. `GET /usuarios/me`, `GET /usuarios`,
+`POST /usuarios` e `PATCH /usuarios/{id}/status` estão disponíveis sob ambos
+os prefixos `/api/v1` e `/bff/v1` e compartilham os mesmos casos de uso.
+Listagem e alteração de status são restritas aos perfis e à organização do
+usuário autenticado. As respostas nunca incluem senha, hash ou token; senhas
+recebidas pela API devem ter de 12 a 72 bytes UTF-8.
+
+Os perfis de autorização são consultados no PostgreSQL em cada operação
+administrativa, não aceitos de campos de entrada nem confiados a claims de
+perfil do token. A migration V4 atribui `OPERADOR` aos usuários existentes;
+nenhuma migration V1–V3 é alterada.
 
 Execute os testes de integração reais e a regressão completa com:
 

@@ -5,6 +5,8 @@ import br.com.srm.creditengine.liquidacao.dominio.ConflitoLiquidacao
 import br.com.srm.creditengine.liquidacao.dominio.RecebivelNaoEncontrado
 import br.com.srm.creditengine.taxas.adaptador.saida.ConsultaCambialIndisponivel
 import br.com.srm.creditengine.taxas.dominio.DadosFinanceirosIndisponiveis
+import br.com.srm.creditengine.usuarios.aplicacao.AcessoAdministrativoNegado
+import br.com.srm.creditengine.usuarios.aplicacao.UsuarioAdministrativoNaoEncontrado
 import java.time.format.DateTimeParseException
 import org.slf4j.LoggerFactory
 import org.springframework.dao.DataIntegrityViolationException
@@ -32,9 +34,14 @@ class ErrosHttp {
         erro(HttpStatus.BAD_REQUEST, "ENTRADA_INVALIDA", "Requisição inválida.")
 
     @ExceptionHandler(RecursoNaoEncontrado::class, CedenteNaoEncontrado::class, RecebivelNaoEncontrado::class,
+        UsuarioAdministrativoNaoEncontrado::class,
         NoResourceFoundException::class)
     fun naoEncontrado(): ResponseEntity<ErroHttp> =
         erro(HttpStatus.NOT_FOUND, "RECURSO_NAO_ENCONTRADO", "Recurso não encontrado.")
+
+    @ExceptionHandler(AcessoAdministrativoNegado::class)
+    fun proibido(): ResponseEntity<ErroHttp> =
+        erro(HttpStatus.FORBIDDEN, "ACESSO_NEGADO", "Acesso não permitido.")
 
     @ExceptionHandler(ConflitoLiquidacao::class, DataIntegrityViolationException::class)
     fun conflito(): ResponseEntity<ErroHttp> =
