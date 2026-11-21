@@ -1,8 +1,8 @@
 # B13 — Padronização Kotlin e auditoria de arquitetura hexagonal do backend
 
-**Estado:** liberada para iniciar (P1) pelo `TASKS.md`; implementação não iniciada. **Fonte de autorização:** linha B13 de [TASKS.md](../../TASKS.md).  
+**Estado:** integrada em `develop` pelo [PR #48](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/48) em 21/11/2026 (P1); CI backend, frontend e Compose aprovada. Este documento registra o escopo aprovado e seus critérios históricos. **Fonte de autorização:** linha B13 de [TASKS.md](../../TASKS.md).  
 **Execução:** agente `backend` em um único worktree exclusivo. **Revisões independentes:** `architect`, `qa` e `reviewer`.  
-**Pré-requisito:** esta tarefa e as suas dependências devem estar integradas em `origin/develop` antes de criar a feature B13.
+**Pré-requisito de execução (cumprido):** dependências integradas em `origin/develop`; implementação B13 já integrada, não iniciar outra feature para a mesma tarefa.
 
 ## Objetivo
 

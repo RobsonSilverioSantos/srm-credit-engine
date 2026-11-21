@@ -1,8 +1,8 @@
 # B14 — Identificação empresarial e documentos de cedentes
 
-**Estado:** planejada (P1); nenhuma alteração funcional foi implementada.  
+**Estado:** liberada para iniciar (P1), após integração do PR #48 da B13 e da atualização correspondente no `TASKS.md`; implementação B14 ainda não iniciada.  
 **Tarefa de origem:** `TASKS.md`, B14; rastreamento [issue #45](https://github.com/RobsonSilverioSantos/srm-credit-engine/issues/45).  
-**Gate de início:** B13 deve estar integrada em `origin/develop` e a linha B14 deve estar presente na mesma branch. Não iniciar a B14 sobre código pendente de PR da B13.  
+**Gate de início:** B13 já integrada em `origin/develop` pelo PR #48; iniciar B14 somente após a atualização de liberação B14 no `TASKS.md` também ser integrada e buscada com `git fetch origin`. Não iniciar a B14 sobre código pendente de PR.  
 **Agentes:** `backend` como coordenador/executor em um único worktree; `frontend` como apoio à especificação/validação da UI; `architect`, `qa` e `reviewer` como revisores independentes. Não executar edições simultâneas no mesmo worktree.
 
 ## Problema observado
