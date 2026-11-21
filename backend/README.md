@@ -1,5 +1,7 @@
 # Backend — SRM Credit Engine
 
+> **Execução multiplataforma do sistema completo:** consulte o [`README.md` principal](../README.md). O script inicia PostgreSQL, backend e frontend via Docker Compose em Linux, macOS e Windows; o provisionamento MASTER no contêiner dispensa `gradlew bootRun` e evita erro de `System.console()`.
+
 Pré-requisitos: JDK 21 para o Gradle local, Docker Engine com Compose v2 ou
 superior para PostgreSQL e `openssl` para gerar a senha. Na primeira execução,
 o Wrapper baixa o Gradle e as dependências. Execute os comandos em `backend/`.

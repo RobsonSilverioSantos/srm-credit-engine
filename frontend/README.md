@@ -1,5 +1,7 @@
 # Frontend — SRM Credit Engine
 
+> **Sistema completo com Docker (sem Node no computador):** utilize os scripts para macOS/Linux ou Windows descritos no [`README.md` principal](../README.md). Os comandos Vite abaixo são apenas para desenvolvimento do frontend isolado.
+
 ## Executar
 
 Com Node.js 22.13+ (na linha 22) ou 24 e npm:
