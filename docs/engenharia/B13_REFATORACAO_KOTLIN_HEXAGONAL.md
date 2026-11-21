@@ -1,6 +1,6 @@
 # B13 — Padronização Kotlin e auditoria de arquitetura hexagonal do backend
 
-**Estado:** planejada, P1; implementação não iniciada. **Fonte de autorização:** linha B13 de [TASKS.md](../../TASKS.md).  
+**Estado:** liberada para iniciar (P1) pelo `TASKS.md`; implementação não iniciada. **Fonte de autorização:** linha B13 de [TASKS.md](../../TASKS.md).  
 **Execução:** agente `backend` em um único worktree exclusivo. **Revisões independentes:** `architect`, `qa` e `reviewer`.  
 **Pré-requisito:** esta tarefa e as suas dependências devem estar integradas em `origin/develop` antes de criar a feature B13.
 
