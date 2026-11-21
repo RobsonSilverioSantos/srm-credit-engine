@@ -7,6 +7,7 @@ if (-not (Test-Path -LiteralPath $envFile)) {
 }
 
 Write-Host 'O provisionamento exige PowerShell interativo e uma organização já criada.'
+Write-Host 'Senha: 12 a 72 bytes UTF-8. Entradas inválidas podem ser corrigidas sem reiniciar.'
 Write-Host 'UUID demo: 00000000-0000-4000-8000-000000000001'
 Write-Host 'A conta MASTER é única por organização e não pode ser recriada por este comando.'
 
