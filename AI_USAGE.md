@@ -74,6 +74,15 @@
 
 Esta coleta documenta as entregas recentes B10 e S02, integradas depois da consolidação D03. Os resumos abaixo são paráfrases das descrições dos PRs e do backlog, não transcrições dos prompts originais. Os resultados de teste local são os relatados pelos agentes nos PRs e **não foram reexecutados nesta coleta**; os checks remotos são registrados separadamente. A conclusão de A01 continua pendente até incorporar evidências verificáveis de F04, conforme `TASKS.md`.
 
+### A01 — Esta coleta documental
+
+- **Agente / ID:** Copilot SDK no VS Code; A01.
+- **Prompt/resumo:** pedido para confirmar branch, base e dependências; registrar evidências reais de IA e PRs didáticos com ID, agente, resumo do prompt, revisão, comandos, testes, commit e PR; manter o escopo documental e adiar a conclusão até F04.
+- **Revisão:** o agente conferiu o diff e o escopo; revisão humana do PR ainda pendente. Nenhum merge foi realizado.
+- **Comandos/testes desta coleta:** `git branch --show-current`, `git status --short` e `git worktree list` confirmaram o worktree/branch previstos; `git diff --check` passou. Nenhum teste de aplicação foi executado porque a mudança é somente documental.
+- **Commit / PR:** commit de conteúdo `3d3df56`; [PR #36](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/36), base `develop`. A CI desta branch e a revisão humana devem ser verificadas antes da integração.
+- **Estado:** registro inicial enviado para revisão; A01 permanece pendente até incluir evidências de F04.
+
 ### B10 — Logs estruturados, métricas e trilha operacional
 
 - **Agente / ID:** agente Copilot no papel backend/devops (B10, conforme `TASKS.md`); o commit da feature registra Robson Silvério Santos e Copilot como coautores.
