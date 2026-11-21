@@ -57,11 +57,18 @@ case "$ACTION" in
     printf 'Extrato: http://localhost:5173/extrato.html\n'
     printf 'Para provisionar o primeiro MASTER: sh scripts/bootstrap-master.sh\n'
     ;;
-  stop|status|logs)
+  stop|restart|status|logs)
     [ -f "$ENV_FILE" ] || die "Não existe backend/.env. Execute start primeiro."
     case "$ACTION" in
       stop) docker compose --env-file "$ENV_FILE" -f "$BASE" -f "$FULL" \
         --profile app down ;;
+      restart)
+        # Reinicia apenas os serviços da aplicação; PostgreSQL e volumes permanecem intactos.
+        # Não recompila imagens nem aplica alterações nas variáveis do contêiner.
+        docker compose --env-file "$ENV_FILE" -f "$BASE" -f "$FULL" \
+          --profile app restart app frontend
+        printf 'Backend e frontend reiniciados, sem reconstruir imagens nem reiniciar o PostgreSQL.\n'
+        ;;
       status) docker compose --env-file "$ENV_FILE" -f "$BASE" -f "$FULL" \
         --profile app ps ;;
       logs) docker compose --env-file "$ENV_FILE" -f "$BASE" -f "$FULL" \
@@ -69,6 +76,6 @@ case "$ACTION" in
     esac
     ;;
   *)
-    die "Uso: sh scripts/start.sh [start|stop|status|logs]"
+    die "Uso: sh scripts/start.sh [start|restart|stop|status|logs]"
     ;;
 esac
