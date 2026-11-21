@@ -12,7 +12,7 @@ import { CampoFormulario } from '../tema/componentes/CampoFormulario'
 import { Carregando, EstadoVazio, Mensagem } from '../tema/componentes/Feedback'
 import { Painel } from '../tema/componentes/Painel'
 import { InstanteLocal } from '../tema/componentes/InstanteLocal'
-import { formatarEntradaMonetaria, formatarMonetario, formatarPercentual, formatarCotacao, normalizarEntradaMonetaria } from '../dominio/formatacaoMonetaria'
+import { formatarEntradaMonetaria, formatarMonetario, formatarPercentual, formatarCotacao, normalizarEntradaMonetaria, separadorDecimalMonetario } from '../dominio/formatacaoMonetaria'
 import { caixaAscii, editarCnpj, erroDocumento, erroTipoDocumento } from '../dominio/documentoCedente'
 
 const grade = { display: 'grid', gap: 2, gridTemplateColumns: { xs: 'minmax(0, 1fr)', sm: 'repeat(2, minmax(0, 1fr))' } }
@@ -51,6 +51,16 @@ export function Aplicacao({ operacoes, gestaoUsuarios, extrato, locale, fusoHora
     const timer = window.setTimeout(() => { setSessao(null); setExpirada(true) }, Math.max(0, sessao.expiraEm - Date.now()))
     return () => window.clearTimeout(timer)
   }, [sessao])
+
+  useEffect(() => {
+    if (!operacaoEmCurso && !operacaoPendente) return
+    function prevenirDescarte(evento: BeforeUnloadEvent) {
+      evento.preventDefault()
+      evento.returnValue = ''
+    }
+    window.addEventListener('beforeunload', prevenirDescarte)
+    return () => window.removeEventListener('beforeunload', prevenirDescarte)
+  }, [operacaoEmCurso, operacaoPendente])
 
   const navegar = useCallback((destino: PaginaOperacional) => {
     const paginaPermitida = destino === 'usuarios' && usuariosVisiveis === false ? 'cedentes' : destino
@@ -387,7 +397,11 @@ function PainelOperacoes({
       aoAtualizarOperacaoPendente(false)
       setSucesso('Liquidação confirmada.')
     } catch (falha) {
-      setErro(`${tratarErro(falha)} A mesma chave será usada ao tentar novamente.`)
+      const conclusivo = falha instanceof ErroOperacao && [400, 401, 403, 404, 409].includes(falha.status ?? 0)
+      const mensagem = tratarErro(falha)
+      setErro(conclusivo
+        ? `${mensagem} A mesma chave será usada ao tentar novamente.`
+        : `${mensagem} O resultado da liquidação é incerto; uma nova tentativa usará a mesma chave de idempotência.`)
     } finally {
       trava.current = false
       atualizarOcupado(false)
@@ -579,16 +593,16 @@ function Valores({ dados, locale, fusoHorario }: { dados: Simulacao | Liquidacao
 }
 
 function mapearCursorMonetario(formatado: string, editavel: string, cursor: number, locale: string): number {
-  const separador = locale.toLowerCase().startsWith('en') ? '.' : ','
+  const separador = separadorDecimalMonetario(locale)
   const prefixo = formatado.slice(0, cursor)
-  const digitosAntes = (prefixo.match(/[0-9]/g) ?? []).length
+  const digitosAntes = (prefixo.match(/\p{Decimal_Number}/gu) ?? []).length
   const passouDecimal = prefixo.includes(separador)
   let digitos = 0
 
   for (let indice = 0; indice < editavel.length; indice += 1) {
     const caractere = editavel[indice]
     if (caractere === separador && digitos === digitosAntes) return indice + (passouDecimal ? 1 : 0)
-    if (/[0-9]/.test(caractere ?? '')) {
+    if (/\p{Decimal_Number}/u.test(caractere ?? '')) {
       if (digitos === digitosAntes) return indice
       digitos += 1
     }

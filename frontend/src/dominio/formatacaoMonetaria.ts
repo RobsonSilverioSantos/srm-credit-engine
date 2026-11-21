@@ -3,12 +3,11 @@ type EntradaInvalida = { valida: false; erro: string }
 export type ResultadoEntradaMonetaria = EntradaValida | EntradaInvalida
 
 export function normalizarEntradaMonetaria(valor: string, locale: string): ResultadoEntradaMonetaria {
-  const texto = valor.trim()
+  const texto = normalizarDigitos(valor.trim(), locale)
   if (!texto) return { valida: false, erro: 'Informe um valor.' }
 
-  const separadorDecimal = locale.toLowerCase().startsWith('en') ? '.' : ','
-  const separadorMilhar = separadorDecimal === '.' ? ',' : '.'
-  const partes = texto.split(separadorDecimal)
+  const { decimal, agrupamento, largurasGrupos } = separadoresLocale(locale)
+  const partes = texto.split(decimal)
   if (partes.length > 2) return { valida: false, erro: 'Informe um valor válido para o idioma selecionado.' }
 
   const [inteiroDigitado, fracaoDigitada] = partes
@@ -17,9 +16,9 @@ export function normalizarEntradaMonetaria(valor: string, locale: string): Resul
   }
 
   let inteiro: string
-  if (inteiroDigitado.includes(separadorMilhar)) {
-    const grupos = inteiroDigitado.split(separadorMilhar)
-    if (!/^[0-9]{1,3}$/.test(grupos[0] ?? '') || grupos.slice(1).some((grupo) => !/^[0-9]{3}$/.test(grupo))) {
+  if (agrupamento && inteiroDigitado.includes(agrupamento)) {
+    const grupos = inteiroDigitado.split(agrupamento)
+    if (grupos.some((grupo) => !/^[0-9]+$/.test(grupo)) || !agrupamentoValido(grupos, largurasGrupos)) {
       return { valida: false, erro: 'Use os separadores do idioma selecionado.' }
     }
     inteiro = grupos.join('')
@@ -43,6 +42,14 @@ export function normalizarEntradaMonetaria(valor: string, locale: string): Resul
   return { valida: true, valorCanonico: `${inteiro}.${fracao}` }
 }
 
+export function separadorDecimalMonetario(locale: string): string {
+  const decimal = new Intl.NumberFormat(locale, { minimumFractionDigits: 1, maximumFractionDigits: 1 })
+    .formatToParts(0n)
+    .find((parte) => parte.type === 'decimal')?.value
+  if (!decimal) throw new Error(`Separador decimal indisponível para o idioma ${locale}.`)
+  return decimal
+}
+
 export function formatarMonetario(valor: string, moeda: 'BRL' | 'USD', locale: string): string {
   const arredondado = arredondarDecimal(valor, 2)
   const [inteiro, fracao] = arredondado.split('.')
@@ -63,10 +70,7 @@ export function formatarEntradaMonetaria(valorCanonico: string, locale: string):
 
   const inteiro = new Intl.NumberFormat(locale, { useGrouping: true, maximumFractionDigits: 0 })
     .format(BigInt(correspondencia[1] ?? '0'))
-  const decimal = new Intl.NumberFormat(locale, { minimumFractionDigits: 1, maximumFractionDigits: 1 })
-    .formatToParts(0n)
-    .find((parte) => parte.type === 'decimal')?.value
-  if (!decimal) throw new Error(`Separador decimal indisponível para o idioma ${locale}.`)
+  const decimal = separadorDecimalMonetario(locale)
   return `${inteiro}${decimal}${localizarDigitos(correspondencia[2] ?? '00', locale)}`
 }
 
@@ -151,10 +155,7 @@ function partesDecimalLocalizado(valor: string, locale: string): Intl.NumberForm
   const partesInteiro = formatador.formatToParts(BigInt(`${sinal}${inteiro}`))
   if (!fracao) return partesInteiro
 
-  const decimal = new Intl.NumberFormat(locale, { minimumFractionDigits: 1, maximumFractionDigits: 1 })
-    .formatToParts(0n)
-    .find((parte) => parte.type === 'decimal')?.value
-  if (!decimal) throw new Error(`Separador decimal indisponível para o idioma ${locale}.`)
+  const decimal = separadorDecimalMonetario(locale)
 
   const ultimoInteiro = partesInteiro.reduce((ultimo, parte, indice) => parte.type === 'integer' ? indice : ultimo, -1)
   const antesDaFracao = partesInteiro.slice(0, ultimoInteiro + 1)
@@ -172,4 +173,29 @@ function localizarDigitos(digitos: string, locale: string): string {
   const formatador = new Intl.NumberFormat(locale, { useGrouping: false, maximumFractionDigits: 0 })
   const mapa = Array.from({ length: 10 }, (_, digito) => formatador.format(BigInt(digito)))
   return [...digitos].map((digito) => mapa[digito.charCodeAt(0) - 48] ?? digito).join('')
+}
+
+function normalizarDigitos(valor: string, locale: string): string {
+  const formatador = new Intl.NumberFormat(locale, { useGrouping: false, maximumFractionDigits: 0 })
+  const mapa = new Map(Array.from({ length: 10 }, (_, digito) => [formatador.format(BigInt(digito)), String(digito)]))
+  return [...valor].map((caractere) => mapa.get(caractere) ?? caractere).join('')
+}
+
+function separadoresLocale(locale: string): { decimal: string; agrupamento: string | null; largurasGrupos: number[] } {
+  const partes = new Intl.NumberFormat(locale, { useGrouping: true, maximumFractionDigits: 0 })
+    .formatToParts(12345678901234567n)
+  return {
+    decimal: separadorDecimalMonetario(locale),
+    agrupamento: partes.find((parte) => parte.type === 'group')?.value ?? null,
+    largurasGrupos: partes.filter((parte) => parte.type === 'integer').map((parte) => [...parte.value].length),
+  }
+}
+
+function agrupamentoValido(grupos: string[], largurasEsperadas: number[]): boolean {
+  if (grupos.length < 2 || grupos.length > largurasEsperadas.length) return false
+  return grupos.every((grupo, indice) => {
+    const posicaoEsperada = largurasEsperadas.length - grupos.length + indice
+    const largura = largurasEsperadas[posicaoEsperada]
+    return largura !== undefined && (indice === 0 ? grupo.length > 0 && grupo.length <= largura : grupo.length === largura)
+  })
 }

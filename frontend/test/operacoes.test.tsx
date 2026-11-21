@@ -180,6 +180,8 @@ test('impede saída durante cadastro e confirma antes de descartar intenção pe
 
   const botaoSair = screen.getByRole('button', { name: 'Sair' })
   expect(botaoSair).toBeEnabled()
+  const tentativaDescarte = new Event('beforeunload', { cancelable: true })
+  expect(window.dispatchEvent(tentativaDescarte)).toBe(false)
   await user.click(botaoSair)
   const dialogo = screen.getByRole('dialog', { name: 'Sair com operação pendente?' })
   expect(within(dialogo).getByText(/consulte os recebíveis no servidor/)).toBeVisible()
@@ -190,6 +192,27 @@ test('impede saída durante cadastro e confirma antes de descartar intenção pe
   await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Sair mesmo assim' }))
   expect(await screen.findByLabelText(/E-mail/)).toBeVisible()
 })
+
+test('explicita incerteza da liquidação e retenta com a mesma chave idempotente', async () => {
+  const porta = criarPorta()
+  porta.liquidar.mockRejectedValueOnce(new ErroOperacao('Falha de conexão.'))
+  const user = await iniciar(porta)
+  await preencher(user)
+  await screen.findByText(/Valor presente:.*92,859\.94/)
+  await user.click(screen.getByRole('button', { name: 'Cadastrar recebível' }))
+  await user.click(await screen.findByRole('button', { name: 'Confirmar liquidação' }))
+  await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Liquidar' }))
+
+  expect(await screen.findByText(/O resultado da liquidação é incerto/)).toBeVisible()
+  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+  expect(screen.getByRole('button', { name: 'Confirmar liquidação' })).toBeEnabled()
+  await user.click(screen.getByRole('button', { name: 'Confirmar liquidação' }))
+  await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Liquidar' }))
+  await screen.findByText(/Código da liquidação: liquidacao-1/)
+  expect(porta.cadastrarRecebivel).toHaveBeenCalledTimes(1)
+  expect(porta.liquidar).toHaveBeenCalledTimes(2)
+  expect(porta.liquidar.mock.calls[1]?.[3]).toBe(porta.liquidar.mock.calls[0]?.[3])
+}, 10000)
 
 test('bloqueia novo cadastro quando a resposta do servidor é incerta', async () => {
   const porta = criarPorta()
@@ -271,6 +294,27 @@ test('formata o valor ao sair do campo e restaura a edição com cursor e decima
   campo.focus()
   await waitFor(() => expect(campo).toHaveValue('25.000,00'))
   expect(campo.selectionStart).toBe('25.000,00'.indexOf(','))
+})
+
+test('colagem, substituição de seleção e backspace mantêm a entrada monetária editável', async () => {
+  const porta = criarPorta()
+  const user = await iniciar(porta, 'pt-BR')
+  await navegarA(user, 'Simulação')
+  const campo = screen.getByLabelText(/Valor de face em BRL/) as HTMLInputElement
+  campo.focus()
+  await user.paste('1.234,56')
+  expect(campo).toHaveValue('1.234,56')
+
+  campo.setSelectionRange(1, 3)
+  await user.keyboard('9')
+  expect(campo).toHaveValue('1934,56')
+  campo.setSelectionRange(3, 3)
+  await user.keyboard('{Backspace}')
+  expect(campo).toHaveValue('194,56')
+
+  await user.type(screen.getByLabelText(/Prazo em meses/), '3')
+  await screen.findByText(/Valor presente:.*92\.859,94/)
+  expect(porta.simular.mock.calls[0]?.[1]).toMatchObject({ valorFaceBrl: '194.56' })
 })
 
 test('entrada monetária en-US mantém agrupamento local e payload decimal canônico', async () => {

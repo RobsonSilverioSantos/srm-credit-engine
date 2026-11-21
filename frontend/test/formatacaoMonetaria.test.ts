@@ -45,6 +45,19 @@ test.each([
   expect(formatarEntradaMonetaria(valor, locale)).toBe(esperado)
 })
 
+test('normaliza agrupamento e dígitos de outras localidades do navegador', () => {
+  expect(normalizarEntradaMonetaria('25\u202f000,75', 'fr-FR'))
+    .toEqual({ valida: true, valorCanonico: '25000.75' })
+
+  const indiano = formatarEntradaMonetaria('12345678901234567.89', 'hi-IN')
+  expect(normalizarEntradaMonetaria(indiano, 'hi-IN'))
+    .toEqual({ valida: true, valorCanonico: '12345678901234567.89' })
+
+  const arabe = formatarEntradaMonetaria('25000.75', 'ar-EG')
+  expect(normalizarEntradaMonetaria(arabe, 'ar-EG'))
+    .toEqual({ valida: true, valorCanonico: '25000.75' })
+})
+
 test('formata percentuais sem arredondar a escala original', () => {
   expect(formatarPercentual('0.0100000000', 'pt-BR')).toBe('1,00000000%')
   expect(formatarPercentual('0.0150000000', 'en-US')).toBe('1.50000000%')

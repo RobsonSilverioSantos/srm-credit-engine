@@ -25,8 +25,10 @@ Após autenticar na página principal, utilize o menu responsivo e os
 breadcrumbs para navegar entre Cedentes, Simulação, Liquidação, Extrato e
 Usuários. As rotas operacionais ficam no fragmento (`/#/simulacao`, por
 exemplo), portanto podem ser abertas diretamente ou atualizadas sem exigir
-fallback de rota no Nginx. A navegação mantém o estado em memória; atualizar ou
-fechar a página encerra a sessão e descarta operações pendentes não persistidas.
+fallback de rota no Nginx. A navegação mantém o estado em memória. Atualizar ou
+fechar a página pede confirmação do navegador quando há solicitação em curso ou
+operação pendente; se a saída for confirmada, a sessão termina e os dados em
+memória são descartados.
 O Catálogo visual permanece separado do menu operacional e identificado como
 demonstração em `/catalogo.html`.
 
@@ -58,11 +60,12 @@ ou cadastro incerto, sair exige confirmação e avisa que o estado em memória s
 descartado; antes de iniciar outro cadastro, o operador deve conferir o estado
 no servidor.
 
-O valor de face aceita os separadores de `pt-BR` e `en-US`. Enquanto o campo
-está em edição, o texto permanece selecionável e sem máscara monetária; ao sair
-do campo, uma entrada válida é exibida como moeda localizada. O foco restaura o
-texto editável e a posição do cursor. Simulação e liquidação continuam enviando
-ao BFF somente strings decimais canônicas.
+O valor de face usa os separadores e dígitos do locale do navegador, com
+fallback para `pt-BR`; a normalização valida o agrupamento daquele locale.
+Enquanto o campo está em edição, o texto permanece selecionável e sem máscara
+monetária; ao sair do campo, uma entrada válida é exibida como moeda localizada.
+O foco restaura o texto editável e a posição do cursor. Simulação e liquidação
+continuam enviando ao BFF somente strings decimais canônicas.
 
 ## Identificação de cedentes (B14)
 
