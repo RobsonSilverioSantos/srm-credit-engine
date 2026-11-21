@@ -72,16 +72,16 @@
 
 ## A01 — Registro inicial de evidências de IA e PRs didáticos (20/11/2026)
 
-Esta coleta documenta as entregas recentes B10 e S02, integradas depois da consolidação D03. Os resumos abaixo são paráfrases das descrições dos PRs e do backlog, não transcrições dos prompts originais. Os resultados de teste local são os relatados pelos agentes nos PRs e **não foram reexecutados nesta coleta**; os checks remotos são registrados separadamente. A conclusão de A01 continua pendente até incorporar evidências verificáveis de F04, conforme `TASKS.md`.
+Esta coleta inicial documenta B10 e S02, integradas depois da consolidação D03. Os resumos abaixo são paráfrases das descrições dos PRs e do backlog, não transcrições dos prompts originais. Os resultados de testes locais são relatos dos agentes, **não reexecutados nesta coleta**; os checks remotos são apresentados separadamente. **O registro posterior de F04 e o encerramento documental da A01 constam no adendo abaixo**, realizado após os merges dos PRs #37 e #36.
 
 ### A01 — Esta coleta documental
 
 - **Agente / ID:** Copilot SDK no VS Code; A01.
 - **Prompt/resumo:** pedido para confirmar branch, base e dependências; registrar evidências reais de IA e PRs didáticos com ID, agente, resumo do prompt, revisão, comandos, testes, commit e PR; manter o escopo documental e adiar a conclusão até F04.
-- **Revisão:** o agente conferiu o diff e o escopo; revisão humana do PR ainda pendente. Nenhum merge foi realizado.
+- **Revisão no momento da abertura do PR:** o agente conferiu o diff e o escopo. Posteriormente, o PR #36 foi integrado em `develop` pelo responsável técnico; o GitHub confirma merge, não necessariamente uma aprovação formal de review.
 - **Comandos/testes desta coleta:** `git branch --show-current`, `git status --short` e `git worktree list` confirmaram o worktree/branch previstos; `git diff --check` passou. Nenhum teste de aplicação foi executado porque a mudança é somente documental.
-- **Commit / PR:** commit de conteúdo `3d3df56`; [PR #36](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/36), base `develop`. A CI desta branch e a revisão humana devem ser verificadas antes da integração.
-- **Estado:** registro inicial enviado para revisão; A01 permanece pendente até incluir evidências de F04.
+- **Commit / PR:** commit de conteúdo `3d3df56`; [PR #36](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/36), base `develop`, merge `d7177f0`; [CI backend/frontend aprovada](https://github.com/RobsonSilverioSantos/srm-credit-engine/actions/runs/44856268536).
+- **Estado:** registro inicial da A01 integrado. O adendo F04 nesta mesma seção completa sua rastreabilidade, sem alegar reexecução dos testes da F04 pela A01.
 
 ### B10 — Logs estruturados, métricas e trilha operacional
 
@@ -102,6 +102,23 @@ Esta coleta documenta as entregas recentes B10 e S02, integradas depois da conso
 - **CI remota:** execução [44852904037](https://github.com/RobsonSilverioSantos/srm-credit-engine/actions/runs/44852904037): jobs backend e frontend aprovados. Isso não é uma reexecução local feita por A01.
 - **Commit / PR:** feature `736a5e8`; merge `8dc1251`; [PR #34](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/34), base `develop`.
 - **Limite didático:** o bootstrap interativo e os testes mobile de F04 continuam pendentes; não presumir um fluxo administrativo frontend integrado.
+
+### F04 — Administração de usuários (adendo após os merges)
+
+- **Agente / ID:** GitHub Copilot no papel frontend, F04; evidência originada no PR #37 e na CI. O adendo documental registra fatos verificados no GitHub e **não** representa nova execução do agente F04.
+- **Solicitação resumida:** construir a interface responsiva MUI para MASTER criar ADMIN/OPERADOR e ADMIN criar OPERADOR, consultar capacidades em `/bff/v1/usuarios/me`, consumir API/BFF da S02 por portas/adaptadores hexagonais, listar e ativar/inativar usuários da própria organização com feedback e confirmação, sem cadastro de MASTER no navegador.
+- **Resultado registrado no PR:** tela administrativa reutiliza a sessão F01 em memória; criação, listagem e alteração de status com escopo e autorização revalidados pelo backend S02. F03 mantém entrada independente, sem prova de navegação/sessão unificadas.
+- **Comandos e testes locais relatados pelo agente F04:** `cd frontend && npm ci` (313 pacotes, 0 vulnerabilidades reportadas); `npm run lint` passou; `npm test` passou com 8 arquivos e 51 testes; `npm run build` passou. Verificação visual com **BFF simulado** e viewport de `390×844` confirmou formulário em coluna única e rolagem horizontal da tabela. **Não foi teste ponta a ponta com backend real, nem no celular físico**, e não foi reexecutado na coleta A01.
+- **CI remota comprovada:** [execução #44856619021](https://github.com/RobsonSilverioSantos/srm-credit-engine/actions/runs/44856619021), jobs backend e frontend concluídos com sucesso no head `13102a4`.
+- **Commit / PR / merge:** feature `13102a4`; [PR #37](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/37), base `develop`, merge `8493928`; integração confirmada no GitHub. Revisão técnica e merge são responsabilidades humanas; a API informa o estado do merge, não a execução de testes manuais.
+- **Documentação A01:** [PR #36](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/36) integrou a coleta inicial de B10/S02 (merge `d7177f0`), com CI verde. A complementação factual F04 foi incorporada posteriormente neste adendo para encerrar a rastreabilidade do backlog.
+- **Limitações persistentes:** bootstrap interativo do primeiro MASTER ainda não foi comprovado manualmente; testar login MASTER → ADMIN → OPERADOR, permissões 401/403/409, simulação, cadastro, liquidação e extrato com banco e BFF reais, inclusive no celular. Não há benchmark ou homologação de negócio pela conclusão dos PRs.
+
+### A01 — Fechamento do registro documental
+
+- **Base verificada:** PRs #33 (B10), #34 (S02), #36 (A01) e #37 (F04), com merges reais e CI backend/frontend aprovadas em seus respectivos heads.
+- **Escopo deste complemento:** consolidar o registro F04 e o estado de conclusão no `AI_USAGE.md` e no `TASKS.md`. Nenhum teste local da aplicação foi realizado neste complemento; os resultados do agente permanecem claramente atribuídos ao PR de origem.
+- **Situação:** evidências do backlog MVP registradas para os 24 itens integrados/operacionais; testes de aceitação humana/end-to-end ainda necessários e independentes da contagem de tarefas.
 
 ## Histórico do repositório anterior (preservado, não vigente para o novo código)
 
