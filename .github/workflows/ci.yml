@@ -105,6 +105,20 @@ jobs:
             psql -U ci_local -d srm_credit_engine -Atqc \
             "SELECT count(*) FROM organizacoes WHERE id = '00000000-0000-4000-8000-000000000001'")"
           test "$count" = "1"
+          # Todas as cotações e taxas abaixo são exclusivamente de demonstração.
+          # Verifica carga inicial exata no PostgreSQL efêmero do job.
+          taxas="$(docker compose --env-file "$RUNNER_TEMP/srm-stack.env" \
+            -f backend/compose.yaml -f backend/compose.full.yaml \
+            --profile app exec -T postgres \
+            psql -U ci_local -d srm_credit_engine -Atqc \
+            "SELECT
+                (SELECT count(*) FROM taxas_base WHERE taxa_mensal = 0.01),
+                (SELECT count(*) FROM spreads_recebiveis
+                 WHERE modalidade = 'DUPLICATA_MERCANTIL' AND spread_mensal = 0.015),
+                (SELECT count(*) FROM spreads_recebiveis
+                 WHERE modalidade = 'CHEQUE_PRE_DATADO' AND spread_mensal = 0.025),
+                (SELECT count(*) FROM cotacoes_cambiais WHERE taxa_brl_por_unidade = 5.4321)")"
+          test "$taxas" = "1|1|1|1"
 
       - name: Diagnóstico e limpeza de recursos efêmeros
         if: always()
