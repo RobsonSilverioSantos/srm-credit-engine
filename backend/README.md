@@ -195,7 +195,7 @@ mas não cria nenhum usuário. Na **raiz do repositório**, em terminal interati
 sh scripts/bootstrap-master.sh
 ```
 
-No Windows PowerShell, execute `\.\scripts\bootstrap-master.ps1`. O atalho
+No Windows PowerShell, execute `.\scripts\bootstrap-master.ps1`. O atalho
 legado `backend/scripts/bootstrap-master.sh` também utiliza o launcher Docker
 interativo; o `gradlew bootRun` não fornece `System.console()` neste caso.
 O provisionamento utiliza a configuração existente em `backend/.env`, incluindo
