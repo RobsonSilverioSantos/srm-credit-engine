@@ -100,12 +100,35 @@ com o comando normal de inicialização antes de executá-lo.
 Depois, entre pela interface principal para criar ADMIN e OPERADOR,
 conforme a hierarquia S02/F04.
 
-**Taxas e cotações não são criadas pela inicialização.** Para simular e
-liquidar, prepare taxa base, spreads e (se for pagar em USD) cotação vigente
-conforme a seção «Fluxo de exemplo com curl» do
-[guia backend](backend/README.md). A cotação demonstrativa vence em 30
-minutos; novos registros históricos devem ser inseridos sem editar ou apagar
-os existentes. Use apenas valores e organizações fictícios.
+### Taxas financeiras de demonstração
+
+O ambiente completo iniciado pelos scripts ativa, **somente no perfil `demo`**,
+a carga opt-in `SRM_DEMO_BOOTSTRAP_TAXAS=true`. No primeiro start com banco
+sem taxas elegíveis, a aplicação grava os valores de referência do
+[enunciado original](docs/requisitos/ENUNCIADO_ORIGINAL_SRM_CREDIT_ENGINE_V2.md):
+
+| Histórico financeiro | Valor inicial |
+|---|---|
+| Taxa base mensal | **1,00% a.m.** (`0.01`) |
+| Spread de duplicata mercantil | **1,50% a.m.** (`0.015`) |
+| Spread de cheque pré-datado | **2,50% a.m.** (`0.025`) |
+| Cotação ilustrativa BRL por USD, golden case C3 | **5,4321** |
+
+A taxa base e os spreads ficam vigentes até que novas versões sejam
+registradas. **A cotação C3 é fictícia**, não representa mercado real e expira
+em **30 minutos** por padrão (`srm.cambio.validade`). Se não houver cotação
+ainda válida, uma nova versão fictícia será criada no próximo início do
+backend em modo demo; a execução em andamento não renova cotações
+automaticamente. Simulações em BRL continuam funcionando após a expiração da
+cotação. Para testar USD após o vencimento, reinicie a stack de demonstração
+ou registre uma nova cotação conforme o
+[guia backend](backend/README.md). Não use esses valores em produção.
+
+O bootstrap **não sobrescreve** taxas ou spreads vigentes já cadastrados,
+não edita históricos nem apaga liquidações. A carga é idempotente: iniciar a
+aplicação novamente não duplica valores elegíveis. A execução somente do
+backend, sem o overlay `compose.full.yaml`, continua sem carga automática.
+
 
 ### Operação e diagnóstico
 
