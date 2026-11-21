@@ -34,11 +34,14 @@ import java.util.concurrent.TimeUnit
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.extension.ExtendWith
 import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.context.TestConfiguration
+import org.springframework.boot.test.system.CapturedOutput
+import org.springframework.boot.test.system.OutputCaptureExtension
 import org.springframework.boot.test.web.server.LocalServerPort
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Import
@@ -58,6 +61,7 @@ import org.springframework.web.bind.annotation.RestController
 @EnabledIfEnvironmentVariable(named = "SRM_TEST_POSTGRES", matches = "true")
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @Import(ContratosHttpPostgresTest.FalhasDeTeste::class)
+@ExtendWith(OutputCaptureExtension::class)
 class ContratosHttpPostgresTest {
     @TestConfiguration(proxyBeanMethods = false)
     class FalhasDeTeste {
@@ -125,6 +129,146 @@ class ContratosHttpPostgresTest {
         assertThat(get("/api/v1/recebiveis/$recebivelId", tokenB).statusCode()).isEqualTo(404)
         assertThat(post("/api/v1/recebiveis", tokenB, """{"cedenteId":"$id","modalidade":"DUPLICATA_MERCANTIL","valorFaceBrl":"1.00","prazoMeses":1}""").statusCode()).isEqualTo(404)
         assertThat(post("/bff/v1/recebiveis/$recebivelId/liquidacoes", tokenB, """{"moeda":"BRL"}""", "cross").statusCode()).isEqualTo(404)
+    }
+
+    @Test
+    fun `B14 contratos antigos novos e unicidade canonica API BFF sem selecionar tenant`() {
+        val antigo = post("/api/v1/cedentes", tokenA, """{"nome":"Numerico","documento":"90.021.382/0001-22"}""")
+        assertThat(antigo.statusCode()).isEqualTo(201)
+        assertThat(antigo.tree()["documento"].asText()).isEqualTo("90021382000122")
+        assertThat(antigo.tree()["documentoCanonico"].asText()).isEqualTo("90021382000122")
+        assertThat(antigo.tree()["pais"].asText()).isEqualTo("BR")
+        assertThat(antigo.tree()["tipoDocumento"].asText()).isEqualTo("CNPJ")
+        assertThat(antigo.tree()["statusDocumento"].asText()).isEqualTo("VALIDADO_DV")
+        val antigoBff = post("/bff/v1/cedentes", tokenB, """{"nome":"Numerico","documento":"90.021.382/0001-22"}""")
+        assertThat(antigoBff.statusCode()).isEqualTo(201)
+        val idAntigoBff = antigoBff.tree()["id"].asText()
+        assertThat(get("/api/v1/cedentes/$idAntigoBff", tokenB).tree()).isEqualTo(antigoBff.tree())
+        assertThat(get("/bff/v1/cedentes", tokenB).tree().map { it["id"].asText() }).contains(idAntigoBff)
+        val numero = "12ABC34501DE35"
+        val novo = post("/bff/v1/cedentes", tokenA,
+            """{"nome":"Alfanumerico","pais":"BR","tipoDocumento":"CNPJ","documento":"12.abc.345/01de-35"}""")
+        assertThat(novo.statusCode()).isEqualTo(201)
+        assertThat(novo.tree()["documento"].asText()).isEqualTo(numero)
+        listOf("/api/v1", "/bff/v1").forEach { prefixo ->
+            val duplicado = post("$prefixo/cedentes", tokenA, """{"nome":"Duplicado","documento":"$numero"}""")
+            assertThat(duplicado.statusCode()).isEqualTo(409)
+            assertThat(duplicado.tree()["codigo"].asText()).isEqualTo("CONFLITO")
+            assertThat(duplicado.body()).doesNotContain(numero, orgA.toString(), orgB.toString(), "SQL", "constraint")
+            val id = novo.tree()["id"].asText()
+            assertThat(get("$prefixo/cedentes/$id", tokenA).tree()).isEqualTo(novo.tree())
+            assertThat(get("$prefixo/cedentes", tokenA).tree().map { it["id"].asText() }).contains(id)
+            assertThat(get("$prefixo/cedentes/$id", tokenB).statusCode()).isEqualTo(404)
+            assertThat(post("$prefixo/cedentes", tokenA,
+                """{"nome":"Invasao","documento":"$numero","organizacaoId":"$orgB"}""").statusCode()).isEqualTo(400)
+        }
+        assertThat(post("/api/v1/cedentes", tokenB, """{"nome":"Outro tenant","documento":"$numero"}""").statusCode()).isEqualTo(201)
+        val naoVerificado = post("/bff/v1/cedentes", tokenA,
+            """{"nome":"Outro tipo pais","pais":"US","tipoDocumento":"OUTRO","documento":"$numero"}""")
+        assertThat(naoVerificado.statusCode()).isEqualTo(201)
+        assertThat(naoVerificado.tree()["statusDocumento"].asText()).isEqualTo("NAO_VERIFICADO")
+        assertThat(post("/api/v1/cedentes", tokenA,
+            """{"nome":"Duplicado OUTRO","pais":"US","tipoDocumento":"OUTRO","documento":"$numero"}""").statusCode()).isEqualTo(409)
+    }
+
+    @Test
+    fun `B14 entrada invalida sempre 400 sem false success nem PII em resposta logs`(output: CapturedOutput) {
+        val invalidos = listOf(
+            """{"nome":"Teste","documento":"12ABC34501DE36"}""",
+            """{"nome":"Teste","documento":"90021382000123"}""",
+            """{"nome":"Teste","documento":"00000000000000"}""",
+            """{"nome":"Teste","documento":"12ABC34501DE3A"}""",
+            """{"nome":"Teste","documento":"12ABC345/01DE35"}""",
+            """{"nome":"Teste","documento":" 12ABC34501DE35"}""",
+            """{"nome":"Teste","documento":"12ABC34501DE35\n"}""",
+            """{"nome":"Teste","documento":"12ABC34501DE\u000035"}""",
+            """{"nome":"Teste","documento":"12АBC34501DE35"}""",
+            """{"nome":"Teste","documento":"ABC","pais":"US"}""",
+            """{"nome":"Teste","documento":"ABC","tipoDocumento":"OUTRO"}""",
+            """{"nome":"Teste","documento":"ABC","pais":null,"tipoDocumento":null}""",
+            """{"nome":"Teste","documento":"ABC","pais":12,"tipoDocumento":"OUTRO"}""",
+            """{"nome":"Teste","documento":123,"pais":"US","tipoDocumento":"OUTRO"}""",
+            """{"nome":"Teste","documento":"ABC","pais":"ZZ","tipoDocumento":"OUTRO"}""",
+            """{"nome":"Teste","documento":"ABC","pais":"XK","tipoDocumento":"OUTRO"}""",
+            """{"nome":"Teste","documento":"ABC","pais":"us","tipoDocumento":"OUTRO"}""",
+            """{"nome":"Teste","documento":"ABC","pais":"USA","tipoDocumento":"OUTRO"}""",
+            """{"nome":"Teste","documento":"123456789","pais":"US","tipoDocumento":"EIN"}""",
+            """{"nome":"Teste","documento":"00000000000000","pais":"BR","tipoDocumento":"OUTRO"}""",
+            """{"nome":"Teste","documento":"12ABC34501DE35","pais":"US","tipoDocumento":"CNPJ"}""",
+            """{"nome":"Teste","documento":"abc","pais":"US","tipoDocumento":"OUTRO"}""",
+            """{"nome":"Teste","documento":"A-B","pais":"US","tipoDocumento":"OUTRO"}""",
+            """{"nome":"Teste","documento":"A B","pais":"US","tipoDocumento":"OUTRO"}""",
+            """{"nome":"Teste","documento":"A.B","pais":"US","tipoDocumento":"OUTRO"}""",
+            """{"nome":"Teste","documento":"A/B","pais":"US","tipoDocumento":"OUTRO"}""",
+            """{"nome":"Teste","documento":"Á","pais":"US","tipoDocumento":"OUTRO"}""",
+            """{"nome":"Teste","documento":"${"A".repeat(33)}","pais":"US","tipoDocumento":"OUTRO"}""",
+            """{"nome":"Teste","documento":"12ABC34501DE35","numeroDocumento":"12ABC34501DE35"}""",
+        )
+        listOf("/api/v1", "/bff/v1").forEach { prefixo ->
+            invalidos.forEach { payload ->
+                val resposta = post("$prefixo/cedentes", tokenA, payload)
+                assertThat(resposta.statusCode()).isEqualTo(400)
+                assertThat(resposta.tree()["codigo"].asText()).isEqualTo("ENTRADA_INVALIDA")
+                assertThat(resposta.body()).doesNotContain("12ABC", "900213", "SQL", "Exception", orgA.toString())
+            }
+        }
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM cedentes WHERE organizacao_id = ?", Long::class.java, orgA)).isZero()
+        assertThat(output.all).doesNotContain("12ABC34501DE36", "90021382000123", "12АBC34501DE35")
+    }
+
+    @Test
+    fun `B14 legado permanece desconhecido e novas coincidencias retornam 409 sem PII`(output: CapturedOutput) {
+        val id = UUID.randomUUID()
+        val historico = " 12.abc.345/01DE-35 "
+        jdbc.update("INSERT INTO cedentes (id, organizacao_id, nome, documento) VALUES (?, ?, 'Legado', ?)", id, orgA, historico)
+        listOf("/api/v1", "/bff/v1").forEach { prefixo ->
+            val legado = get("$prefixo/cedentes/$id", tokenA)
+            assertThat(legado.statusCode()).isEqualTo(200)
+            assertThat(legado.tree()["documento"].asText()).isEqualTo(historico)
+            assertThat(legado.tree()["statusDocumento"].asText()).isEqualTo("DESCONHECIDO")
+            listOf("pais", "tipoDocumento", "documentoCanonico").forEach { campo ->
+                assertThat(legado.tree()[campo] == null || legado.tree()[campo].isNull).isTrue()
+            }
+            assertThat(get("$prefixo/cedentes", tokenA).tree().map { it["id"].asText() }).contains(id.toString())
+            listOf(
+                """{"nome":"Novo","documento":"12ABC34501DE35"}""",
+                """{"nome":"Novo","pais":"US","tipoDocumento":"OUTRO","documento":"12ABC34501DE35"}""",
+            ).forEach { payload ->
+                val resposta = post("$prefixo/cedentes", tokenA, payload)
+                assertThat(resposta.statusCode()).isEqualTo(409)
+                assertThat(resposta.tree()["codigo"].asText()).isEqualTo("CONFLITO")
+                assertThat(resposta.body()).doesNotContain("12ABC34501DE35", historico, id.toString(), orgA.toString(), "SQL")
+            }
+        }
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM cedentes WHERE organizacao_id = ?", Long::class.java, orgA)).isEqualTo(1)
+        assertThat(post("/bff/v1/cedentes", tokenB, """{"nome":"Outro","documento":"12ABC34501DE35"}""").statusCode()).isEqualTo(201)
+        assertThat(output.all).doesNotContain(historico, "12ABC34501DE35")
+    }
+
+    @Test
+    fun `B14 HTTP concorrente entre API BFF tem somente um 201 e conflitos 409`() {
+        val executor = Executors.newFixedThreadPool(8)
+        val prontos = CountDownLatch(8)
+        val iniciar = CountDownLatch(1)
+        try {
+            val futuros = (0..7).map { indice ->
+                executor.submit<Int> {
+                    prontos.countDown()
+                    check(iniciar.await(10, TimeUnit.SECONDS))
+                    val prefixo = if (indice % 2 == 0) "/api/v1" else "/bff/v1"
+                    val numero = if (indice % 2 == 0) "12.abc.345/01de-35" else "12ABC34501DE35"
+                    post("$prefixo/cedentes", tokenA, """{"nome":"Concorrente","documento":"$numero"}""").statusCode()
+                }
+            }
+            assertThat(prontos.await(10, TimeUnit.SECONDS)).isTrue()
+            iniciar.countDown()
+            assertThat(futuros.map { it.get(15, TimeUnit.SECONDS) }.sorted()).containsExactly(201, 409, 409, 409, 409, 409, 409, 409)
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM cedentes WHERE organizacao_id = ?", Long::class.java, orgA)).isEqualTo(1)
+        } finally {
+            iniciar.countDown()
+            executor.shutdownNow()
+            check(executor.awaitTermination(10, TimeUnit.SECONDS))
+        }
     }
 
     @Test
@@ -517,7 +661,9 @@ class ContratosHttpPostgresTest {
     }
 
     private fun criarCedente(prefixo: String): JsonNode {
-        val resposta = post("$prefixo/cedentes", tokenA, """{"nome":"Cedente teste","documento":"${UUID.randomUUID().toString().take(32)}"}""")
+        val documento = UUID.randomUUID().toString().replace("-", "").uppercase()
+        val resposta = post("$prefixo/cedentes", tokenA,
+            """{"nome":"Cedente teste","pais":"US","tipoDocumento":"OUTRO","documento":"$documento"}""")
         assertThat(resposta.statusCode()).isEqualTo(201)
         return resposta.tree()
     }

@@ -1,9 +1,9 @@
-import type { Cedente, EntradaRecebivel, EntradaSimulacao, IntencaoLiquidacao, Liquidacao, Moeda, Recebivel, Sessao, Simulacao } from '../dominio/operacoes'
+import type { Cedente, EntradaCedente, EntradaRecebivel, EntradaSimulacao, IntencaoLiquidacao, Liquidacao, Moeda, Recebivel, Sessao, Simulacao } from '../dominio/operacoes'
 
 export interface PortaOperacoes {
   autenticar(email: string, senha: string): Promise<Sessao>
   listarCedentes(token: string): Promise<Cedente[]>
-  cadastrarCedente(token: string, nome: string, documento: string): Promise<Cedente>
+  cadastrarCedente(token: string, entrada: EntradaCedente): Promise<Cedente>
   simular(token: string, entrada: EntradaSimulacao, sinal: AbortSignal): Promise<Simulacao>
   cadastrarRecebivel(token: string, entrada: EntradaRecebivel): Promise<Recebivel>
   liquidar(token: string, id: string, moeda: Moeda, chave: string): Promise<Liquidacao>

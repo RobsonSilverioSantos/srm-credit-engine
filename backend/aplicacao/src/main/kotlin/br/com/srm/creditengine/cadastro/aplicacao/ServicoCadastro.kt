@@ -7,6 +7,7 @@ import br.com.srm.creditengine.cadastro.aplicacao.porta.saida.Cedentes
 import br.com.srm.creditengine.cadastro.aplicacao.porta.saida.ContextoOrganizacao
 import br.com.srm.creditengine.cadastro.aplicacao.porta.saida.Recebiveis
 import br.com.srm.creditengine.cadastro.dominio.Cedente
+import br.com.srm.creditengine.cadastro.dominio.DocumentoEmpresarial
 import br.com.srm.creditengine.cadastro.dominio.Recebivel
 import java.util.UUID
 
@@ -15,8 +16,16 @@ class ServicoCadastro(
     private val cedentes: Cedentes,
     private val recebiveis: Recebiveis,
 ) : Cadastro {
-    override fun cadastrarCedente(comando: NovoCedente): Cedente =
-        cedentes.cadastrar(Cedente(UUID.randomUUID(), contexto.organizacaoId(), comando.nome, comando.documento))
+    override fun cadastrarCedente(comando: NovoCedente): Cedente {
+        val organizacaoId = contexto.organizacaoId()
+        require((comando.pais == null) == (comando.tipoDocumento == null)) { "País e tipo devem ser informados juntos" }
+        val documento = DocumentoEmpresarial.validar(
+            comando.pais ?: "BR", comando.tipoDocumento ?: "CNPJ", comando.documento,
+        )
+        return cedentes.cadastrar(Cedente(
+            UUID.randomUUID(), organizacaoId, comando.nome, documento.numero, identificacao = documento,
+        ))
+    }
 
     override fun buscarCedente(id: UUID): Cedente? = cedentes.buscar(contexto.organizacaoId(), id)
 

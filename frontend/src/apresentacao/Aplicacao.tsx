@@ -1,13 +1,14 @@
-import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
 import { Box, Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Stack, Typography } from '@mui/material'
 import type { PortaGestaoUsuarios } from '../aplicacao/gestaoUsuarios'
 import { cadastrarParaLiquidacao, confirmarLiquidacao, ErroOperacao, mensagemErro, type PortaOperacoes } from '../aplicacao/operacoes'
-import type { Cedente, IntencaoLiquidacao, Liquidacao, Modalidade, Moeda, Sessao, Simulacao } from '../dominio/operacoes'
+import type { Cedente, IntencaoLiquidacao, Liquidacao, Modalidade, Moeda, Sessao, Simulacao, TipoDocumento } from '../dominio/operacoes'
 import { PaginaAdministracaoUsuarios } from './PaginaAdministracaoUsuarios'
 import { CampoFormulario } from '../tema/componentes/CampoFormulario'
 import { Carregando, EstadoVazio, Mensagem } from '../tema/componentes/Feedback'
 import { Painel } from '../tema/componentes/Painel'
 import { formatarMonetario, formatarPercentual, formatarCotacao, normalizarEntradaMonetaria } from '../dominio/formatacaoMonetaria'
+import { caixaAscii, editarCnpj, erroDocumento, erroTipoDocumento } from '../dominio/documentoCedente'
 
 const grade = { display: 'grid', gap: 2, gridTemplateColumns: { xs: 'minmax(0, 1fr)', sm: 'repeat(2, minmax(0, 1fr))' } }
 const modalidades = [
@@ -94,6 +95,11 @@ function PainelOperacoes({ operacoes, token, tratarErro, locale }: PainelProps) 
   const [atualizacao, setAtualizacao] = useState(0)
   const [nome, setNome] = useState('')
   const [documento, setDocumento] = useState('')
+  const [pais, setPais] = useState('BR')
+  const [tipoDocumento, setTipoDocumento] = useState<TipoDocumento>('CNPJ')
+  const colandoDocumento = useRef(false)
+  const selecaoDocumento = useRef(false)
+  const cursorDocumento = useRef<{ campo: HTMLInputElement; posicao: number } | null>(null)
   const [cedenteId, setCedenteId] = useState('')
   const [modalidade, setModalidade] = useState<Modalidade>('DUPLICATA_MERCANTIL')
   const [valor, setValor] = useState('')
@@ -113,6 +119,13 @@ function PainelOperacoes({ operacoes, token, tratarErro, locale }: PainelProps) 
   const [liquidacao, setLiquidacao] = useState<Liquidacao | null>(null)
   const trava = useRef(false)
 
+  const erroIdentificacao = erroDocumento(pais, tipoDocumento, documento)
+  const erroTipo = erroTipoDocumento(pais, tipoDocumento)
+  useLayoutEffect(() => {
+    const cursor = cursorDocumento.current
+    if (cursor && document.activeElement === cursor.campo) cursor.campo.setSelectionRange(cursor.posicao, cursor.posicao)
+    cursorDocumento.current = null
+  }, [documento])
   const entradaMonetaria = normalizarEntradaMonetaria(valor, locale)
   const valorCanonico = entradaMonetaria.valida ? entradaMonetaria.valorCanonico : ''
   const valido = entradaMonetaria.valida
@@ -165,20 +178,26 @@ function PainelOperacoes({ operacoes, token, tratarErro, locale }: PainelProps) 
 
   async function cadastrarCedente(evento: FormEvent) {
     evento.preventDefault()
-    if (!token || trava.current) return
+    if (!token || trava.current || erroIdentificacao) return
     trava.current = true
     setOcupado(true)
     setErro('')
     setSucesso('')
     try {
-      const novo = await operacoes.cadastrarCedente(token, nome.trim(), documento.trim())
+      const novo = await operacoes.cadastrarCedente(token, { nome: nome.trim(), documento, pais, tipoDocumento })
       setCedenteId(novo.id)
       setNome('')
       setDocumento('')
       setSucesso('Cedente cadastrado.')
       setAtualizacao((n) => n + 1)
     } catch (falha) {
-      setErro(`${tratarErro(falha)} Confira a lista de cedentes antes de tentar cadastrar novamente.`)
+      if (falha instanceof ErroOperacao && falha.status === 400) {
+        setErro('Dados rejeitados pelo servidor. Confira nome, país, tipo e documento, incluindo os dígitos do CNPJ.')
+      } else if (falha instanceof ErroOperacao && falha.status === 409) {
+        setErro('Conflito no cadastro. Pode haver documento duplicado ou outro conflito; confira os dados e a lista de cedentes.')
+      } else {
+        setErro(`${tratarErro(falha)} Confira a lista de cedentes antes de tentar cadastrar novamente.`)
+      }
       setAtualizacao((n) => n + 1)
     } finally {
       trava.current = false
@@ -230,6 +249,7 @@ function PainelOperacoes({ operacoes, token, tratarErro, locale }: PainelProps) 
 
   const bloqueado = ocupado || Boolean(pendente) || incerto || Boolean(liquidacao)
   const previaAtual = previa?.entrada === chaveEntrada ? previa.dados : null
+  const cedenteSelecionado = cedentes?.find((cedente) => cedente.id === cedenteId)
   return (
     <Stack spacing={3} sx={{ mt: 3 }}>
       <Typography color="text.secondary">Simule antes de cadastrar e liquidar um recebível.</Typography>
@@ -237,11 +257,55 @@ function PainelOperacoes({ operacoes, token, tratarErro, locale }: PainelProps) 
         <Stack component="form" onSubmit={cadastrarCedente} spacing={2}>
           <Box sx={grade}>
             <CampoFormulario label="Nome do cedente" required value={nome} disabled={bloqueado}
-              slotProps={{ htmlInput: { maxLength: 160 } }} onChange={(e) => setNome(e.target.value)} />
+              slotProps={{ htmlInput: { maxLength: 160 } }} onChange={(e) => { setNome(e.target.value); setErro('') }} />
+            <CampoFormulario label="País do documento (ISO alpha-2)" required value={pais} disabled={bloqueado}
+              helperText="Duas letras, por exemplo BR ou US. O servidor valida o país."
+              erro={pais && !/^[A-Z]{2}(?![\s\S])/.test(pais) ? 'Informe duas letras ASCII.' : undefined}
+              onChange={(e) => {
+                const novoPais = caixaAscii(e.target.value)
+                setPais(novoPais)
+                if (/^[A-Z]{2}(?![\s\S])/.test(novoPais)) setTipoDocumento(novoPais === 'BR' ? 'CNPJ' : 'OUTRO')
+                setErro('')
+              }} />
+            <CampoFormulario label="Tipo de documento" value={tipoDocumento} disabled={bloqueado}
+              opcoes={[{ valor: 'CNPJ', rotulo: 'CNPJ' }, { valor: 'OUTRO', rotulo: 'Outro — identificador não verificado' }]}
+              erro={erroTipo || undefined}
+              helperText="BR exige CNPJ; países estrangeiros exigem Outro."
+              onChange={(e) => { setTipoDocumento(e.target.value as TipoDocumento); setErro('') }} />
             <CampoFormulario label="Documento do cedente" required value={documento} disabled={bloqueado}
-              slotProps={{ htmlInput: { maxLength: 32 } }} onChange={(e) => setDocumento(e.target.value)} />
+              helperText={tipoDocumento === 'CNPJ'
+                ? 'CNPJ numérico ou alfanumérico; o servidor valida os dígitos verificadores.'
+                : 'Identificador não verificado: 1 a 32 letras ASCII ou números. Não é validação fiscal.'}
+              erro={documento && !erroTipo && erroIdentificacao ? erroIdentificacao : undefined}
+              slotProps={{ htmlInput: {
+                onPaste: () => { colandoDocumento.current = true },
+                onKeyDown: (e: KeyboardEvent<HTMLInputElement>) => {
+                  const campo = e.currentTarget
+                  selecaoDocumento.current = campo.selectionStart !== campo.selectionEnd
+                },
+              } }}
+              onChange={(e) => {
+                const campo = e.target as HTMLInputElement
+                const texto = campo.value
+                const posicao = campo.selectionStart ?? texto.length
+                const colagem = colandoDocumento.current
+                colandoDocumento.current = false
+                const eventoInput = e.nativeEvent as InputEvent
+                const editado = pais === 'BR' && tipoDocumento === 'CNPJ' && !eventoInput.isComposing
+                  ? editarCnpj(documento, texto, posicao, eventoInput.inputType ?? '', colagem, selecaoDocumento.current, eventoInput.data)
+                  : { valor: caixaAscii(texto), cursor: posicao }
+                selecaoDocumento.current = false
+                const { valor: novo, cursor } = editado
+                if (novo !== texto) {
+                  if (novo === documento) campo.setSelectionRange(cursor, cursor)
+                  else cursorDocumento.current = { campo, posicao: cursor }
+                }
+                setDocumento(novo)
+                setErro('')
+              }} />
           </Box>
-          <Box><Button type="submit" variant="outlined" disabled={bloqueado}>Cadastrar cedente</Button></Box>
+          {tipoDocumento === 'OUTRO' && <Typography variant="body2">Identificador não verificado. Não é validação fiscal.</Typography>}
+          <Box><Button type="submit" variant="outlined" disabled={bloqueado || Boolean(erroIdentificacao)}>Cadastrar cedente</Button></Box>
         </Stack>
         {erroCedentes && <Mensagem severity="error">{erroCedentes} <Button onClick={() => setAtualizacao((n) => n + 1)}>Tentar novamente</Button></Mensagem>}
         {!cedentes && !erroCedentes && <Carregando rotulo="Carregando cedentes…" />}
@@ -249,6 +313,12 @@ function PainelOperacoes({ operacoes, token, tratarErro, locale }: PainelProps) 
         {cedentes?.some((c) => c.ativo) && <CampoFormulario label="Cedente" value={cedenteId} disabled={bloqueado}
           opcoes={cedentes.filter((c) => c.ativo).map((c) => ({ valor: c.id, rotulo: `${c.nome} — ${c.documento}` }))}
           onChange={(e) => setCedenteId(e.target.value)} />}
+        {cedenteSelecionado && <Typography variant="body2">
+          País: {cedenteSelecionado.pais ?? 'desconhecido'}; tipo: {cedenteSelecionado.tipoDocumento ?? 'desconhecido'}; status: {
+            cedenteSelecionado.statusDocumento === 'VALIDADO_DV' ? 'dígitos verificadores validados'
+              : cedenteSelecionado.statusDocumento === 'NAO_VERIFICADO' ? 'não verificado' : 'desconhecido'
+          }.
+        </Typography>}
       </Painel>
       <Painel id="simulacao" titulo="Simulação pré-cadastro">
         <Mensagem severity="warning">Simulação indicativa, sem garantia de taxas ou câmbio até a liquidação. Nenhum recebível é criado nesta etapa.</Mensagem>

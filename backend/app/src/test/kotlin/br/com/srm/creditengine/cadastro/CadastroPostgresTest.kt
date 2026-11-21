@@ -59,7 +59,7 @@ class CadastroPostgresTest {
 
     @Test
     fun `cadastra e consulta apenas dados da organizacao autenticada`() {
-        val cedenteA = cadastro.cadastrarCedente(NovoCedente("Cedente A", "documento"))
+        val cedenteA = cadastro.cadastrarCedente(NovoCedente("Cedente A", "90021382000122"))
         val comando = NovoRecebivel(
             cedenteA.id, Modalidades.DUPLICATA_MERCANTIL, BigDecimal("100.000"), 3, LocalDate.of(2027, 1, 15),
         )
@@ -72,7 +72,7 @@ class CadastroPostgresTest {
         assertThat(cadastro.buscarCedente(cedenteA.id)).isEqualTo(cedenteA)
 
         contexto.id = organizacaoB
-        val cedenteB = cadastro.cadastrarCedente(NovoCedente("Cedente B", "documento"))
+        val cedenteB = cadastro.cadastrarCedente(NovoCedente("Cedente B", "90021382000122"))
         val recebivelB = cadastro.cadastrarRecebivel(
             comando.copy(cedenteId = cedenteB.id, modalidade = Modalidades.CHEQUE_PRE_DATADO),
         )
@@ -99,9 +99,9 @@ class CadastroPostgresTest {
 
     @Test
     fun `constraint rejeita documento duplicado na mesma organizacao`() {
-        cadastro.cadastrarCedente(NovoCedente("Primeiro", "documento"))
+        cadastro.cadastrarCedente(NovoCedente("Primeiro", "90021382000122"))
         assertThatExceptionOfType(DataIntegrityViolationException::class.java)
-            .isThrownBy { cadastro.cadastrarCedente(NovoCedente("Segundo", "documento")) }
+            .isThrownBy { cadastro.cadastrarCedente(NovoCedente("Segundo", "90.021.382/0001-22")) }
         assertThat(cadastro.listarCedentes()).hasSize(1)
     }
 

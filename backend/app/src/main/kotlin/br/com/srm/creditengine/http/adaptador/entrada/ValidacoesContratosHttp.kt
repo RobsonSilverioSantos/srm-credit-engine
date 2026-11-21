@@ -1,6 +1,7 @@
 package br.com.srm.creditengine.http.adaptador.entrada
 
 import br.com.srm.creditengine.cadastro.dominio.Cedente
+import br.com.srm.creditengine.cadastro.dominio.StatusDocumento
 import br.com.srm.creditengine.cadastro.dominio.Recebivel
 import br.com.srm.creditengine.liquidacao.dominio.MoedaPagamento
 import br.com.srm.creditengine.liquidacao.dominio.ResultadoLiquidacao
@@ -9,7 +10,10 @@ import java.math.BigDecimal
 import java.util.UUID
 import tools.jackson.databind.JsonNode
 
-internal fun Cedente.resposta() = CedenteResposta(id, nome, documento, ativo)
+internal fun Cedente.resposta() = CedenteResposta(
+    id, nome, documento, ativo, identificacao?.pais, identificacao?.tipoDocumento,
+    identificacao?.numero, (identificacao?.status ?: StatusDocumento.DESCONHECIDO).name,
+)
 
 internal fun Recebivel.resposta() = RecebivelResposta(
     id, cedenteId, modalidade, valorFaceBrl.toPlainString(), prazoMeses, vencimento, status.name, versao,

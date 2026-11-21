@@ -43,8 +43,13 @@ class ContratosHttp(private val cadastros: ObjectProvider<Cadastro>) {
     @ApiResponse(responseCode = "201", description = "Cedente cadastrado",
         content = [Content(mediaType = "application/json", schema = Schema(implementation = CedenteResposta::class))])
     fun cadastrarCedente(@RequestBody corpo: JsonNode): ResponseEntity<CedenteResposta> {
-        corpo.validarCampos("nome", "documento")
-        val cedente = cadastros.`object`.cadastrarCedente(NovoCedente(corpo.texto("nome"), corpo.texto("documento")))
+        corpo.validarCampos("nome", "documento", "pais", "tipoDocumento")
+        require(corpo.has("pais") == corpo.has("tipoDocumento")) { "País e tipo devem ser informados juntos" }
+        val cedente = cadastros.`object`.cadastrarCedente(NovoCedente(
+            corpo.texto("nome"), corpo.texto("documento"),
+            if (corpo.has("pais")) corpo.texto("pais") else null,
+            if (corpo.has("tipoDocumento")) corpo.texto("tipoDocumento") else null,
+        ))
         return ResponseEntity.status(HttpStatus.CREATED).body(cedente.resposta())
     }
 
