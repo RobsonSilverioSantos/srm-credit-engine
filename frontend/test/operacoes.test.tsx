@@ -94,6 +94,7 @@ test('cadastra após prévia e mantém a chave na retentativa após expiração'
   await user.click(screen.getByRole('button', { name: 'Confirmar liquidação' }))
   await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Liquidar' }))
   await screen.findByText(/Sessão expirada\. Entre novamente com a mesma conta/)
+  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
   await user.type(screen.getByLabelText(/Senha/), 'senha')
   await user.click(screen.getByRole('button', { name: 'Entrar' }))
   await user.click(await screen.findByRole('button', { name: 'Confirmar liquidação' }))
