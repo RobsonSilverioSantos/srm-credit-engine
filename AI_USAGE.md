@@ -70,6 +70,39 @@
 - **Custos:** não houve deploy, serviço cloud ou pagamento real durante esta validação. O teste PostgreSQL foi efêmero. Não foi verificado valor de assinatura ou custo monetário do uso de IA; o registro OPS-01 descreve uma mensagem de limite do Cursor, não uma cobrança.
 - **Limitações:** não foi executado benchmark; não foi feita demonstração manual do fluxo completo F01/F03; as telas ainda têm entradas/autenticação independentes. Relatos nos PRs e checks remotos permanecem separados dos testes locais acima. Decisões e premissas do MVP continuam sujeitas à validação humana descrita em `SPEC.md` e `DECISIONS.md`.
 
+## A01 — Registro inicial de evidências de IA e PRs didáticos (20/11/2026)
+
+Esta coleta documenta as entregas recentes B10 e S02, integradas depois da consolidação D03. Os resumos abaixo são paráfrases das descrições dos PRs e do backlog, não transcrições dos prompts originais. Os resultados de teste local são os relatados pelos agentes nos PRs e **não foram reexecutados nesta coleta**; os checks remotos são registrados separadamente. A conclusão de A01 continua pendente até incorporar evidências verificáveis de F04, conforme `TASKS.md`.
+
+### A01 — Esta coleta documental
+
+- **Agente / ID:** Copilot SDK no VS Code; A01.
+- **Prompt/resumo:** pedido para confirmar branch, base e dependências; registrar evidências reais de IA e PRs didáticos com ID, agente, resumo do prompt, revisão, comandos, testes, commit e PR; manter o escopo documental e adiar a conclusão até F04.
+- **Revisão:** o agente conferiu o diff e o escopo; revisão humana do PR ainda pendente. Nenhum merge foi realizado.
+- **Comandos/testes desta coleta:** `git branch --show-current`, `git status --short` e `git worktree list` confirmaram o worktree/branch previstos; `git diff --check` passou. Nenhum teste de aplicação foi executado porque a mudança é somente documental.
+- **Commit / PR:** commit de conteúdo `3d3df56`; [PR #36](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/36), base `develop`. A CI desta branch e a revisão humana devem ser verificadas antes da integração.
+- **Estado:** registro inicial enviado para revisão; A01 permanece pendente até incluir evidências de F04.
+
+### B10 — Logs estruturados, métricas e trilha operacional
+
+- **Agente / ID:** agente Copilot no papel backend/devops (B10, conforme `TASKS.md`); o commit da feature registra Robson Silvério Santos e Copilot como coautores.
+- **Prompt/resumo:** implementar logs JSON correlacionados sem segredos, métricas Micrometer de confirmações/replays/duração sem tags de alta cardinalidade e expor métricas pelo Actuator autenticado, sem alterar contratos financeiros.
+- **Revisão:** PR [#33](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/33) integrado em `develop` por RobsonSilverioSantos. A consulta ao GitHub não retornou aprovação/review formal (`reviews` vazio e `reviewDecision` vazio); portanto, o merge não é apresentado como aprovação formal. A descrição do PR registra pontos para revisão humana e correções feitas durante a iteração.
+- **Comandos/testes locais relatados no PR:** `cd backend && bash scripts/test-cadastro-postgres.sh` — `BUILD SUCCESSFUL`, 74 testes, 0 falhas, 0 erros e 0 ignorados, com PostgreSQL temporário; `git diff --check` — passou. Incluídos testes para JSON/MDC, correlação, métricas sem tags, replay, rollback e confirmação pós-commit. Uma chamada inicial do wrapper na raiz e uma configuração YAML incorreta falharam durante a iteração; foram corrigidas antes da execução final reportada.
+- **CI remota:** execução [44852388657](https://github.com/RobsonSilverioSantos/srm-credit-engine/actions/runs/44852388657): jobs backend e frontend aprovados. Isso não é uma reexecução local feita por A01.
+- **Commit / PR:** feature `49f4392`; merge `f82f224`; [PR #33](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/33), base `develop`.
+- **Limite didático:** métricas não têm exporter Prometheus, dashboard ou alerta; não houve benchmark nem teste de carga.
+
+### S02 — Gestão segura de usuários organizacionais
+
+- **Agente / ID:** agente Copilot no papel backend (S02, conforme `TASKS.md`); o commit da feature registra Robson Silvério Santos e Copilot como coautores.
+- **Prompt/resumo:** implementar perfis MASTER/ADMIN/OPERADOR e bootstrap local controlado do primeiro MASTER; derivar organização da identidade JWT validada, consultar autorização atual no PostgreSQL e compartilhar os casos de uso entre API e BFF, sem cadastro público de MASTER nem reescrita das migrations V1–V3.
+- **Revisão:** PR [#34](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/34) integrado em `develop` por RobsonSilverioSantos. A consulta ao GitHub não retornou aprovação/review formal (`reviews` vazio e `reviewDecision` vazio); portanto, o merge não é apresentado como aprovação formal. A descrição do PR registra as limitações do bootstrap e que o fluxo interativo completo do terminal não foi validado manualmente.
+- **Comandos/testes locais relatados no PR:** `cd backend && bash scripts/test-cadastro-postgres.sh` — `BUILD SUCCESSFUL`, 73 testes, 0 falhas, 0 erros e 0 ignorados, com PostgreSQL efêmero; `bash -n backend/scripts/bootstrap-master.sh` — passou; `git diff --cached --check` — passou. O PR relata testes de bootstrap BCrypt/reexecução, permissões, escopo, API/BFF, segredos e revogação de JWT. Uma asserção de teste e um problema de nulabilidade foram corrigidos antes da execução final reportada.
+- **CI remota:** execução [44852904037](https://github.com/RobsonSilverioSantos/srm-credit-engine/actions/runs/44852904037): jobs backend e frontend aprovados. Isso não é uma reexecução local feita por A01.
+- **Commit / PR:** feature `736a5e8`; merge `8dc1251`; [PR #34](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/34), base `develop`.
+- **Limite didático:** o bootstrap interativo e os testes mobile de F04 continuam pendentes; não presumir um fluxo administrativo frontend integrado.
+
 ## Histórico do repositório anterior (preservado, não vigente para o novo código)
 
 
