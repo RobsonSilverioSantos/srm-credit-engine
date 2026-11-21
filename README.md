@@ -13,6 +13,121 @@ Motor demonstrativo de antecipação de recebíveis com **Kotlin / Spring Boot /
 - **Frontend:** tema e componentes MUI gratuitos; pré-simulação sem persistência, depois cadastro e confirmação da liquidação; nenhuma matemática financeira executada no browser.
 - **Não há desembolso bancário real.** O sistema registra a liquidação lógica e seu snapshot.
 
+## Iniciar o sistema completo (Windows, macOS e Linux)
+
+**Pré-requisito único para executar a aplicação:** Docker Desktop com Linux
+containers e Docker Compose v2 (Windows/macOS), ou Docker Engine + Compose v2
+(Linux). No Windows, habilite o backend WSL2 do Docker Desktop. É necessário
+que o Docker esteja iniciado. Não é preciso instalar Java, Gradle, Node ou
+PostgreSQL no computador: as imagens cuidam do build e da execução.
+
+Esta configuração é para **demonstração local**, não para produção: o PostgreSQL
+persiste em volume Docker; o backend é servido por Java 21 em contêiner e o
+frontend React compilado é servido por Nginx, que encaminha `/api` e `/bff`
+ao backend. O Compose usa `backend/compose.yaml` mais o overlay
+`backend/compose.full.yaml`. Não executar o backend `bootRun` ou Vite ao mesmo
+tempo nas mesmas portas.
+
+### macOS e Linux (Terminal)
+
+Na raiz do repositório:
+
+```sh
+sh scripts/start.sh
+```
+
+### Windows (PowerShell)
+
+No PowerShell, na raiz do repositório, com Docker Desktop iniciado:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\start.ps1
+```
+
+Em PowerShell 7, também é possível executar `.\scripts\start.ps1` se a
+política de execução permitir. O `-ExecutionPolicy Bypass` do exemplo acima
+se aplica somente ao processo iniciado; não altera a política global.
+
+Na primeira execução, os scripts criam `backend/.env` (ignorado pelo Git)
+com senha aleatória do PostgreSQL e segredo JWT aleatório. Se o arquivo já
+existir, as credenciais do banco são preservadas, e o segredo JWT só é
+adicionado quando estiver ausente. **Não recrie o `.env` nem remova volumes
+Docker se já houver dados**: a senha do PostgreSQL é gravada no primeiro
+uso do volume e não muda ao alterar o arquivo. Para corrigir senha divergente,
+consulte a seção de configuração do [backend](backend/README.md).
+Não comite senhas, JWTs ou `backend/.env`.
+
+O primeiro start baixa as imagens necessárias, compila o backend e o frontend
+e aguarda os três serviços ficarem saudáveis. Acesse:
+
+| Serviço | Endereço padrão |
+|---|---|
+| Frontend: operações e administração | http://localhost:5173/ |
+| Extrato (entrada e login separados) | http://localhost:5173/extrato.html |
+| Saúde do backend | http://localhost:8080/actuator/health |
+| OpenAPI/Swagger | http://localhost:8080/swagger-ui/index.html |
+| PostgreSQL (uso local) | localhost:5432 |
+
+A interface e o extrato são acessados pelo Nginx na porta 5173. O frontend
+não deve conectar diretamente ao `localhost:8080` do navegador de outro
+computador: as chamadas relativas `/api` e `/bff` passam pelo Nginx e chegam
+ao contêiner `app`. O acesso ao backend e ao PostgreSQL permanece restrito à
+interface loopback do computador hospedeiro.
+
+### Primeiro usuário MASTER
+
+No primeiro start, a organização de **demonstração** é criada de forma
+explícita pelo perfil `demo` (ID
+`00000000-0000-4000-8000-000000000001`). **Nenhum usuário é criado
+automaticamente.** Para criar o primeiro MASTER, com os três serviços ativos,
+use um terminal interativo:
+
+- macOS/Linux: `sh scripts/bootstrap-master.sh`
+- Windows PowerShell: `.\scripts\bootstrap-master.ps1` (ou
+  `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\bootstrap-master.ps1`).
+
+O comando executa o **JAR dentro de um contêiner com TTY**, não `gradlew
+bootRun`, e solicita UUID de organização, e-mail e senha do MASTER
+(12 a 72 bytes UTF-8), sem exibir a senha. Use o UUID demonstrativo acima.
+Só é permitido um MASTER por organização; se ele já existir, não tente
+reprovisioná-lo. Depois, entre pela interface principal para criar ADMIN e
+OPERADOR, conforme a hierarquia S02/F04.
+
+**Taxas e cotações não são criadas pela inicialização.** Para simular e
+liquidar, prepare taxa base, spreads e (se for pagar em USD) cotação vigente
+conforme a seção «Fluxo de exemplo com curl» do
+[guia backend](backend/README.md). A cotação demonstrativa vence em 30
+minutos; novos registros históricos devem ser inseridos sem editar ou apagar
+os existentes. Use apenas valores e organizações fictícios.
+
+### Operação e diagnóstico
+
+| Ação | macOS/Linux | Windows PowerShell |
+|---|---|---|
+| Iniciar/reconstruir | `sh scripts/start.sh` | `.\scripts\start.ps1` |
+| Ver status | `sh scripts/start.sh status` | `.\scripts\start.ps1 status` |
+| Ver logs | `sh scripts/start.sh logs` | `.\scripts\start.ps1 logs` |
+| Parar, preservando dados | `sh scripts/start.sh stop` | `.\scripts\start.ps1 stop` |
+
+As portas opcionais `SRM_FRONTEND_PORT` (5173), `SRM_APP_PORT` (8080) e
+`SRM_DB_PORT` (5432) podem ser definidas em `backend/.env`, caso estejam
+ocupadas. Após alterá-las, reinicie os serviços. Se o banco usar volume
+existente, mantenha seu usuário e senha originais.
+
+Para demonstrar **no celular da mesma rede**, configure
+`SRM_FRONTEND_BIND=0.0.0.0` no `backend/.env` e reinicie pelo script.
+Acesse `http://IP_DO_COMPUTADOR:5173/` (ou a porta configurada), permitindo a
+porta no firewall local se necessário. Restrinja-se a Wi-Fi privado e
+dados fictícios: este modo usa **HTTP sem TLS**, não deve ficar exposto à
+internet. A sessão do extrato ainda é independente da sessão do painel.
+
+Na falha de inicialização, examine os logs e o status com os comandos acima.
+Confira primeiro Docker ativo, portas disponíveis e credenciais do banco.
+O workflow de CI inclui um smoke test Docker Compose para validar os três
+contêineres, healthchecks e o proxy HTTP. Esse smoke test **não substitui**
+provisionamento manual, integração financeira ponta a ponta ou testes em
+celular real.
+
 ## Como rodar o backend
 
 Veja o [guia do backend](backend/README.md) para preparar o `.env` local,
