@@ -1,8 +1,8 @@
 # F05 — Navegação autenticada, formatação e clareza de operações no frontend
 
-**Estado:** planejada (P1); implementação não iniciada.  
-**Fonte de verdade:** `TASKS.md`, F05; rastreamento [issue #50](https://github.com/RobsonSilverioSantos/srm-credit-engine/issues/50).  
-**Executor:** agente `frontend` em worktree exclusivo; revisores `architect`, `qa`, `reviewer`.  
+**Estado:** planejada (P1); implementação não iniciada.\
+**Fonte de verdade:** `TASKS.md`, F05; rastreamento [issue #50](https://github.com/RobsonSilverioSantos/srm-credit-engine/issues/50).\
+**Executor:** agente `frontend` em worktree exclusivo; revisores `architect`, `qa`, `reviewer`.\
 **Gate de início:** aguardar a **B14 integrada em `origin/develop`**, além do PR de registro F05 integrado. A B14 altera o cadastro de cedentes no mesmo componente `Aplicacao.tsx`; evitar commits simultâneos e merges com conflitos que reintroduzam validação antiga. O planejamento F05 pode ser revisado em paralelo, mas **não** a implementação.
 
 ## Evidências do frontend atual
