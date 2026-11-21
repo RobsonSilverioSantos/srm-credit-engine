@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-cd "$(dirname "$0")/.."
-: "${SRM_JWT_SECRET:?Configure SRM_JWT_SECRET antes do provisionamento}"
-
-exec ./gradlew :app:bootRun \
-    --args='--spring.main.web-application-type=none --srm.security.bootstrap-master.enabled=true'
+# Mantém compatibilidade com o comando legado executado em backend/.
+# O launcher da raiz usa o JAR no Docker com TTY, ao contrário de gradlew bootRun.
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+exec sh "$ROOT/scripts/bootstrap-master.sh"
