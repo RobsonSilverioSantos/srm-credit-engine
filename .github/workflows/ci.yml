@@ -64,3 +64,58 @@ jobs:
         run: npm test
       - name: Build
         run: npm run build
+
+  full-stack:
+    name: Docker Compose — backend, frontend e PostgreSQL
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Obter código
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+
+      - name: Preparar credenciais efêmeras
+        shell: bash
+        run: |
+          umask 077
+          printf 'SRM_DB_USER=ci_local\nSRM_DB_PASSWORD=%s\nSRM_JWT_SECRET=%s\n' \
+            "$(openssl rand -hex 32)" "$(openssl rand -hex 32)" \
+            > "$RUNNER_TEMP/srm-stack.env"
+
+      - name: Build e inicialização dos três serviços
+        shell: bash
+        run: |
+          docker compose --env-file "$RUNNER_TEMP/srm-stack.env" \
+            -f backend/compose.yaml -f backend/compose.full.yaml \
+            --profile app up -d --build --wait
+
+      - name: Smoke test HTTP e organização de demonstração
+        shell: bash
+        run: |
+          curl -fsS http://127.0.0.1:8080/actuator/health | grep -q '"UP"'
+          curl -fsS http://127.0.0.1:5173/ | grep -q 'SRM Credit Engine'
+          curl -fsS http://127.0.0.1:5173/extrato.html | grep -q 'SRM Credit Engine'
+          status="$(curl -s -o /dev/null -w '%{http_code}' \
+            http://127.0.0.1:5173/bff/v1/usuarios/me)"
+          test "$status" = "401"
+          count="$(docker compose --env-file "$RUNNER_TEMP/srm-stack.env" \
+            -f backend/compose.yaml -f backend/compose.full.yaml \
+            --profile app exec -T postgres \
+            psql -U ci_local -d srm_credit_engine -Atqc \
+            "SELECT count(*) FROM organizacoes WHERE id = '00000000-0000-4000-8000-000000000001'")"
+          test "$count" = "1"
+
+      - name: Diagnóstico e limpeza de recursos efêmeros
+        if: always()
+        shell: bash
+        run: |
+          if [ -f "$RUNNER_TEMP/srm-stack.env" ]; then
+            docker compose --env-file "$RUNNER_TEMP/srm-stack.env" \
+              -f backend/compose.yaml -f backend/compose.full.yaml \
+              --profile app logs --no-color --tail=80 || true
+            docker compose --env-file "$RUNNER_TEMP/srm-stack.env" \
+              -f backend/compose.yaml -f backend/compose.full.yaml \
+              --profile app down -v --remove-orphans || true
+            rm -f "$RUNNER_TEMP/srm-stack.env"
+          fi
