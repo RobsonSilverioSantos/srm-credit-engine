@@ -2,10 +2,12 @@ package br.com.srm.creditengine.liquidacao
 
 import br.com.srm.creditengine.cadastro.adaptador.saida.RecebiveisJdbc
 import br.com.srm.creditengine.liquidacao.adaptador.saida.LiquidacaoJdbc
+import br.com.srm.creditengine.liquidacao.adaptador.saida.MetricasLiquidacao
 import br.com.srm.creditengine.liquidacao.aplicacao.ServicoLiquidacao
 import br.com.srm.creditengine.liquidacao.aplicacao.porta.entrada.ComandoLiquidacao
 import br.com.srm.creditengine.liquidacao.aplicacao.porta.saida.IdentidadeConfiavel
 import br.com.srm.creditengine.liquidacao.aplicacao.porta.saida.IdentidadeLiquidacao
+import br.com.srm.creditengine.liquidacao.aplicacao.porta.saida.IdempotenciaLiquidacao
 import br.com.srm.creditengine.liquidacao.aplicacao.porta.saida.TransacaoLiquidacao
 import br.com.srm.creditengine.liquidacao.dominio.ConflitoLiquidacao
 import br.com.srm.creditengine.liquidacao.dominio.MoedaPagamento
@@ -38,6 +40,8 @@ import org.springframework.dao.DataAccessException
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.transaction.support.TransactionTemplate
+import org.springframework.transaction.support.TransactionSynchronizationManager
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 
 @EnabledIfEnvironmentVariable(named = "SRM_TEST_POSTGRES", matches = "true")
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
@@ -72,9 +76,10 @@ class LiquidacaoPostgresTest {
         val repositorio = LiquidacaoJdbc(jdbc, TransactionTemplate(gerenciador), clock)
         fun servico(
             id: IdentidadeLiquidacao = IdentidadeLiquidacao(org, usuario),
+            idempotencia: IdempotenciaLiquidacao = repositorio,
             transacao: TransacaoLiquidacao = repositorio,
             relogio: Clock = clock,
-        ) = ServicoLiquidacao(IdentidadeConfiavel { id }, RecebiveisJdbc(jdbc), repositorio, taxas, transacao, relogio)
+        ) = ServicoLiquidacao(IdentidadeConfiavel { id }, RecebiveisJdbc(jdbc), idempotencia, taxas, transacao, relogio)
 
         fun recebivel(modalidade: String = Modalidades.DUPLICATA_MERCANTIL, face: String = "100000.00", prazo: Int = 3): UUID {
             val id = UUID.randomUUID()
@@ -174,6 +179,51 @@ class LiquidacaoPostgresTest {
         assertThat(estado["status"]).isEqualTo("DISPONIVEL")
         assertThat(estado["versao"]).isEqualTo(0L)
         assertThat(f.servico().liquidar(comando).recebivelId).isEqualTo(id)
+    }
+
+    @Test
+    fun `contabiliza e registra confirmacao somente apos commit e nao no replay ou rollback`() {
+        val f = fixture()
+        val registro = SimpleMeterRegistry()
+        val metricas = MetricasLiquidacao(registro)
+        val persistencia = LiquidacaoJdbc(
+            jdbc,
+            TransactionTemplate(gerenciador),
+            f.clock,
+            aoConfirmarAposCommit = { _, liquidacao ->
+                assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isFalse()
+                assertThat(
+                    jdbc.queryForObject(
+                        "SELECT count(*) FROM liquidacoes WHERE recebivel_id = ?",
+                        Int::class.java,
+                        liquidacao.recebivel.id,
+                    ),
+                ).isEqualTo(1)
+                metricas.registrarConfirmacao()
+            },
+            aoReproduzir = metricas::registrarReplay,
+        )
+        val recebivelId = f.recebivel()
+        val comando = ComandoLiquidacao(recebivelId, MoedaPagamento.BRL, "metricas")
+        val servico = f.servico(idempotencia = persistencia, transacao = persistencia)
+
+        servico.liquidar(comando)
+        assertThat(registro.get("srm.liquidacoes.confirmadas").counter().count()).isEqualTo(1.0)
+        servico.liquidar(comando)
+        assertThat(registro.get("srm.liquidacoes.confirmadas").counter().count()).isEqualTo(1.0)
+        assertThat(registro.get("srm.liquidacoes.replays").counter().count()).isEqualTo(1.0)
+
+        val outroRecebivel = f.recebivel()
+        assertThrows<DataAccessException> {
+            f.servico(
+                id = IdentidadeLiquidacao(f.org, UUID.randomUUID()),
+                idempotencia = persistencia,
+                transacao = persistencia,
+            ).liquidar(ComandoLiquidacao(outroRecebivel, MoedaPagamento.BRL, "rollback-metrica"))
+        }
+        assertThat(registro.get("srm.liquidacoes.confirmadas").counter().count()).isEqualTo(1.0)
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM liquidacoes WHERE recebivel_id = ?", Int::class.java, outroRecebivel))
+            .isZero()
     }
 
     @Test

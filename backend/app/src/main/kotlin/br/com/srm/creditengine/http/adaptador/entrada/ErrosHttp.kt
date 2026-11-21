@@ -43,7 +43,10 @@ class ErrosHttp {
     @ExceptionHandler(DadosFinanceirosIndisponiveis::class, ConsultaCambialIndisponivel::class,
         TransientDataAccessException::class)
     fun indisponivel(ex: Exception): ResponseEntity<ErroHttp> {
-        logger.warn("Falha temporária ao processar requisição: {}", ex.javaClass.simpleName)
+        logger.atWarn()
+            .addKeyValue("event", "http.request.failed")
+            .addKeyValue("errorType", ex.javaClass.simpleName)
+            .log("Temporary request failure")
         return erro(HttpStatus.SERVICE_UNAVAILABLE, "SERVICO_INDISPONIVEL", "Dados financeiros ou serviço indisponível.")
     }
 
@@ -65,7 +68,10 @@ class ErrosHttp {
 
     @ExceptionHandler(Exception::class)
     fun inesperado(ex: Exception): ResponseEntity<ErroHttp> {
-        logger.error("Falha inesperada ao processar requisição: {}", ex.javaClass.name)
+        logger.atError()
+            .addKeyValue("event", "http.request.failed")
+            .addKeyValue("errorType", ex.javaClass.simpleName)
+            .log("Unexpected request failure")
         return erro(HttpStatus.INTERNAL_SERVER_ERROR, "ERRO_INTERNO", "Não foi possível processar a requisição.")
     }
 

@@ -47,7 +47,16 @@ No PowerShell/Windows, configure as mesmas variáveis no processo e use `.\gradl
 Ajuste a URL do `curl` se mudou a porta e aguarde a inicialização do backend.
 `GET /actuator/health` retorna `200` e `{"status":"UP"}` quando o backend
 consegue consultar o banco; se o banco ficar indisponível, retorna `503` e
-`{"status":"DOWN"}`. Nenhum detalhe do banco nem outro endpoint Actuator é exposto.
+`{"status":"DOWN"}`. O endpoint de health é público e não revela detalhes do
+banco. As métricas ficam em `/actuator/metrics` e exigem autenticação JWT; os
+demais endpoints Actuator não são expostos.
+
+O caso de uso de liquidação registra `srm.liquidacoes.confirmadas` somente
+depois do commit, `srm.liquidacoes.replays` para respostas idempotentes e
+`srm.liquidacoes.duracao` para a duração total das tentativas. Essas métricas não
+possuem labels. Cada requisição recebe um `X-Correlation-Id` gerado pelo servidor,
+incluído no log JSON e na resposta; credenciais, chaves idempotentes, IDs de
+entidades e payloads não são registrados.
 
 Use `docker compose --profile app logs app postgres` para diagnóstico e
 `docker compose --profile app down` para parar o ambiente sem apagar os dados.
