@@ -63,8 +63,8 @@ revalida os campos e continua sendo a autoridade final.
 
 Acesse `/extrato.html` para utilizar o extrato de liquidações.
 
-O extrato possui autenticação própria nesta etapa, mantendo o token JWT
-somente em memória. Respostas HTTP 401 exigem nova autenticação.
+O extrato utiliza autenticação própria, mantendo o token JWT somente em
+memória. Respostas HTTP 401 exigem nova autenticação.
 
 O extrato consome o BFF e permite filtrar liquidações por período, cedente
 (UUID) e moeda. Os filtros de datas seguem o contrato atual da API,
@@ -82,17 +82,16 @@ decimais do BFF. O campo de valor aceita os separadores de `pt-BR` e `en-US`,
 valida agrupamento/escala e envia ao BFF uma string decimal canônica com ponto
 decimal; nenhum cálculo financeiro é realizado no navegador.
 
-A tela permanece como entrada independente para evitar conflitos entre
-as implementações paralelas F01 e F03. A integração posterior deverá
-compartilhar a sessão autenticada, conectar a navegação e reutilizar
-a porta `PortaExtrato` na `PaginaExtrato`.
+O extrato é uma entrada independente da interface principal: o login e a
+sessão autenticada não são compartilhados com o painel de operações e a
+administração de usuários. Essa separação é uma limitação conhecida da
+experiência de navegação atual, não uma dependência de implementação pendente.
 
 ## Catálogo de componentes
 
-A URL principal também poderá disponibilizar o catálogo fictício de
-componentes conforme a configuração de navegação e build integrada.
-Os dados do catálogo são exclusivamente demonstrativos e não devem
-ser utilizados como fonte para operações financeiras reais.
+O catálogo visual de componentes utiliza dados exclusivamente fictícios e
+permanece isolado dos fluxos financeiros. Ele não fornece dados para operações
+reais nem é necessário para executar o painel, a administração ou o extrato.
 
 
 ## Reutilizar
@@ -114,7 +113,7 @@ ser utilizados como fonte para operações financeiras reais.
 - **Feedback e layout:** use `Mensagem` para severidades, `EstadoVazio` para
   orientar o próximo passo e `Carregando` com rótulo específico. `Painel`
   oferece um título semântico e `LayoutAdministrativo` adapta a navegação ao
-  espaço disponível. A integração de navegação com F03 requer coordenação.
+  espaço disponível. O extrato F03 permanece acessível por URL independente.
 
 ## Fronteiras
 
@@ -140,7 +139,7 @@ O catálogo visual permanece isolado para demonstração e testes, utilizando da
 
 O ESLint bloqueia imports diretos indevidos entre as camadas.
 
-A integração futura entre F01 e F03 deverá compartilhar a sessão autenticada e a navegação, preservando a separação das portas e dos adaptadores.
+F01 e F04 reutilizam a mesma sessão em memória da interface principal; F03 mantém autenticação e navegação separadas. As três funcionalidades preservam portas e adaptadores independentes.
 
 
 Preferiu-se MUI Core a CSS/componentes próprios para aproveitar semântica,
