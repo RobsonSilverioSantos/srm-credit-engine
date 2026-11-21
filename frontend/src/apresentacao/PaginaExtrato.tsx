@@ -1,0 +1,152 @@
+import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { Box, Button, Container, Stack, TablePagination, Typography } from '@mui/material'
+import { consultarExtrato, SessaoExpirada, validarFiltros, type ConsultaExtrato, type PortaAutenticacao, type PortaExtrato } from '../aplicacao/extrato'
+import type { FiltrosExtrato, ItemExtrato, PaginaExtrato as Pagina } from '../dominio/extrato'
+import { CampoFormulario } from '../tema/componentes/CampoFormulario'
+import { Mensagem } from '../tema/componentes/Feedback'
+import { Painel } from '../tema/componentes/Painel'
+import { TabelaDados, type EstadoTabela } from '../tema/componentes/TabelaDados'
+
+const filtrosIniciais: FiltrosExtrato = { inicio: '', fim: '', cedenteId: '', moeda: '' }
+
+export function PaginaExtrato({ porta, token, aoExpirar }: { porta: PortaExtrato; token: string; aoExpirar: () => void }) {
+  const [filtros, setFiltros] = useState(filtrosIniciais)
+  const [validado, setValidado] = useState(false)
+  const [consulta, setConsulta] = useState<ConsultaExtrato>({ ...filtrosIniciais, pagina: 0, tamanho: 20 })
+  const [resultado, setResultado] = useState<Pagina>()
+  const [estado, setEstado] = useState<'carregando' | 'pronto' | 'erro'>('carregando')
+  const [erro, setErro] = useState('')
+  const [tentativa, setTentativa] = useState(0)
+  const geracao = useRef(0)
+  const erros = validado ? validarFiltros(filtros) : {}
+
+  useEffect(() => {
+    const controle = new AbortController()
+    const atual = ++geracao.current
+    let ativa = true
+    consultarExtrato(porta, consulta, token, controle.signal).then((pagina) => {
+      if (!ativa || atual !== geracao.current) return
+      const ultima = Math.max(0, Math.ceil(pagina.total / pagina.tamanho) - 1)
+      if (pagina.pagina > ultima) {
+        setConsulta((atual) => ({ ...atual, pagina: ultima }))
+        return
+      }
+      setResultado(pagina)
+      setEstado('pronto')
+    }).catch((falha: unknown) => {
+      if (!ativa || atual !== geracao.current) return
+      if (falha instanceof SessaoExpirada) {
+        aoExpirar()
+      } else {
+        setErro(falha instanceof Error ? falha.message : 'Falha ao consultar o extrato.')
+        setEstado('erro')
+      }
+    })
+    return () => { ativa = false; controle.abort() }
+  }, [porta, token, consulta, tentativa, aoExpirar])
+
+  function atualizarConsulta(proxima: ConsultaExtrato) {
+    geracao.current++
+    setEstado('carregando')
+    setResultado(undefined)
+    setConsulta(proxima)
+  }
+
+  function aplicar(evento: FormEvent) {
+    evento.preventDefault()
+    setValidado(true)
+    if (Object.keys(validarFiltros(filtros)).length) return
+    atualizarConsulta({ ...filtros, pagina: 0, tamanho: consulta.tamanho })
+  }
+
+  const tabela: EstadoTabela<ItemExtrato> = estado === 'carregando' ? { tipo: 'carregando' }
+    : estado === 'erro' ? { tipo: 'erro', mensagem: erro, acao: <Button color="inherit" onClick={() => { geracao.current++; setEstado('carregando'); setTentativa((n) => n + 1) }}>Tentar novamente</Button> }
+      : resultado ? { tipo: 'pronto', linhas: resultado.itens }
+        : { tipo: 'erro', mensagem: 'Não foi possível carregar o resultado do extrato.' }
+
+  return (
+    <Stack spacing={3}>
+      <Box component="header">
+        <Typography variant="h1">Extrato de liquidações</Typography>
+        <Typography color="text.secondary">Datas inclusivas em UTC. Valores e snapshots conforme registrados na liquidação.</Typography>
+      </Box>
+      <Painel id="filtros-extrato" titulo="Filtros">
+        <Box component="form" noValidate onSubmit={aplicar}>
+          <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))' } }}>
+            <CampoFormulario label="Data inicial (UTC)" type="date" slotProps={{ inputLabel: { shrink: true } }} value={filtros.inicio} erro={erros.inicio} onChange={(e) => setFiltros({ ...filtros, inicio: e.target.value })} />
+            <CampoFormulario label="Data final (UTC)" type="date" slotProps={{ inputLabel: { shrink: true } }} value={filtros.fim} erro={erros.fim} onChange={(e) => setFiltros({ ...filtros, fim: e.target.value })} />
+            <CampoFormulario label="ID do cedente" value={filtros.cedenteId} erro={erros.cedenteId} helperText="UUID do cedente, opcional." onChange={(e) => setFiltros({ ...filtros, cedenteId: e.target.value.trim() })} />
+            <CampoFormulario label="Moeda" value={filtros.moeda} erro={erros.moeda} opcoes={[{ valor: '', rotulo: 'Todas' }, { valor: 'BRL', rotulo: 'BRL' }, { valor: 'USD', rotulo: 'USD' }]} onChange={(e) => {
+              const moeda = e.target.value
+              if (moeda === '' || moeda === 'BRL' || moeda === 'USD') setFiltros({ ...filtros, moeda })
+            }} />
+          </Box>
+          <Button type="submit" variant="contained" sx={{ mt: 2 }}>Aplicar filtros</Button>
+        </Box>
+      </Painel>
+      <Painel id="liquidacoes" titulo="Liquidações">
+        <TabelaDados legenda="Liquidações" chaveLinha={(item) => item.liquidacaoId} estado={tabela}
+          vazio={{ titulo: 'Nenhuma liquidação encontrada', descricao: 'Altere os filtros ou consulte novamente mais tarde.' }}
+          colunas={[
+            { id: 'data', rotulo: 'Liquidação (UTC)', renderizar: (item) => item.liquidadaEm },
+            { id: 'id', rotulo: 'ID da liquidação', cabecalhoLinha: true, renderizar: (item) => item.liquidacaoId },
+            { id: 'cedente', rotulo: 'ID do cedente', renderizar: (item) => item.cedenteId },
+            { id: 'modalidade', rotulo: 'Modalidade', renderizar: (item) => item.modalidade },
+            { id: 'pagamento', rotulo: 'Pagamento', alinhar: 'right', renderizar: (item) => `${item.moeda} ${item.valorPagamento}` },
+            { id: 'detalhes', rotulo: 'Snapshot', renderizar: (item) => <details><summary>Detalhes</summary>
+              <Box component="dl" sx={{ minWidth: 260 }}>
+                {([
+                  ['Recebível', item.recebivelId], ['Versão do recebível', item.versaoRecebivel], ['Prazo (meses)', item.prazoMeses],
+                  ['Valor de face BRL', item.valorFaceBrl], ['Valor presente BRL', item.valorPresenteBrl], ['Deságio BRL', item.desagioBrl],
+                  ['Taxa base ID', item.taxaBaseId], ['Taxa base mensal', item.taxaBaseMensal], ['Taxa base vigente em', item.taxaBaseVigenteEm],
+                  ['Spread ID', item.spreadId], ['Spread mensal', item.spreadMensal], ['Spread vigente em', item.spreadVigenteEm],
+                  ...(item.cotacaoCambialId !== null ? [['Cotação ID', item.cotacaoCambialId], ['BRL por unidade', item.taxaBrlPorUnidade], ['Cotação vigente em', item.cotacaoVigenteEm], ['Cotação válida até', item.cotacaoValidaAte]] : []),
+                ] as const).map(([nome, valor]) => <Box key={nome}><Typography component="dt" fontWeight={700}>{nome}</Typography><Typography component="dd" sx={{ ml: 0, overflowWrap: 'anywhere' }}>{valor ?? 'Não informado'}</Typography></Box>)}
+              </Box>
+            </details> },
+          ]} />
+        {estado === 'pronto' && resultado && <TablePagination component="div" count={resultado.total} page={resultado.pagina} rowsPerPage={resultado.tamanho}
+          rowsPerPageOptions={[10, 20, 50, 100]} labelRowsPerPage="Itens por página"
+          labelDisplayedRows={({ from, to, count }) => `${from}–${to} de ${count}`}
+          getItemAriaLabel={(tipo) => tipo === 'next' ? 'Próxima página' : tipo === 'previous' ? 'Página anterior' : tipo === 'first' ? 'Primeira página' : 'Última página'}
+          onPageChange={(_, pagina) => atualizarConsulta({ ...consulta, pagina })}
+          onRowsPerPageChange={(e) => atualizarConsulta({ ...consulta, pagina: 0, tamanho: Number(e.target.value) })} />}
+      </Painel>
+    </Stack>
+  )
+}
+
+export function AcessoExtrato({ autenticacao, porta }: { autenticacao: PortaAutenticacao; porta: PortaExtrato }) {
+  const [token, setToken] = useState('')
+  const [email, setEmail] = useState('')
+  const [senha, setSenha] = useState('')
+  const [erro, setErro] = useState('')
+  const [entrando, setEntrando] = useState(false)
+
+  async function entrar(evento: FormEvent) {
+    evento.preventDefault()
+    setEntrando(true)
+    setErro('')
+    try {
+      const novoToken = await autenticacao.autenticar(email, senha, new AbortController().signal)
+      setSenha('')
+      setToken(novoToken)
+    } catch (falha: unknown) {
+      setSenha('')
+      setErro(falha instanceof Error ? falha.message : 'Falha ao autenticar.')
+    } finally {
+      setEntrando(false)
+    }
+  }
+
+  return <Container component="main" maxWidth="lg" sx={{ py: { xs: 3, md: 5 } }}>
+    {token ? <PaginaExtrato porta={porta} token={token} aoExpirar={() => { setToken(''); setErro('Sessão expirada. Entre novamente.') }} /> :
+      <Stack component="form" onSubmit={entrar} spacing={2} sx={{ maxWidth: 420 }}>
+        <Typography variant="h1">Acesso ao extrato</Typography>
+        {erro && <Mensagem severity="error">{erro}</Mensagem>}
+        <CampoFormulario label="E-mail" type="email" autoComplete="username" required value={email} onChange={(e) => setEmail(e.target.value)} />
+        <CampoFormulario label="Senha" type="password" autoComplete="current-password" required value={senha} onChange={(e) => setSenha(e.target.value)} />
+        <Button type="submit" variant="contained" disabled={entrando}>{entrando ? 'Entrando…' : 'Entrar'}</Button>
+      </Stack>}
+  </Container>
+}
