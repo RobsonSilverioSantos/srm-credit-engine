@@ -96,7 +96,7 @@ class BootstrapTaxasDemoPostgresTest {
 
     private fun executarBootstrap() {
         BootstrapTaxasDemo().bootstrapTaxas(jdbc, gerenciador, Duration.ofMinutes(30))
-            .run(DefaultApplicationArguments(emptyArray<String>()))
+            .run(DefaultApplicationArguments())
     }
 
     private fun prepararTabelasTemporarias() {
