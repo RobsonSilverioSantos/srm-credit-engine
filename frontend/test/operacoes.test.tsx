@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import userEvent from '@testing-library/user-event'
 import { expect, test, vi } from 'vitest'
 import { ErroOperacao, type PortaOperacoes } from '../src/aplicacao/operacoes'
+import type { PortaGestaoUsuarios } from '../src/aplicacao/gestaoUsuarios'
 import { Aplicacao } from '../src/apresentacao/Aplicacao'
 import type { Simulacao } from '../src/dominio/operacoes'
 import { tema } from '../src/tema/tema'
@@ -27,9 +28,21 @@ function criarPorta() {
   } satisfies PortaOperacoes
 }
 
+function criarPortaGestao() {
+  return {
+    minhaConta: vi.fn().mockResolvedValue({
+      id: 'operador-1', email: 'operador@example.com', perfil: 'OPERADOR',
+      capacidades: { perfisCriaveis: [], podeListarUsuarios: false, podeAlterarStatus: false },
+    }),
+    listar: vi.fn().mockResolvedValue([]),
+    criar: vi.fn(),
+    alterarStatus: vi.fn(),
+  } satisfies PortaGestaoUsuarios
+}
+
 async function iniciar(operacoes: PortaOperacoes, locale = 'en-US') {
   const user = userEvent.setup()
-  render(<ThemeProvider theme={tema}><Aplicacao operacoes={operacoes} locale={locale} /></ThemeProvider>)
+  render(<ThemeProvider theme={tema}><Aplicacao operacoes={operacoes} gestaoUsuarios={criarPortaGestao()} locale={locale} /></ThemeProvider>)
   await user.type(screen.getByLabelText(/E-mail/), 'operador@example.com')
   await user.type(screen.getByLabelText(/Senha/), 'senha')
   await user.click(screen.getByRole('button', { name: 'Entrar' }))
@@ -124,7 +137,7 @@ test('cadastra cedente e permite nova tentativa de simulação indisponível', a
     .mockResolvedValue([{ id: 'cedente-2', nome: 'Novo', documento: '456', ativo: true }])
   porta.simular.mockRejectedValueOnce(new ErroOperacao('Serviço indisponível.', 503))
   const user = userEvent.setup()
-  render(<ThemeProvider theme={tema}><Aplicacao operacoes={porta} locale="en-US" /></ThemeProvider>)
+  render(<ThemeProvider theme={tema}><Aplicacao operacoes={porta} gestaoUsuarios={criarPortaGestao()} locale="en-US" /></ThemeProvider>)
   await user.type(screen.getByLabelText(/E-mail/), 'operador@example.com')
   await user.type(screen.getByLabelText(/Senha/), 'senha')
   await user.click(screen.getByRole('button', { name: 'Entrar' }))

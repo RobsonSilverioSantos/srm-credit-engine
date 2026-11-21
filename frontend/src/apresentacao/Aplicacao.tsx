@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { Box, Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Stack, Typography } from '@mui/material'
+import type { PortaGestaoUsuarios } from '../aplicacao/gestaoUsuarios'
 import { cadastrarParaLiquidacao, confirmarLiquidacao, ErroOperacao, mensagemErro, type PortaOperacoes } from '../aplicacao/operacoes'
 import type { Cedente, IntencaoLiquidacao, Liquidacao, Modalidade, Moeda, Sessao, Simulacao } from '../dominio/operacoes'
+import { PaginaAdministracaoUsuarios } from './PaginaAdministracaoUsuarios'
 import { CampoFormulario } from '../tema/componentes/CampoFormulario'
 import { Carregando, EstadoVazio, Mensagem } from '../tema/componentes/Feedback'
 import { Painel } from '../tema/componentes/Painel'
@@ -14,9 +16,9 @@ const modalidades = [
 ]
 const moedas = [{ valor: 'BRL', rotulo: 'BRL' }, { valor: 'USD', rotulo: 'USD' }]
 
-type Props = { operacoes: PortaOperacoes; locale: string }
+type Props = { operacoes: PortaOperacoes; gestaoUsuarios: PortaGestaoUsuarios; locale: string }
 
-export function Aplicacao({ operacoes, locale }: Props) {
+export function Aplicacao({ operacoes, gestaoUsuarios, locale }: Props) {
   const [sessao, setSessao] = useState<Sessao | null>(null)
   const [email, setEmail] = useState('')
   const [identidade, setIdentidade] = useState('')
@@ -49,13 +51,15 @@ export function Aplicacao({ operacoes, locale }: Props) {
     }
   }
 
+  const expirarSessao = useCallback(() => {
+    setSessao(null)
+    setExpirada(true)
+  }, [])
+
   const tratarErro = useCallback((falha: unknown) => {
-    if (falha instanceof ErroOperacao && falha.status === 401) {
-      setSessao(null)
-      setExpirada(true)
-      }
+    if (falha instanceof ErroOperacao && falha.status === 401) expirarSessao()
     return mensagemErro(falha)
-    }, [])
+  }, [expirarSessao])
 
   return (
     <Box component="main" sx={{ maxWidth: 1120, mx: 'auto', p: { xs: 2, md: 4 } }}>
@@ -75,12 +79,13 @@ export function Aplicacao({ operacoes, locale }: Props) {
       )}
       <Box hidden={!sessao}>
         <PainelOperacoes operacoes={operacoes} token={sessao?.token ?? null} tratarErro={tratarErro} locale={locale} />
+        {sessao && <PaginaAdministracaoUsuarios key={sessao.token} porta={gestaoUsuarios} token={sessao.token} aoExpirar={expirarSessao} />}
       </Box>
     </Box>
   )
 }
 
-type PainelProps = Props & { token: string | null; tratarErro: (erro: unknown) => string }
+type PainelProps = Pick<Props, 'operacoes' | 'locale'> & { token: string | null; tratarErro: (erro: unknown) => string }
 type Previa = { entrada: string; dados: Simulacao }
 
 function PainelOperacoes({ operacoes, token, tratarErro, locale }: PainelProps) {
