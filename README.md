@@ -55,6 +55,39 @@ limitados pelo escopo de referências do GitHub e não devem conter segredos;
 código do PR pode ser executado no runner e acessa caches disponíveis à sua
 base. Esses checks não são proteção obrigatória de merge: veja ADR-022 abaixo.
 
+## Evidências de execução, custos e limites
+
+Em 20/11/2026, na branch documental D03, a regressão integrada do backend foi
+executada com `cd backend && bash scripts/test-cadastro-postgres.sh`:
+`BUILD SUCCESSFUL`, 70 testes, 0 falhas, 0 erros e 0 ignorados, usando PostgreSQL
+efêmero removido pelo script. No frontend, `cd frontend && npm ci` instalou as
+dependências do lockfile e `npm run lint`, `npm test` e `npm run build`
+passaram; Vitest reportou 4 arquivos e 21 testes aprovados. Esses são resultados
+locais desta sessão, não testes manuais de ponta a ponta.
+
+As implementações que compõem a baseline foram integradas por PRs revisados e
+integrados pelo responsável técnico: [B07 #19](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/19),
+[B08 #20](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/20),
+[B08-S01 #23](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/23),
+[B08-E01 #22](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/22),
+[F03 #25](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/25) e
+[F01 #26](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/26).
+Os checks remotos de backend e frontend passaram em [B12 #7](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/7),
+[F03 #25](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/25)
+e [F01 #26](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/26).
+Os relatos de teste contidos nos PRs são identificados como relatos; não são
+apresentados como execução local do D03. A alteração documental D03 ainda
+precisa de seu próprio CI no respectivo PR.
+
+O teste local utilizou apenas infraestrutura efêmera; não houve deploy,
+pagamento real ou uso de provedor cloud nesta validação. Não há comprovante
+para atribuir valor monetário a assinaturas ou uso de IA; consulte
+[`AI_USAGE.md`](AI_USAGE.md), que registra o limite de cota do Cursor sem
+inferir cobrança. O benchmark de desempenho da SPEC não foi executado.
+Também não se deve apresentar F01 e F03 como fluxo integrado de ponta a ponta:
+as telas ainda têm entradas e autenticação independentes, conforme
+[`frontend/README.md`](frontend/README.md).
+
 ## Documentos: fonte de verdade e finalidade
 
 1. `docs/requisitos/ENUNCIADO_ORIGINAL_SRM_CREDIT_ENGINE_V2.md` — enunciado original, preservado sem alteração.
@@ -107,5 +140,7 @@ O repositório é privado e a conta atualmente não dispõe de Rulesets para est
 
 ADRs: `docs/adr/ADR-005-*.md`, `ADR-018-*.md`, `ADR-019-*.md`; EDA: `docs/arquitetura/EDA_LIQUIDACAO.md`; matriz: `docs/defesa/RASTREABILIDADE_STAFF_TECH_LEAD.md`. O design para 1 milhão/min permanece **pendente e independente**. Nenhum documento atesta benchmark executado. Keycloak e deploy em nuvem são cortes conscientes por prazo, justificados em `DECISIONS.md`.
 
-**Primeira ação:** crie um repositório privado **vazio** no GitHub, extraia este pacote e siga [`INICIO_GIT.md`](INICIO_GIT.md). Não apague o repositório antigo.
+**Bootstrap:** este repositório já foi criado e versionado. Para reproduzir a
+configuração inicial em outro repositório, consulte [`INICIO_GIT.md`](INICIO_GIT.md);
+para executar este checkout, use os guias do backend e do frontend acima.
 

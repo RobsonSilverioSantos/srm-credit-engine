@@ -21,17 +21,28 @@
 
 ## Checklist para a entrega
 
-- [ ] Golden cases C1–C3 passaram em execução real.
-- [ ] Liquidação concorrente, idempotência, rollback e isolamento testados com PostgreSQL real.
-- [ ] CI e setup reproduzidos; README atualizado com comandos observados.
+- [x] Golden cases C1–C3 passaram na regressão backend local com PostgreSQL descartável; ver `AI_USAGE.md` — D03.
+- [x] Liquidação concorrente, idempotência, rollback e isolamento incluídos na regressão local com PostgreSQL real e na evidência do PR [#19](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/19).
+- [x] Setup e checks locais reproduzidos; CI remota dos PRs [#7](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/7), [#25](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/25) e [#26](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/26) passou. Isso não valida a alteração D03 antes do CI próprio.
 - [ ] C4 nível 1/2 validado de acordo com a implementação final.
 - [ ] ADRs e proposta EDA revisados pelo responsável técnico.
 - [ ] Exercício de arquitetura de alta escala elaborado, revisado e entregue (atualmente pendente).
 - [x] Ao menos um PR real para `develop` ensina decisões, alternativas, testes e riscos: #4 e #5 integrados.
 - [x] Gate do GitHub Actions validado com PR #3 de `feature/*` → `main` fechado automaticamente pelo bot e comentário público no PR; permissões de execução demonstradas no caso testado.
 - [x] Responsável ativou `core.hooksPath=.githooks` e demonstrou recusa local em testes simulados para `main` e `develop` (sem push remoto).
-- [ ] Registrar na apresentação que Actions + hook são controles compensatórios **não mandatórios no servidor**; a regra nativa continua indisponível na configuração atual.
-- [ ] AI_USAGE inclui erro real de IA e como foi detectado, além de limites e custos verificáveis.
+- [x] O roteiro abaixo registra que Actions + hook são controles compensatórios **não mandatórios no servidor**; a regra nativa continua indisponível na configuração atual.
+- [x] `AI_USAGE.md` registra a recomendação arquitetural incorreta histórica da IA e sua detecção, separada do erro operacional D03, além do limite de uso do Cursor e da ausência de valores de assinatura/custos verificados.
+
+## Roteiro de defesa técnica — evidência, demonstração e limites
+
+1. **Delimitar o que está sendo defendido.** Apresentar `SPEC.md` e `DECISIONS.md`: trata-se de MVP demonstrativo, sem transferência bancária, com premissas financeiras ainda não homologadas pelo negócio. Não apresentar o C4 como arquitetura de alta escala.
+2. **Demonstrar precisão financeira.** Mostrar os testes C1–C3 e seus valores esperados. Explicar que o frontend exibe valores do backend e não calcula montantes. A evidência local da regressão backend está registrada em `AI_USAGE.md`; ela não homologa as premissas de negócio.
+3. **Explicar a simulação pré-cadastro.** Percorrer o BFF/API e os testes de [B08-S01 #23](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/23): a prévia é indicativa, não persiste recebível/liquidação e não reserva taxa/câmbio.
+4. **Provar integridade transacional.** Executar `cd backend && bash scripts/test-cadastro-postgres.sh` em ambiente local com Docker. A execução D03 reportou 70 testes, sem falhas, erros ou ignorados; o banco temporário é removido pelo script. Usar [B07 #19](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/19) para localizar os cenários de concorrência, replay idempotente, rollback e isolamento. Distinguir a regressão atualmente reexecutada do relato original do PR.
+5. **Apresentar contratos e extrato.** Relacionar BFF/API e OpenAPI ao [B08 #20](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/20), e filtros/paginação server-side aos [B08-E01 #22](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/22) e [F03 #25](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/25). Os filtros de datas seguem dias inclusivos em UTC; paginação por offset pode deslocar registros entre consultas.
+6. **Não prometer integração de UX ainda ausente.** F01 e F03 estão em PRs distintos ([#26](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/26) e [#25](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/25)). O frontend mantém entradas e autenticação independentes; não alegar navegação ou sessão compartilhada nem demonstrar como fluxo único sem validação adicional.
+7. **Separar testes locais, CI e revisão.** Mostrar `AI_USAGE.md` para comandos e resultados locais e os checks dos PRs para execução remota. Os merges foram feitos pelo responsável técnico; isso registra intervenção humana, mas não equivale a teste manual ponta a ponta ou validação de negócio. O CI do diff D03 deve ser verificado no próprio PR.
+8. **Declarar custos e limitações.** Nenhum deploy, pagamento real, benchmark de desempenho ou custo monetário de assinatura foi comprovado nesta etapa. O teste de PostgreSQL foi efêmero; o aviso de cota do Cursor não prova cobrança. Actions e hook local não são proteção server-side mandatória, como detalha ADR-022.
 
 ## Justificativa da decisão de governança — ADR-022
 
