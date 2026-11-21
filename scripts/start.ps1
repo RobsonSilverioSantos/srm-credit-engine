@@ -1,5 +1,5 @@
 param(
-    [ValidateSet('start', 'stop', 'status', 'logs')]
+    [ValidateSet('start', 'restart', 'stop', 'status', 'logs')]
     [string]$Action = 'start'
 )
 
@@ -69,6 +69,14 @@ if ($Action -eq 'start') {
     }
     switch ($Action) {
         'stop' { & docker @compose down }
+        'restart' {
+            # Reinicia backend/frontend sem afetar PostgreSQL ou volumes existentes.
+            # Não recompila imagens nem reaplica variáveis do contêiner.
+            & docker @compose restart app frontend
+            if ($LASTEXITCODE -eq 0) {
+                Write-Host 'Backend e frontend reiniciados, sem reconstruir imagens nem reiniciar o PostgreSQL.'
+            }
+        }
         'status' { & docker @compose ps }
         'logs' { & docker @compose logs -f --tail=100 }
     }

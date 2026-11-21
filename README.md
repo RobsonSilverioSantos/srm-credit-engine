@@ -120,7 +120,8 @@ em **30 minutos** por padrão (`srm.cambio.validade`). Se não houver cotação
 ainda válida, uma nova versão fictícia será criada no próximo início do
 backend em modo demo; a execução em andamento não renova cotações
 automaticamente. Simulações em BRL continuam funcionando após a expiração da
-cotação. Para testar USD após o vencimento, reinicie a stack de demonstração
+cotação. Para testar USD após o vencimento, reinicie os serviços da aplicação
+com `sh scripts/start.sh restart` (`.\scripts\start.ps1 restart` no Windows),
 ou registre uma nova cotação conforme o
 [guia backend](backend/README.md). Não use esses valores em produção.
 
@@ -135,14 +136,23 @@ backend, sem o overlay `compose.full.yaml`, continua sem carga automática.
 | Ação | macOS/Linux | Windows PowerShell |
 |---|---|---|
 | Iniciar/reconstruir | `sh scripts/start.sh` | `.\scripts\start.ps1` |
+| Reiniciar backend e frontend (sem rebuild) | `sh scripts/start.sh restart` | `.\scripts\start.ps1 restart` |
 | Ver status | `sh scripts/start.sh status` | `.\scripts\start.ps1 status` |
 | Ver logs | `sh scripts/start.sh logs` | `.\scripts\start.ps1 logs` |
 | Parar, preservando dados | `sh scripts/start.sh stop` | `.\scripts\start.ps1 stop` |
 
+**`restart`** reinicia somente os contêineres `app` e `frontend`: mantém o
+PostgreSQL e seus volumes intactos e **não recompila imagens nem aplica mudanças
+na configuração dos contêineres**. Para carregar novo código, alterar Compose
+ou atualizar variáveis de ambiente, execute **`start`**, que reconstrói e
+reconcilia a stack via `docker compose up -d --build --wait`. Em ambos os casos,
+aguarde a aplicação ficar saudável antes de fazer novas operações.
+
 As portas opcionais `SRM_FRONTEND_PORT` (5173), `SRM_APP_PORT` (8080) e
 `SRM_DB_PORT` (5432) podem ser definidas em `backend/.env`, caso estejam
-ocupadas. Após alterá-las, reinicie os serviços. Se o banco usar volume
-existente, mantenha seu usuário e senha originais.
+ocupadas. Após alterá-las, execute **`start`** para recriar os contêineres com
+as novas configurações. Se o banco usar volume existente, mantenha seu usuário
+e senha originais.
 
 Para demonstrar **no celular da mesma rede**, configure
 `SRM_FRONTEND_BIND=0.0.0.0` no `backend/.env` e reinicie pelo script.
