@@ -120,6 +120,23 @@ Esta coleta inicial documenta B10 e S02, integradas depois da consolidação D03
 - **Escopo deste complemento:** consolidar o registro F04 e o estado de conclusão no `AI_USAGE.md` e no `TASKS.md`. Nenhum teste local da aplicação foi realizado neste complemento; os resultados do agente permanecem claramente atribuídos ao PR de origem.
 - **Situação:** evidências do backlog MVP registradas para os 24 itens integrados/operacionais; testes de aceitação humana/end-to-end ainda necessários e independentes da contagem de tarefas.
 
+## AFERICAO-MANUAL-01 — Golden cases C1, C2 e C3 pela interface (21/11/2026)
+
+- **Ator e origem da evidência:** responsável técnico do projeto, executando a aplicação local e comparando os resultados com a seção de aferição obrigatória do enunciado. **C1 e C2** foram declarados corretos até os centavos pelo responsável; não foi fornecida captura individual desses casos. **C3** foi declarado correto e apresentado em captura visual da pré-simulação React.
+- **Resultados exigidos e conferidos:**
+
+  | Caso | Modalidade / dados | Resultado esperado | Evidência manual |
+  |---|---|---|---|
+  | C1 | Duplicata mercantil; R$ 100.000,00; 3 meses; BRL | **R$ 92.859,94** (deságio R$ 7.140,06) | **Confirmado pelo responsável** como coincidente nos centavos; sem captura versionada |
+  | C2 | Cheque pré-datado; R$ 25.000,00; 2 meses; BRL | **R$ 23.337,77** (deságio R$ 1.662,23) | **Confirmado pelo responsável** como coincidente nos centavos; sem captura versionada |
+  | C3 | Duplicata mercantil; R$ 100.000,00; 3 meses; USD; 5,4321 BRL/USD | **US$ 17.094,67** (VP BRL R$ 92.859,94; deságio R$ 7.140,06) | **Captura da interface apresentada** com os três valores correspondentes |
+
+- **Evidência visual de C3:** tela `Simulação pré-cadastro` apresenta pagamento `US$ 17.094,67`, valor presente `R$ 92.859,94`, deságio `R$ 7.140,06`, taxa base mensal `1,00000000%`, spread mensal `1,50000000%` e cotação `5.4321000000`. Referência da simulação: `2026-11-21T22:26:22.110780Z`. **Imagem não incorporada ao repositório neste registro**.
+- **Teste automatizado separado:** `backend/app/src/test/kotlin/br/com/srm/creditengine/precificacao/PrecificacaoTest.kt` já possui assertions Kotlin `BigDecimal` para C1/C2/C3, mais cenários de `HALF_EVEN`. A regressão local PostgreSQL em `D03` é evidência histórica própria; **não foi reexecutada** nesta coleta documental.
+- **Intervenção humana:** aferição na interface e relato dos resultados são ações do responsável, não execução por agente de IA. ChatGPT revisou a captura C3, conferiu valores e referências de código/repositório e estruturou o registro documental. **B14 já integrada** no PR [#56](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/56); essa atualização não implementa ou reinicia B14.
+- **Limites:** evidência **3/3 dos resultados de pré-simulação conferidos em centavos**, não homologação financeira produtiva, liquidação ponta a ponta, transação bancária, PTAX oficial, disponibilidade contínua ou teste de todas as combinações. A cotação de C3 é mock fixo 5,4321; o problema visual dos zeros de escala está em [PR #59](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/59), sem impacto no valor calculado. Não foram usados tokens JWT nem informações de empresas reais no registro documental.
+- **Documento de apoio:** [VALIDACAO_GOLDEN_CASES_C1_C2_C3_2026-11-21.md](docs/validacao/VALIDACAO_GOLDEN_CASES_C1_C2_C3_2026-11-21.md). Os valores e a origem de cada evidência ficam reunidos nesse relatório.
+
 ## Histórico do repositório anterior (preservado, não vigente para o novo código)
 
 
