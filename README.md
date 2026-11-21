@@ -83,7 +83,9 @@ No head `50d950d`, o backend passou e o mesmo teste frontend voltou a falhar
 ([execução #44849740354](https://github.com/RobsonSilverioSantos/srm-credit-engine/actions/runs/44849740354));
 essa execução ficou vermelha. O teste local do frontend passou e nenhum código
 foi alterado em resposta; a causa da falha remota não foi estabelecida. Confira
-o estado do PR antes de integração.
+o estado do PR antes de integração. No commit documental `cbdbd20`, os dois jobs
+passaram ([execução #44850079836](https://github.com/RobsonSilverioSantos/srm-credit-engine/actions/runs/44850079836));
+as falhas anteriores permanecem registradas como histórico.
 Os relatos de teste contidos nos PRs são identificados como relatos; não são
 apresentados como execução local do D03.
 
