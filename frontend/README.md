@@ -13,9 +13,19 @@ npm test
 npm run build
 ```
 
-Abra a URL exibida pelo Vite. O catálogo identifica dados fictícios, permite testar
-o formulário e alternar os estados da tabela. Não há sessão, requisições ao BFF,
-persistência nem cálculo financeiro.
+Abra a URL exibida pelo Vite para o catálogo fictício ou `/extrato.html` para o
+extrato real. O extrato solicita credenciais locais, mantém o token somente em
+memória e consulta o BFF; um 401 exige novo acesso. Configure o backend e um
+usuário conforme [o guia do backend](../backend/README.md). Em desenvolvimento,
+o Vite encaminha `/api` e `/bff` para `http://localhost:8080`; em produção,
+publique ambas as rotas na mesma origem do frontend por um proxy reverso.
+
+Os filtros de data são inclusivos em UTC e o cedente é informado pelo UUID. A
+paginação e a ordenação são do servidor; inserções entre páginas podem deslocar
+itens. Os valores e snapshots são exibidos como strings recebidas, sem cálculo.
+A tela é uma entrada independente para evitar conflito com F01: a integração
+futura deve fornecer a sessão autenticada e `PortaExtrato` a `PaginaExtrato`,
+além de conectar a navegação. O catálogo continua sem sessão ou acesso ao BFF.
 
 ## Reutilizar
 
@@ -45,7 +55,8 @@ persistência nem cálculo financeiro.
 (`aplicacao/`) e a página (`apresentacao/`). `dominio/` descreve apenas os dados
 da demonstração; não é um contrato do BFF. Não importe o mock em F01/F03: crie
 portas para os contratos aprovados e injete os adaptadores em `main.tsx`. A
-apresentação não deve executar HTTP nem aritmética monetária. O ESLint bloqueia
+apresentação não deve executar HTTP nem aritmética monetária. `extrato.tsx`
+compõe as portas e adaptadores HTTP da tela independente. O ESLint bloqueia
 imports diretos indevidos entre as camadas.
 
 Preferiu-se MUI Core a CSS/componentes próprios para aproveitar semântica,
