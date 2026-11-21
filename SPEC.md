@@ -1,10 +1,18 @@
 # SPEC.md — SRM Credit Engine (MVP)
 
-**Versão:** 3.2 — novo repositório, 20/11/2026. **Estado:** especificação aprovada para implementação demonstrativa, **não homologada pelo negócio nem implementada nesta baseline**. Referências: enunciado em `docs/requisitos/`, decisões em `DECISIONS.md` e ambiguidades detalhadas em `docs/negocio/MATRIZ_AMBIGUIDADES.md`.
+**Versão:** 3.3 — novo repositório, baseline de 20/11/2026, revisão documental da B14 em 21/11/2026. **Estado:** especificação para implementação demonstrativa; entregas são comprovadas pelos PRs e pelo código correspondente e **não representam homologação pelo negócio ou por órgão fiscal**. Referências: enunciado em `docs/requisitos/`, decisões em `DECISIONS.md` e ambiguidades em `docs/negocio/MATRIZ_AMBIGUIDADES.md`.
 
 ## 1. Escopo e papéis
 
 O MVP permite **simular**, cadastrar e liquidar logicamente recebíveis de **cedentes** em BRL, com pagamento registrado em BRL ou USD, e consultar extrato analítico. Não movimenta dinheiro real nem implementa estorno, liquidação parcial ou cobrança. **Organização** é o limite de autorização/isolamento (`organizacao_id`); **Cedente** é quem cede os recebíveis e pertence a uma organização. A UI recebe identidade/autorização do servidor, nunca de `organizacaoId` livre no body.
+
+### Identificação de cedentes e limite de validação documental (B14)
+
+O cadastro possui **país ISO 3166-1 alfa-2**, **tipo de documento** e **número/documento canônico**. Apenas o **CNPJ brasileiro (`BR/CNPJ`)** possui validação implementada de formato e **ambos os dígitos verificadores**, incluindo CNPJ numérico e alfanumérico. `statusDocumento = VALIDADO_DV` indica somente conformidade estrutural; **não comprova existência, situação ativa, titularidade ou regularidade fiscal** e não resulta de consulta à Receita Federal.
+
+Para **país estrangeiro**, o tipo `OUTRO` permite identificador de 1–32 caracteres `[A-Z0-9]`, registrado explicitamente como `NAO_VERIFICADO`, sem validação fiscal internacional. `BR/OUTRO` e CNPJ associado a outro país não são aceitos. País do cedente não determina organização, moeda de pagamento ou política cambial.
+
+Novos `POST /cedentes` com apenas `nome` e `documento` são interpretados como `BR/CNPJ` (restrição deliberada de entradas antes arbitrárias); país e tipo explícitos devem ser fornecidos juntos quando o documento não for CNPJ brasileiro. Registros **anteriores à migration V5** sem país/tipo permanecem `DESCONHECIDO`, sem classificação automática por aparência. A unicidade e a resolução de possíveis colisões são por organização e identidade canônica, com reconciliação manual de legados ambíguos. Política completa: [ADR-023](docs/adr/ADR-023-identificacao-empresarial-por-pais-e-documento.md) e [documentação da B14](backend/docs/B14_DOCUMENTOS_CEDENTES.md).
 
 ## 2. Premissas financeiras e ambiguidades
 

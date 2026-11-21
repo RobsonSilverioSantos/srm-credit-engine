@@ -1,9 +1,13 @@
 # B14 — Identificação empresarial e documentos de cedentes
 
-**Estado:** liberada para iniciar (P1), após integração do PR #48 da B13 e da atualização correspondente no `TASKS.md`; implementação B14 ainda não iniciada.  
+**Estado:** **integrada em `develop` — PR #56, 21/11/2026** (P1). Esta especificação registra o planejamento histórico; o comportamento efetivamente implementado é descrito em [backend/docs/B14_DOCUMENTOS_CEDENTES.md](../../backend/docs/B14_DOCUMENTOS_CEDENTES.md) e na [ADR-023](../adr/ADR-023-identificacao-empresarial-por-pais-e-documento.md).  
 **Tarefa de origem:** `TASKS.md`, B14; rastreamento [issue #45](https://github.com/RobsonSilverioSantos/srm-credit-engine/issues/45).  
-**Gate de início:** B13 já integrada em `origin/develop` pelo PR #48; iniciar B14 somente após a atualização de liberação B14 no `TASKS.md` também ser integrada e buscada com `git fetch origin`. Não iniciar a B14 sobre código pendente de PR.  
+**Gate histórico de início (cumprido):** B13 integrada pelo PR #48, B14 liberada pelo PR #49 e implementação integrada pelo PR #56. Não reiniciar a B14 nem usar esta especificação como autorização para alterações adicionais.  
 **Agentes:** `backend` como coordenador/executor em um único worktree; `frontend` como apoio à especificação/validação da UI; `architect`, `qa` e `reviewer` como revisores independentes. Não executar edições simultâneas no mesmo worktree.
+
+## Resultado efetivo da implementação
+
+A B14 integrou no PR #56: `BR/CNPJ` numérico e alfanumérico com verificação dos DVs; identificador estrangeiro `OUTRO` aceito como `NAO_VERIFICADO`, sem validação fiscal; `BR/OUTRO` e `<país estrangeiro>/CNPJ` rejeitados; novos POST antigos inferem `BR/CNPJ`; legados sem país/tipo permanecem `DESCONHECIDO`. A migration V5 preserva dados históricos e trata colisões de forma conservadora. As provas locais declaradas no PR não equivalem à homologação operacional completa. O limite normativo está na ADR-023.
 
 ## Problema observado
 
