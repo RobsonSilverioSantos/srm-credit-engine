@@ -1,6 +1,7 @@
 import { expect, test } from 'vitest'
 import {
   formatarCotacao,
+  formatarEntradaMonetaria,
   formatarMonetario,
   formatarPercentual,
   normalizarEntradaMonetaria,
@@ -34,6 +35,14 @@ test('formata BRL/USD com arredondamento HALF_EVEN e preserva magnitudes grandes
   expect(formatarMonetario('2.355', 'BRL', 'pt-BR')).toBe('R$\u00a02,36')
   expect(formatarMonetario('123456789012345678.99', 'USD', 'en-US'))
     .toBe('$123,456,789,012,345,678.99')
+})
+
+test.each([
+  ['25000.00', 'pt-BR', '25.000,00'],
+  ['25000.00', 'en-US', '25,000.00'],
+  ['12345678901234567.89', 'en-US', '12,345,678,901,234,567.89'],
+])('formata entrada editável %s em %s sem ponto flutuante', (valor, locale, esperado) => {
+  expect(formatarEntradaMonetaria(valor, locale)).toBe(esperado)
 })
 
 test('formata percentuais sem arredondar a escala original', () => {

@@ -7,14 +7,38 @@ import { Mensagem } from '../tema/componentes/Feedback'
 import { Painel } from '../tema/componentes/Painel'
 import { TabelaDados, type EstadoTabela } from '../tema/componentes/TabelaDados'
 import { formatarCotacao, formatarMonetario, formatarPercentual } from '../dominio/formatacaoMonetaria'
+import { InstanteLocal } from '../tema/componentes/InstanteLocal'
 
 const filtrosIniciais: FiltrosExtrato = { inicio: '', fim: '', cedenteId: '', moeda: '' }
 
-export function PaginaExtrato({ porta, token, aoExpirar, locale }: {
+const instantesSnapshot = new Set(['Taxa base vigente em', 'Spread vigente em', 'Cotação vigente em', 'Cotação válida até'])
+type DetalheSnapshot = readonly [string, string | number | null]
+
+function detalhesSnapshot(item: ItemExtrato, locale: string): readonly DetalheSnapshot[] {
+  return [
+    ['Recebível', item.recebivelId], ['Versão do recebível', item.versaoRecebivel], ['Prazo (meses)', item.prazoMeses],
+    ['Valor de face BRL', formatarMonetario(item.valorFaceBrl, 'BRL', locale)],
+    ['Valor presente BRL', formatarMonetario(item.valorPresenteBrl, 'BRL', locale)],
+    ['Deságio BRL', formatarMonetario(item.desagioBrl, 'BRL', locale)],
+    ['Taxa base ID', item.taxaBaseId], ['Taxa base mensal', formatarPercentual(item.taxaBaseMensal, locale)], ['Taxa base vigente em', item.taxaBaseVigenteEm],
+    ['Spread ID', item.spreadId], ['Spread mensal', formatarPercentual(item.spreadMensal, locale)], ['Spread vigente em', item.spreadVigenteEm],
+    ...(item.cotacaoCambialId !== null ? [
+      ['Cotação ID', item.cotacaoCambialId],
+      ['BRL por unidade', item.taxaBrlPorUnidade === null ? 'Não informado' : formatarCotacao(item.taxaBrlPorUnidade, locale)],
+      ['Cotação vigente em', item.cotacaoVigenteEm],
+      ['Cotação válida até', item.cotacaoValidaAte],
+    ] as const : []),
+  ]
+}
+
+export function PaginaExtrato({ porta, token, aoExpirar, locale, fusoHorario, ativa = true, mostrarTitulo = true }: {
   porta: PortaExtrato
   token: string
   aoExpirar: () => void
   locale: string
+  fusoHorario?: string
+  ativa?: boolean
+  mostrarTitulo?: boolean
 }) {
   const [filtros, setFiltros] = useState(filtrosIniciais)
   const [validado, setValidado] = useState(false)
@@ -27,11 +51,12 @@ export function PaginaExtrato({ porta, token, aoExpirar, locale }: {
   const erros = validado ? validarFiltros(filtros) : {}
 
   useEffect(() => {
+    if (!ativa) return
     const controle = new AbortController()
     const atual = ++geracao.current
-    let ativa = true
+    let montada = true
     consultarExtrato(porta, consulta, token, controle.signal).then((pagina) => {
-      if (!ativa || atual !== geracao.current) return
+      if (!montada || atual !== geracao.current) return
       const ultima = Math.max(0, Math.ceil(pagina.total / pagina.tamanho) - 1)
       if (pagina.pagina > ultima) {
         setConsulta((atual) => ({ ...atual, pagina: ultima }))
@@ -40,7 +65,7 @@ export function PaginaExtrato({ porta, token, aoExpirar, locale }: {
       setResultado(pagina)
       setEstado('pronto')
     }).catch((falha: unknown) => {
-      if (!ativa || atual !== geracao.current) return
+      if (!montada || atual !== geracao.current) return
       if (falha instanceof SessaoExpirada) {
         aoExpirar()
       } else {
@@ -48,8 +73,8 @@ export function PaginaExtrato({ porta, token, aoExpirar, locale }: {
         setEstado('erro')
       }
     })
-    return () => { ativa = false; controle.abort() }
-  }, [porta, token, consulta, tentativa, aoExpirar])
+    return () => { montada = false; controle.abort() }
+  }, [ativa, porta, token, consulta, tentativa, aoExpirar])
 
   function atualizarConsulta(proxima: ConsultaExtrato) {
     geracao.current++
@@ -73,8 +98,8 @@ export function PaginaExtrato({ porta, token, aoExpirar, locale }: {
   return (
     <Stack spacing={3}>
       <Box component="header">
-        <Typography variant="h1">Extrato de liquidações</Typography>
-        <Typography color="text.secondary">Datas inclusivas em UTC. Valores e snapshots conforme registrados na liquidação.</Typography>
+        {mostrarTitulo && <Typography variant="h1">Extrato de liquidações</Typography>}
+        <Typography color="text.secondary">Filtros de data inclusivos em UTC; horários exibidos no fuso local, com o instante ISO original disponível para auditoria.</Typography>
       </Box>
       <Painel id="filtros-extrato" titulo="Filtros">
         <Box component="form" noValidate onSubmit={aplicar}>
@@ -94,22 +119,18 @@ export function PaginaExtrato({ porta, token, aoExpirar, locale }: {
         <TabelaDados legenda="Liquidações" chaveLinha={(item) => item.liquidacaoId} estado={tabela}
           vazio={{ titulo: 'Nenhuma liquidação encontrada', descricao: 'Altere os filtros ou consulte novamente mais tarde.' }}
           colunas={[
-            { id: 'data', rotulo: 'Liquidação (UTC)', renderizar: (item) => item.liquidadaEm },
-            { id: 'id', rotulo: 'ID da liquidação', cabecalhoLinha: true, renderizar: (item) => item.liquidacaoId },
+            { id: 'data', rotulo: 'Data/hora da liquidação', renderizar: (item) => <InstanteLocal isoUtc={item.liquidadaEm} locale={locale} rotulo="Data/hora da liquidação" fusoHorario={fusoHorario} /> },
+            { id: 'id', rotulo: 'Código da liquidação', cabecalhoLinha: true, renderizar: (item) => item.liquidacaoId },
             { id: 'cedente', rotulo: 'ID do cedente', renderizar: (item) => item.cedenteId },
             { id: 'modalidade', rotulo: 'Modalidade', renderizar: (item) => item.modalidade },
             { id: 'pagamento', rotulo: 'Pagamento', alinhar: 'right', renderizar: (item) => formatarMonetario(item.valorPagamento, item.moeda, locale) },
             { id: 'detalhes', rotulo: 'Snapshot', renderizar: (item) => <details><summary>Detalhes</summary>
               <Box component="dl" sx={{ minWidth: 260 }}>
-                {([
-                  ['Recebível', item.recebivelId], ['Versão do recebível', item.versaoRecebivel], ['Prazo (meses)', item.prazoMeses],
-                  ['Valor de face BRL', formatarMonetario(item.valorFaceBrl, 'BRL', locale)],
-                  ['Valor presente BRL', formatarMonetario(item.valorPresenteBrl, 'BRL', locale)],
-                  ['Deságio BRL', formatarMonetario(item.desagioBrl, 'BRL', locale)],
-                  ['Taxa base ID', item.taxaBaseId], ['Taxa base mensal', formatarPercentual(item.taxaBaseMensal, locale)], ['Taxa base vigente em', item.taxaBaseVigenteEm],
-                  ['Spread ID', item.spreadId], ['Spread mensal', formatarPercentual(item.spreadMensal, locale)], ['Spread vigente em', item.spreadVigenteEm],
-                  ...(item.cotacaoCambialId !== null ? [['Cotação ID', item.cotacaoCambialId], ['BRL por unidade', item.taxaBrlPorUnidade === null ? 'Não informado' : formatarCotacao(item.taxaBrlPorUnidade, locale)], ['Cotação vigente em', item.cotacaoVigenteEm], ['Cotação válida até', item.cotacaoValidaAte]] : []),
-                ] as const).map(([nome, valor]) => <Box key={nome}><Typography component="dt" fontWeight={700}>{nome}</Typography><Typography component="dd" sx={{ ml: 0, overflowWrap: 'anywhere' }}>{valor ?? 'Não informado'}</Typography></Box>)}
+                {detalhesSnapshot(item, locale).map(([nome, valor]) => <Box key={nome}><Typography component="dt" fontWeight={700}>{nome}</Typography><Typography component="dd" sx={{ ml: 0, overflowWrap: 'anywhere' }}>
+                  {typeof valor === 'string' && instantesSnapshot.has(nome)
+                    ? <InstanteLocal isoUtc={valor} locale={locale} rotulo={nome} fusoHorario={fusoHorario} />
+                    : valor ?? 'Não informado'}
+                </Typography></Box>)}
               </Box>
             </details> },
           ]} />
@@ -124,7 +145,7 @@ export function PaginaExtrato({ porta, token, aoExpirar, locale }: {
   )
 }
 
-export function AcessoExtrato({ autenticacao, porta, locale }: { autenticacao: PortaAutenticacao; porta: PortaExtrato; locale: string }) {
+export function AcessoExtrato({ autenticacao, porta, locale, fusoHorario }: { autenticacao: PortaAutenticacao; porta: PortaExtrato; locale: string; fusoHorario?: string }) {
   const [token, setToken] = useState('')
   const [email, setEmail] = useState('')
   const [senha, setSenha] = useState('')
@@ -148,7 +169,7 @@ export function AcessoExtrato({ autenticacao, porta, locale }: { autenticacao: P
   }
 
   return <Container component="main" maxWidth="lg" sx={{ py: { xs: 3, md: 5 } }}>
-    {token ? <PaginaExtrato porta={porta} token={token} locale={locale} aoExpirar={() => { setToken(''); setErro('Sessão expirada. Entre novamente.') }} /> :
+    {token ? <PaginaExtrato porta={porta} token={token} locale={locale} fusoHorario={fusoHorario} aoExpirar={() => { setToken(''); setErro('Sessão expirada. Entre novamente.') }} /> :
       <Stack component="form" onSubmit={entrar} spacing={2} sx={{ maxWidth: 420 }}>
         <Typography variant="h1">Acesso ao extrato</Typography>
         {erro && <Mensagem severity="error">{erro}</Mensagem>}

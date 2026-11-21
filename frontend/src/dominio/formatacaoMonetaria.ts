@@ -57,6 +57,19 @@ export function formatarMonetario(valor: string, moeda: 'BRL' | 'USD', locale: s
   return partes.map((parte) => parte.type === 'fraction' ? fracaoLocalizada : parte.value).join('')
 }
 
+export function formatarEntradaMonetaria(valorCanonico: string, locale: string): string {
+  const correspondencia = /^([0-9]+)\.([0-9]{2})$/.exec(valorCanonico)
+  if (!correspondencia) throw new Error('Valor decimal canônico inválido.')
+
+  const inteiro = new Intl.NumberFormat(locale, { useGrouping: true, maximumFractionDigits: 0 })
+    .format(BigInt(correspondencia[1] ?? '0'))
+  const decimal = new Intl.NumberFormat(locale, { minimumFractionDigits: 1, maximumFractionDigits: 1 })
+    .formatToParts(0n)
+    .find((parte) => parte.type === 'decimal')?.value
+  if (!decimal) throw new Error(`Separador decimal indisponível para o idioma ${locale}.`)
+  return `${inteiro}${decimal}${localizarDigitos(correspondencia[2] ?? '00', locale)}`
+}
+
 export function formatarPercentual(fracao: string, locale: string): string {
   const percentual = deslocarDecimal(fracao, 2)
   const partesNumero = partesDecimalLocalizado(percentual, locale)

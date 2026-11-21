@@ -69,11 +69,17 @@ function renderizar(ui: React.ReactNode) {
 test('filtros e paginação são enviados ao servidor; snapshots mantêm os valores recebidos', async () => {
   const user = userEvent.setup()
   const porta = { consultar: vi.fn(async (pedido: ConsultaExtrato) => ({ ...pagina, pagina: pedido.pagina, tamanho: pedido.tamanho })) }
-  renderizar(<PaginaExtrato porta={porta} token="jwt" locale="pt-BR" aoExpirar={vi.fn()} />)
+  renderizar(<PaginaExtrato porta={porta} token="jwt" locale="pt-BR" fusoHorario="America/Sao_Paulo" aoExpirar={vi.fn()} />)
   expect(await screen.findByText(/17\.094,67/)).toBeVisible()
+  expect(screen.getByText('Código da liquidação')).toBeVisible()
+  expect(screen.getByText('liquidacao-1')).toBeVisible()
+  const instanteLiquidacao = screen.getByText('31/12/2025 21:10:00 (America/Sao_Paulo)')
+  expect(instanteLiquidacao).toHaveAttribute('dateTime', item.liquidadaEm)
+  expect(instanteLiquidacao).toHaveAttribute('title', `ISO 8601 UTC: ${item.liquidadaEm}`)
   await user.click(screen.getByText('Detalhes'))
   expect(screen.getByText('5,4321')).toBeVisible()
   expect(screen.getByText('1,00%')).toBeVisible()
+  expect(screen.getAllByText('31/12/2025 21:00:00 (America/Sao_Paulo)')).toHaveLength(3)
   await user.click(screen.getByRole('button', { name: 'Próxima página' }))
   await waitFor(() => expect(porta.consultar).toHaveBeenLastCalledWith(expect.objectContaining({ pagina: 1, tamanho: 20 }), 'jwt', expect.any(AbortSignal)))
   expect(await screen.findByText('21–25 de 25')).toBeVisible()

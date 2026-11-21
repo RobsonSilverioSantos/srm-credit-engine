@@ -11,6 +11,7 @@ type Props = {
   porta: PortaGestaoUsuarios
   token: string
   aoExpirar: () => void
+  aoVerificarCapacidade?: (podeListar: boolean) => void
 }
 
 const perfis: readonly { valor: PerfilCriavel; rotulo: string }[] = [
@@ -22,7 +23,7 @@ function mensagemFalha(falha: unknown): string {
   return falha instanceof Error ? falha.message : 'Falha inesperada. Tente novamente.'
 }
 
-export function PaginaAdministracaoUsuarios({ porta, token, aoExpirar }: Props) {
+export function PaginaAdministracaoUsuarios({ porta, token, aoExpirar, aoVerificarCapacidade }: Props) {
   const [conta, setConta] = useState<MinhaConta | null>(null)
   const [usuarios, setUsuarios] = useState<UsuarioOrganizacional[]>([])
   const [estadoLista, setEstadoLista] = useState<'carregando' | 'pronto' | 'erro'>('carregando')
@@ -63,6 +64,7 @@ export function PaginaAdministracaoUsuarios({ porta, token, aoExpirar }: Props) 
         const minhaConta = await porta.minhaConta(token, controlador.signal)
         if (!ativa) return
         setConta(minhaConta)
+        aoVerificarCapacidade?.(minhaConta.capacidades.podeListarUsuarios)
         if (!minhaConta.capacidades.podeListarUsuarios) {
           setEstadoLista('pronto')
           return
@@ -73,6 +75,7 @@ export function PaginaAdministracaoUsuarios({ porta, token, aoExpirar }: Props) 
         setEstadoLista('pronto')
       } catch (falha) {
         if (!ativa) return
+        aoVerificarCapacidade?.(false)
         if (falha instanceof ErroGestaoUsuarios && falha.status === 401) {
           aoExpirar()
           return
@@ -87,7 +90,7 @@ export function PaginaAdministracaoUsuarios({ porta, token, aoExpirar }: Props) 
       ativa = false
       controlador.abort()
     }
-  }, [aoExpirar, porta, tentativa, token])
+  }, [aoExpirar, aoVerificarCapacidade, porta, tentativa, token])
 
   async function cadastrar(evento: FormEvent) {
     evento.preventDefault()
