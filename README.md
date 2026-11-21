@@ -75,9 +75,10 @@ integrados pelo responsável técnico: [B07 #19](https://github.com/RobsonSilver
 Os checks remotos de backend e frontend passaram em [B12 #7](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/7),
 [F03 #25](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/25)
 e [F01 #26](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/26).
+O CI do PR D03 [#29](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/29)
+também passou nos dois jobs no commit `f71eb43` ([execução #44848917116](https://github.com/RobsonSilverioSantos/srm-credit-engine/actions/runs/44848917116)).
 Os relatos de teste contidos nos PRs são identificados como relatos; não são
-apresentados como execução local do D03. A alteração documental D03 ainda
-precisa de seu próprio CI no respectivo PR.
+apresentados como execução local do D03.
 
 O teste local utilizou apenas infraestrutura efêmera; não houve deploy,
 pagamento real ou uso de provedor cloud nesta validação. Não há comprovante
