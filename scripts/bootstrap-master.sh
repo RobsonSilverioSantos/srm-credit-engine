@@ -8,7 +8,13 @@ ENV_FILE="$ROOT/backend/.env"
   exit 1
 }
 
+if [ ! -t 0 ] || [ ! -t 1 ]; then
+  printf 'ERRO: execute o provisionamento em um terminal interativo (sem redirecionar a entrada).\n' >&2
+  exit 1
+fi
+
 printf 'O bootstrap exige terminal interativo e uma organização já criada.\n'
+printf 'Senha: de 12 a 72 bytes UTF-8; dados inválidos podem ser corrigidos no próprio terminal.\n'
 printf 'UUID demo: 00000000-0000-4000-8000-000000000001\n'
 printf 'A conta MASTER é única por organização e não é recriada por este comando.\n'
 
