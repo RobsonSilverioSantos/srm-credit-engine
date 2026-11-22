@@ -14,6 +14,24 @@ permissions:
   contents: read
 
 jobs:
+  qa-b16-contract:
+    name: QA B16 — contrato do cenário k6 (sem rede)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Obter código
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - name: Configurar Node.js 24
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: '24'
+      - name: Validar sintaxe do cenário k6
+        run: node --input-type=module --check < qa/k6/b16/concorrencia.js
+      - name: Testar contrato de replay e concorrência
+        run: node --test qa/k6/b16/contrato.test.mjs
+
   backend:
     name: Backend — build e testes
     runs-on: ubuntu-latest
