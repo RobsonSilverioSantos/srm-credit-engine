@@ -10,6 +10,7 @@ import type { Simulacao } from '../src/dominio/operacoes'
 import { formatarMonetario } from '../src/dominio/formatacaoMonetaria'
 import { tema } from '../src/tema/tema'
 import { criarPortaLotes } from './fixtures/lotes'
+import { criarPortaCambio } from './fixtures/cambio'
 
 beforeEach(() => window.history.replaceState(null, '', '/'))
 
@@ -57,6 +58,7 @@ async function iniciar(
   extrato = criarPortaExtrato(),
   gestaoUsuarios = criarPortaGestao(),
   lotes = criarPortaLotes(),
+  cambio = criarPortaCambio(),
 ) {
   const user = userEvent.setup()
   render(<ThemeProvider theme={tema}><Aplicacao
@@ -64,6 +66,7 @@ async function iniciar(
     gestaoUsuarios={gestaoUsuarios}
     extrato={extrato}
     lotes={lotes}
+    cambio={cambio}
     locale={locale}
     fusoHorario="America/Sao_Paulo"
   /></ThemeProvider>)
@@ -94,6 +97,24 @@ async function preencher(user: ReturnType<typeof userEvent.setup>) {
   await user.type(screen.getByLabelText(/Valor de face em BRL/), '100000.00')
   await user.type(screen.getByLabelText(/Prazo em meses/), '3')
 }
+
+test('navegação Câmbio usa sessão principal, breadcrumbs, back e preserva formulário operacional', async () => {
+  const operacoes = criarPorta()
+  const cambio = criarPortaCambio()
+  const user = await iniciar(operacoes, 'pt-BR', criarPortaExtrato(), criarPortaGestao(), criarPortaLotes(), cambio)
+  expect(cambio.historico).not.toHaveBeenCalled()
+  await navegarA(user, 'Simulação')
+  await user.type(screen.getByLabelText(/Valor de face em BRL/), '100,00')
+  await navegarA(user, 'Câmbio')
+  expect(await screen.findByRole('heading', { level: 1, name: 'Câmbio' })).toBeVisible()
+  expect(within(screen.getByRole('navigation', { name: 'Caminho de navegação' })).getByText('Administração')).toBeVisible()
+  await screen.findByRole('table', { name: 'Cotações cambiais' })
+  expect(cambio.historico).toHaveBeenCalledWith('jwt', { pagina: 0, tamanho: 20 }, expect.any(AbortSignal))
+  expect(operacoes.autenticar).toHaveBeenCalledTimes(1)
+  await act(async () => { window.history.back() })
+  await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: 'Simulação' })).toBeVisible())
+  expect(screen.getByLabelText(/Valor de face em BRL/)).toHaveValue(formatarMonetario('100.00', 'BRL', 'pt-BR'))
+}, 15000)
 
 test('aguarda 500 ms após a última edição antes de simular', async () => {
   const porta = criarPorta()
@@ -273,6 +294,7 @@ test('cadastra cedente e permite nova tentativa de simulação indisponível', a
     gestaoUsuarios={criarPortaGestao()}
     extrato={criarPortaExtrato()}
     lotes={criarPortaLotes()}
+    cambio={criarPortaCambio()}
     locale="en-US"
     fusoHorario="America/Sao_Paulo"
   /></ThemeProvider>)

@@ -16,6 +16,8 @@ import { formatarEntradaMonetaria, formatarMonetario, formatarPercentual, format
 import { caixaAscii, editarCnpj, erroDocumento, erroTipoDocumento } from '../dominio/documentoCedente'
 import type { PortaLotes } from '../aplicacao/lotes'
 import { PaginaImportacaoLote } from './PaginaImportacaoLote'
+import type { PortaCambio } from '../aplicacao/cambio'
+import { PaginaCambio } from './PaginaCambio'
 
 const grade = { display: 'grid', gap: 2, gridTemplateColumns: { xs: 'minmax(0, 1fr)', sm: 'repeat(2, minmax(0, 1fr))' } }
 const modalidades = [
@@ -24,9 +26,9 @@ const modalidades = [
 ]
 const moedas = [{ valor: 'BRL', rotulo: 'BRL' }, { valor: 'USD', rotulo: 'USD' }]
 
-type Props = { operacoes: PortaOperacoes; gestaoUsuarios: PortaGestaoUsuarios; extrato: PortaExtrato; lotes: PortaLotes; locale: string; fusoHorario?: string }
+type Props = { operacoes: PortaOperacoes; gestaoUsuarios: PortaGestaoUsuarios; extrato: PortaExtrato; lotes: PortaLotes; cambio: PortaCambio; locale: string; fusoHorario?: string }
 
-export function Aplicacao({ operacoes, gestaoUsuarios, extrato, lotes, locale, fusoHorario }: Props) {
+export function Aplicacao({ operacoes, gestaoUsuarios, extrato, lotes, cambio, locale, fusoHorario }: Props) {
   const [sessao, setSessao] = useState<Sessao | null>(null)
   const [email, setEmail] = useState('')
   const [identidade, setIdentidade] = useState('')
@@ -40,6 +42,8 @@ export function Aplicacao({ operacoes, gestaoUsuarios, extrato, lotes, locale, f
   const [operacaoPendente, setOperacaoPendente] = useState(false)
   const [loteEmCurso, setLoteEmCurso] = useState(false)
   const [lotePendente, setLotePendente] = useState(false)
+  const [cambioEmCurso, setCambioEmCurso] = useState(false)
+  const [cambioPendente, setCambioPendente] = useState(false)
   const [confirmarSaida, setConfirmarSaida] = useState(false)
 
   useEffect(() => {
@@ -57,14 +61,14 @@ export function Aplicacao({ operacoes, gestaoUsuarios, extrato, lotes, locale, f
   }, [sessao])
 
   useEffect(() => {
-    if (!operacaoEmCurso && !operacaoPendente && !loteEmCurso && !lotePendente) return
+    if (!operacaoEmCurso && !operacaoPendente && !loteEmCurso && !lotePendente && !cambioEmCurso && !cambioPendente) return
     function prevenirDescarte(evento: BeforeUnloadEvent) {
       evento.preventDefault()
       evento.returnValue = ''
     }
     window.addEventListener('beforeunload', prevenirDescarte)
     return () => window.removeEventListener('beforeunload', prevenirDescarte)
-  }, [operacaoEmCurso, operacaoPendente, loteEmCurso, lotePendente])
+  }, [operacaoEmCurso, operacaoPendente, loteEmCurso, lotePendente, cambioEmCurso, cambioPendente])
 
   const navegar = useCallback((destino: PaginaOperacional) => {
     const paginaPermitida = destino === 'usuarios' && usuariosVisiveis === false ? 'cedentes' : destino
@@ -119,18 +123,20 @@ export function Aplicacao({ operacoes, gestaoUsuarios, extrato, lotes, locale, f
     setOperacaoPendente(false)
     setLoteEmCurso(false)
     setLotePendente(false)
+    setCambioEmCurso(false)
+    setCambioPendente(false)
     setConfirmarSaida(false)
     navegar('cedentes')
   }, [navegar])
 
   const solicitarSaida = useCallback(() => {
-    if (operacaoEmCurso || loteEmCurso) return
-    if (operacaoPendente || lotePendente) {
+    if (operacaoEmCurso || loteEmCurso || cambioEmCurso) return
+    if (operacaoPendente || lotePendente || cambioPendente) {
       setConfirmarSaida(true)
       return
     }
     sair()
-  }, [operacaoEmCurso, operacaoPendente, loteEmCurso, lotePendente, sair])
+  }, [operacaoEmCurso, operacaoPendente, loteEmCurso, lotePendente, cambioEmCurso, cambioPendente, sair])
 
   const tratarErro = useCallback((falha: unknown) => {
     if (falha instanceof ErroOperacao && falha.status === 401) expirarSessao()
@@ -160,16 +166,16 @@ export function Aplicacao({ operacoes, gestaoUsuarios, extrato, lotes, locale, f
         <LayoutOperacional
           pagina={pagina}
           usuariosVisiveis={usuariosVisiveis === true}
-          sairDesabilitado={operacaoEmCurso || loteEmCurso}
+          sairDesabilitado={operacaoEmCurso || loteEmCurso || cambioEmCurso}
           aoNavegar={navegar}
           aoSair={solicitarSaida}
         >
-          {(operacaoPendente || lotePendente) && (
+          {(operacaoPendente || lotePendente || cambioPendente) && (
             <Dialog open={confirmarSaida} onClose={() => setConfirmarSaida(false)} aria-labelledby="confirmar-saida-titulo">
               <DialogTitle id="confirmar-saida-titulo">Sair com operação pendente?</DialogTitle>
               <DialogContent>
                 <DialogContentText>
-                  Sair encerra a sessão e descarta a intenção ou o bloqueio mantido apenas em memória. Antes de iniciar outro cadastro, consulte os recebíveis no servidor e confirme o resultado da operação.
+                  Sair encerra a sessão e descarta a intenção ou o bloqueio mantido apenas em memória. Antes de iniciar outro cadastro, consulte os recebíveis no servidor e confirme o resultado da operação. Para câmbio, confira também os históricos de cotações e autorizações.
                 </DialogContentText>
               </DialogContent>
               <DialogActions>
@@ -201,6 +207,11 @@ export function Aplicacao({ operacoes, gestaoUsuarios, extrato, lotes, locale, f
               aoAtualizarOperacaoPendente={setLotePendente}
               bloqueadoExternamente={operacaoEmCurso || operacaoPendente}
             />
+          </Box>
+          <Box hidden={pagina !== 'cambio'}>
+            <PaginaCambio porta={cambio} usuarios={gestaoUsuarios} token={sessao?.token ?? null}
+              ativa={pagina === 'cambio'} locale={locale} aoExpirar={expirarSessao}
+              aoAtualizarOperacaoEmCurso={setCambioEmCurso} aoAtualizarOperacaoPendente={setCambioPendente} />
           </Box>
           {sessao && <Box hidden={pagina !== 'extrato'}>
             <PaginaExtrato

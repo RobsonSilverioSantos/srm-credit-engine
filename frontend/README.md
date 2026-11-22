@@ -22,8 +22,8 @@ Em desenvolvimento, o Vite encaminha `/api` e `/bff` para
 origem do frontend, utilizando HTTPS e um proxy reverso.
 
 Após autenticar na página principal, utilize o menu responsivo e os
-breadcrumbs para navegar entre Cedentes, Simulação, Liquidação, Extrato e
-Usuários. As rotas operacionais ficam no fragmento (`/#/simulacao`, por
+breadcrumbs para navegar entre Cedentes, Simulação, Liquidação, Extrato,
+Usuários e Câmbio. As rotas operacionais ficam no fragmento (`/#/simulacao`, por
 exemplo), portanto podem ser abertas diretamente ou atualizadas sem exigir
 fallback de rota no Nginx. A navegação mantém o estado em memória. Atualizar ou
 fechar a página pede confirmação do navegador quando há solicitação em curso ou
@@ -66,6 +66,43 @@ Enquanto o campo está em edição, o texto permanece selecionável e sem másca
 monetária; ao sair do campo, uma entrada válida é exibida como moeda localizada.
 O foco restaura o texto editável e a posição do cursor. Simulação e liquidação
 continuam enviando ao BFF somente strings decimais canônicas.
+
+## Administração de câmbio (F06)
+
+Em **Administração / Câmbio** (`/#/cambio`), os perfis autenticados consultam
+cotações por fonte e seleções/autorizações, com paginação independente no
+servidor. O contrato B15 não possui filtro por período nem endpoint de fonte
+efetiva; o histórico não deve ser interpretado como garantia de elegibilidade.
+O backend determina a fonte e revalida o câmbio em cada operação financeira.
+
+MASTER/ADMIN podem cadastrar uma taxa MANUAL positiva em BRL por USD, com
+até 10 dígitos inteiros e 10 decimais, e justificativa obrigatória. A entrada
+aceita os separadores do idioma do navegador (pt-BR/en-US), preserva o texto
+durante a edição e formata agrupamentos ao sair do campo; envia somente
+`taxaBrlPorUsd` como string canônica e `justificativa`. A confirmação de cadastro
+**não autoriza o uso**. Escolha depois a cotação no histórico ou use a recém-criada,
+informe a justificativa de seleção e confirme **Autorizar uso da MANUAL**.
+
+O servidor fornece os instantes: a autorização MANUAL termina na próxima
+meia-noite exclusiva de `America/Sao_Paulo`. O aviso de prazo encerrado usa
+o relógio local apenas para apresentação, nunca para decidir elegibilidade.
+O retorno à PTAX exige ação e confirmação explícitas; não garante boletim
+elegível. **Sincronizar PTAX** consulta os sete dias anteriores sem alterar
+a seleção nem renovar boletins antigos. Não há edição, exclusão ou fallback
+PTAX/MANUAL/DEMO. OPERADOR não recebe ações administrativas nem visualiza
+autor/justificativa de auditoria.
+
+As escritas não possuem chave idempotente no contrato B15. Não há retry
+automático: rede, erro 5xx ou resposta inválida após POST bloqueiam novas
+escritas nesta sessão, inclusive após navegação ou renovação do JWT.
+Atualize os históricos e reconcilie o resultado antes de sair; o bloqueio não
+coordena outras abas nem sobrevive a recarregamento/saída confirmada.
+
+Além dos testes Vitest, após `npm run build`, execute
+`node scripts/verificar-cambio-browser.mjs` com Google Chrome disponível
+(`CHROME_BIN` pode indicar outro executável compatível). O script verifica
+390/1280px, navegação, foco/Escape, cadastro/autorização separados e RBAC
+com **BFF simulado**; não comprova integração real com backend/PostgreSQL.
 
 ## Identificação de cedentes (B14)
 
