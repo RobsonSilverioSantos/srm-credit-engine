@@ -1,15 +1,24 @@
 # B16 — API de importação de recebíveis em lote por arquivo
 
-**Status:** P1 — **liberada para iniciar somente após integração do PR documental de liberação à `develop`**. Cadastro atômico aprovado em 22/11/2026; [ADR-024](../adr/ADR-024-cadastro-atomico-lotes.md). A B17 permanece bloqueada por política de liquidação própria.  
+**Status:** P1 — **integrada em `develop` pelo [PR #71](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/71)** em 22/11/2026, merge `186786e27320e83700a81e3922c72d096cefcb86`. Cadastro atômico aprovado na [ADR-024](../adr/ADR-024-cadastro-atomico-lotes.md). A B17 permanece bloqueada por política de liquidação própria.
+
 **Issue:** [#63](https://github.com/RobsonSilverioSantos/srm-credit-engine/issues/63).  
 **Dependências técnicas:** B04, B08, B08-S01, B14 e B12 já integradas. Interação futura com B15 exige isolar o câmbio de aferição e evitar conflito entre migrations.  
-**Executor proposto:** agente `backend` em worktree exclusivo; `architect`, `qa` e `reviewer` como revisores. Frontend F08 só pode iniciar após integração e documentação do contrato B16.
+**Execução registrada:** agente backend em feature/worktree exclusivos, com revisão independente relatada no PR. Não reiniciar a B16. F08 continua bloqueada por B17, contratos homologados e nova liberação literal.
+
+## Reconciliação G02 — 22/11/2026
+
+O PR #71 integrou pré-validação CSV/XLSX sem persistência, confirmação atômica/idempotente API/BFF, OpenAPI e migration V6. Fontes implementadas: [controller](../../backend/app/src/main/kotlin/br/com/srm/creditengine/http/adaptador/entrada/LotesRecebiveisHttp.kt), [caso de uso](../../backend/aplicacao/src/main/kotlin/br/com/srm/creditengine/lotes/aplicacao/ServicoImportacaoLote.kt), [persistência](../../backend/app/src/main/kotlin/br/com/srm/creditengine/lotes/adaptador/saida/LotesJdbc.kt) e [testes PostgreSQL](../../backend/app/src/test/kotlin/br/com/srm/creditengine/lotes/ImportacaoLoteHttpPostgresTest.kt).
+
+**Evidência remota:** CI backend/PostgreSQL, frontend e Compose aprovada no PR #71; o agente relatou compilação/smokes locais parciais e impedimento de toolchain para concluir `clean check` local. A G02 não reexecutou esses testes. Os [scripts QA k6](../../qa/k6/b16/README.md) foram integrados pelo [PR #70](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/70), merge `9043732b86a4671bf7ea368e288bf68151205fdb`, mas **a execução real contra o backend continua pendente**. Cadastro concorrente não comprova controle otimista financeiro da B17.
+
+As seções abaixo preservam o escopo e os critérios redigidos no planejamento. Verbos no futuro e caixas desmarcadas não significam que B16 continua sem implementação, nem constituem evidência de testes; conferir o PR integrado e o [adendo G02 do AI_USAGE](../../AI_USAGE.md). Nenhuma regra financeira foi alterada por esta reconciliação.
 
 ## Motivação e enquadramento no enunciado
 
 O [enunciado original](../requisitos/ENUNCIADO_ORIGINAL_SRM_CREDIT_ENGINE_V2.md) descreve receber **um lote de recebíveis**, calcular o deságio e registrar uma transação auditável no contexto de negócio. Os requisitos técnicos explícitos exigem motor, API REST, liquidação ACID/idempotente e extrato, mas **não estabelecem obrigatoriedade de upload CSV/XLSX**. Esta tarefa amplia a cobertura operacional sem declarar uma exigência técnica não formulada.
 
-A solução atual aceita cadastro de recebíveis individualmente e operações de liquidação individuais. **Importar um lote não deve equivaler a liquidar títulos automaticamente**. A fronteira entre importação e liquidação financeira é relevante para autorização, snapshots, idempotência e integridade. A liquidação explícita posterior de um lote será tratada na [B17](B17_LIQUIDACAO_LOTE_CONCORRENCIA.md), [issue #65](https://github.com/RobsonSilverioSantos/srm-credit-engine/issues/65), com concorrência e semântica transacional próprias.
+Antes da B16, a solução aceitava apenas cadastro e liquidação individuais. O cadastro em lote foi integrado no PR #71; **importar um lote não equivale a liquidar títulos automaticamente**. A fronteira entre importação e liquidação financeira é relevante para autorização, snapshots, idempotência e integridade. A liquidação explícita posterior de um lote será tratada na [B17](B17_LIQUIDACAO_LOTE_CONCORRENCIA.md), [issue #65](https://github.com/RobsonSilverioSantos/srm-credit-engine/issues/65), com concorrência e semântica transacional próprias.
 
 ## Fluxo proposto — duas fases
 
@@ -65,7 +74,7 @@ A validação do Lote B após cadastro e liquidação do Lote A deve acusar **qu
 
 **Separação da simulação cambial:** ausência de cotação USD elegível pode impedir a **simulação** de valores, mas **não invalida isoladamente o cadastro** de um recebível BRL com moeda de pagamento futura ainda não escolhida no domínio. Retornar o problema de simulação como alerta distinto do erro de cadastro; a B17 exigirá 100% das simulações válidas antes da confirmação da **liquidação**, revalidando taxas e câmbio. Não associar cotação mockada com obrigação financeira permanente.
 
-**Início pelos agentes:** somente depois do merge da presente liberação, quando `origin/develop:TASKS.md` contiver literalmente `Liberada para iniciar` para B16 e todas as dependências estiverem integradas. A implementação deve respeitar a ADR-024, sem alterar regras financeiras existentes. A B17 ainda requer decisão humana independente sobre liquidação parcial versus atômica.
+**Gate histórico da B16:** a liberação documental ocorreu no PR #69 e a implementação foi integrada no PR #71. O gate de início já foi consumido; não abrir nova feature B16 a partir deste documento. A B17 ainda requer decisão humana independente sobre liquidação parcial versus atômica e nova liberação literal em `origin/develop:TASKS.md`.
 
 A liquidação de lote é a tarefa **B17**, planejada de forma independente. Exige confirmação distinta, regras de taxa/câmbio, política de atomicidade e falha parcial, idempotência por título/lote e testes concorrentes sobre **o mesmo recebível**. A política da B16 para cadastro não determina a política da B17 para liquidação. Não implementar liquidação automática por inferência a partir da palavra "lote" do enunciado.
 
