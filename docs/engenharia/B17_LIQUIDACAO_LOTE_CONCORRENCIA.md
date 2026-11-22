@@ -21,6 +21,19 @@ A importação e o cadastro de recebíveis (B16) **não** realizam liquidação 
 
 O endpoint, formato exato de payload/resposta e semântica de códigos HTTP são **contratos propostos**, não implementados. O executor deve submetê-los à revisão humana antes de codificar.
 
+## Gate de revisão de **todas** as simulações antes da liquidação
+
+**Decisão de UX aprovada em 22/11/2026:** o fluxo apresenta a prévia financeira **de todos os itens do lote**, com valor presente, deságio, moeda, taxa base, spread e cotação/fonte quando aplicável, e um resumo por moeda. O botão **`Liquidar lote`** somente pode ser habilitado após retorno completo e válido das simulações, sem erros de dado, cedente, elegibilidade, cotação ou título já liquidado. Uma prévia parcial/falha **não autoriza confirmação**. Mostrar no UI contagem conferida, total de itens e aviso de que a prévia não reserva câmbio/taxa.
+
+A confirmação exige **etapa deliberada adicional** (modal contendo resumo e quantidade, com ação `Confirmar liquidação`). O backend **revalida todas as condições no momento efetivo da escrita**; a verificação da UI não substitui autorização, controle de versão nem transação. Se taxa/câmbio/estado variar entre prévia e confirmação, aplicar a política financeira aprovada: devolver erro/novo snapshot para reconfirmação ou resultado por item conforme a semântica atômica/parcial homologada; **não liquidar silenciosamente com preço diferente**. O request deve identificar uma versão/revisão da prévia ou hash canônico para detectar prévia obsoleta, sujeito ao desenho definitivo do contrato.
+
+**Separação:** a aprovação do botão e da conferência total **não escolhe** se a transação do lote será tudo-ou-nada ou parcial por recebível. Essa decisão permanece pendente.
+
+### Arquivos de aferição de duplicidades
+
+Os [CSV A e B](../validacao/lotes/README.md) possuem 200 linhas cada e quatro referências de negócio repetidas entre arquivos: duas nas mesmas posições e duas em ordem diferente. Após liquidar integralmente A, pré-validar B deve acusar quatro títulos `JA_LIQUIDADO` pela relação persistida `(organizacao, referenciaExterna)`; nenhum dos quatro pode criar uma segunda liquidação. Para cadastrar os outros 196 no modelo tudo-ou-nada, corrigir/remover previamente as quatro linhas rejeitadas. **Esse é um teste de duplicidade sequencial, não o teste concorrente.** A prova do lock otimista é feita disparando duas requisições financeiras diferentes simultaneamente sobre o mesmo `recebivelId`, com chaves distintas.
+
+
 ## Semântica financeira a decidir antes da implementação
 
 | Alternativa | Comportamento em conflito de 1 título | Benefício | Custo e risco |
@@ -32,6 +45,7 @@ O endpoint, formato exato de payload/resposta e semântica de códigos HTTP são
 
 ## Testes de concorrência e idempotência obrigatórios
 
+- **Antes do botão de liquidação:** simulações de 100% dos itens presentes e válidas; qualquer linha inválida/sem câmbio/duplicada impede confirmação; conferir contagem, hash de prévia e revalidação no backend em testes.
 - **Duas requisições diferentes, mesmo recebível:** usar barreira/latch em teste de integração PostgreSQL real para disparo simultâneo com **chaves diferentes**. O resultado deve ter **uma liquidação confirmada**, uma operação rejeitada por conflito de versão/estado (`409` quando contrato de API aplicável), uma trilha auditável, nenhuma dupla liquidação; conferir tabelas, não apenas respostas HTTP.
 - **Replay do mesmo comando:** mesma chave de idempotência **e payload idêntico** devolvem resposta já persistida, sem novo lançamento; mesma chave com payload diferente → `409`.
 - **Sobreposição de lotes:** um recebível não deve ser liquidado duas vezes mesmo que apareça em comandos de lote concorrentes, nem por reenvio/duplo clique da UI.
