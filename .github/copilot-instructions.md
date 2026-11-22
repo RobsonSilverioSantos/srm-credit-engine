@@ -1,6 +1,6 @@
-# Instruções gerais — SRM Credit Engine (novo repositório)
+# Instruções gerais — SRM Credit Engine
 
-**Prioridade:** enunciado original > SPEC.md > DECISIONS.md > modelos e migrations > TASKS.md (tarefas e dependências). Novo repositório: nenhum código ou teste anterior é herdado por presunção.
+**Prioridade:** enunciado original > SPEC.md > DECISIONS.md > modelos e migrations > TASKS.md (tarefas e dependências). Evidências do ciclo anterior não comprovam a implementação vigente; consulte o histórico em `AI_USAGE.md`.
 
 ## Arquitetura e domínio
 
@@ -9,7 +9,7 @@
 - Modelo em pt-BR: `Organizacao`/`organizacaoId`/`organizacao_id` define o escopo de autenticação, autorização e isolamento. `Cedente` é a entidade de negócio que cede o recebível, vinculada à organização. Não confundir cedente com organização nem criar entidade adicional para a parte compradora neste MVP.
 - Auth local Spring Security/BCrypt + token assinado, segredos em ambiente, organização **somente da identidade validada**; nenhum Keycloak ou federação no MVP.
 - `BigDecimal`, HALF_EVEN e golden cases C1–C3; spreads e taxas em fracões, JSON como strings. Estratégias separadas da persistência.
-- Liquidação ACID, idempotência `(organizacaoId,tipoOperacao,chave)` + hash, `@Version` no recebível, UNIQUE adicional, rollback e conflito 409; sem pessimistic lock explícito.
+- Liquidação ACID e idempotência `(organizacaoId,tipoOperacao,chave)` + hash. O controle otimista usa JDBC e `UPDATE` condicional por organização, ID, versão esperada e estado `DISPONIVEL`. Exatamente uma linha atualizada permite prosseguir; zero linhas gera conflito HTTP 409. Preservar `UNIQUE` por recebível, rollback integral e ausência de `SELECT FOR UPDATE` explícito no recebível ([ADR-010](../docs/adr/ADR-010-controle-otimista-sql-versionado.md)).
 - FX mockado com corte UTC, snapshot e validade 30m configurável, sem chamada HTTP dentro da transação de liquidação.
 - API `/api/v1/*` e BFF `/bff/v1/*` chamam os mesmos casos de uso; simulação **pré-cadastro** sem persistência. Extrato filtrado e paginado no servidor.
 - UI React + Material UI Core, design tokens/tema e componentes descritos em docs/arquitetura/FRONTEND.md; sem bibliotecas premium nem cálculo monetário no navegador.
