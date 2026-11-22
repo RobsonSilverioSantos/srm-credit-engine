@@ -39,10 +39,19 @@ referenciaExterna;cedenteId;modalidade;valorFaceBrl;prazoMeses;vencimento;moedaP
 
 Campos adicionais, como número documental do recebível ou origem bancária, exigem justificativa e migração compatível, não inclusão silenciosa.
 
+## Cenário demonstrativo — dois arquivos de 200 linhas
+
+Os arquivos [Lote A](../validacao/lotes/SRM_LOTE_A_200_RECEBIVEIS.csv) e [Lote B](../validacao/lotes/SRM_LOTE_B_200_RECEBIVEIS_COM_4_REPETIDOS.csv) contêm 200 linhas cada, com quatro referências idênticas **entre os dois arquivos** (duas nas mesmas posições e duas realocadas). Em conjunto, há **396 referências de negócio distintas**. O teste deve ser reprodutível com o mesmo cedente e a mesma organização, desde que o UUID do arquivo exista no ambiente; o UUID é derivado de captura de demonstração anterior e não garante persistência em bancos reiniciados.
+
+**Regra de identidade indispensável:** `referenciaExterna` deve ser única e consultável **por organização em todos os lotes**, não somente no mesmo `idLote`. Persistir o vínculo estável `(organizacao_id, referencia_externa) → recebivel_id` e proteger por constraint/índice UNIQUE no PostgreSQL. O backend deve distinguir `NOVO`, `JA_CADASTRADO` e `JA_LIQUIDADO` e devolver a correspondência de linha/identidade com motivo seguro. **Não considerar igualdade de valor, prazo, modalidade ou moeda prova de título duplicado:** títulos diferentes podem ter termos financeiros idênticos. Não aceitar nova referência para burlar identidade de um recebível que tenha identificador documental de negócio distinto; evoluir regra quando existir documento de título específico.
+
+A validação do Lote B após cadastro e liquidação do Lote A deve acusar **quatro `JA_LIQUIDADO`**, sem nova gravação desses títulos. Na política de cadastro tudo-ou-nada proposta, o lote B não pode ser confirmado enquanto contiver duplicidades; o operador corrige ou exclui as linhas apontadas, confirma somente as 196 novas e pode então seguir para a liquidação B17 com nova confirmação. **Não ignorar duplicidades automaticamente** nem declarar que um processamento sequencial desses arquivos constitui teste de concorrência; a corrida controlada sobre o mesmo `recebivel_id` exige teste separado na B17.
+
+
 ## Integridade, segurança e operação
 
 - Tamanho inicial **proposto**: no máximo 200 linhas e 2 MiB, configurável e sujeito a confirmação; rejeitar arquivos acima do limite antes de consumir integralmente em memória. Retornar `413` para tamanho e erros `400/422` estruturados para formato/linhas, preservando `401/403/409/503` de acordo com causa.
-- Identificar repetição dentro do arquivo e contra registros persistidos; verificar usuário, tenant e cedente em **todas** as linhas. Não permitir `organizacaoId` livre no payload nem inserir em lote linhas de outros tenants.
+- Identificar repetição dentro do arquivo **e entre lotes preexistentes por identidade de negócio persistida e única por organização**; distinguir `JA_CADASTRADO` de `JA_LIQUIDADO`, verificar usuário, tenant e cedente em **todas** as linhas. Não permitir `organizacaoId` livre no payload nem inserir em lote linhas de outros tenants.
 - Reutilizar `BigDecimal`, Strategy, arredondamento `HALF_EVEN`, golden cases C1–C3 e regras de elegibilidade de taxas. Cotação da **prévia** não é compromisso de liquidação futura. Compatibilidade com B15 requer fonte/momento explícitos na simulação, nunca fallback oculto.
 - Abrir nova migration Flyway com **próxima versão disponível na data do desenvolvimento**, considerando B14 V5 e uma possível migration B15 concorrente. Registrar lote, referência, identidade por organização, hash, chave idempotente, autor, carimbo UTC, estado e vínculos dos recebíveis sem reescrever V1–V5. Especificar unicidade e travas para evitar importações simultâneas duplicadas.
 - Não logar conteúdo completo, dados fiscais, JWT ou planilhas; relatar problemas sem PII desnecessária. Exportações CSV devem neutralizar fórmulas. XLSX exige defesa contra ZIP bombs, fórmulas e referências externas. Nunca interpretar célula de fórmula como valor confiável.
@@ -53,7 +62,7 @@ Campos adicionais, como número documental do recebível ou origem bancária, ex
 Antes de alterar `SPEC.md`, `DECISIONS.md` ou iniciar a B16, o responsável deve aprovar expressamente:
 1. **Resultado do upload:** prévia + confirmação de **cadastro**, sem liquidação automática, ou outra operação.
 2. **Atomicidade:** proposta de **tudo-ou-nada** versus aceitação parcial com erros por linha.
-3. **Duplicidade e replay:** semântica de `referenciaExterna`, unicidade por organização, token/chave idempotente e retenção de status.
+3. **Duplicidade e replay:** `referenciaExterna` globalmente única por organização **entre lotes**, apontando ao mesmo recebível; distinguir já cadastrado/já liquidado, semântica de chave idempotente e retenção de status.
 4. **Escopo e limites:** CSV no primeiro incremento; XLSX na mesma entrega ou posterior; limite de linhas/tamanho e política para USD sem cotação elegível.
 
 A liquidação de lote é a tarefa **B17**, planejada de forma independente. Exige confirmação distinta, regras de taxa/câmbio, política de atomicidade e falha parcial, idempotência por título/lote e testes concorrentes sobre **o mesmo recebível**. A política da B16 para cadastro não determina a política da B17 para liquidação. Não implementar liquidação automática por inferência a partir da palavra "lote" do enunciado.
