@@ -80,6 +80,8 @@ jobs:
         run: npm run lint
       - name: Testes
         run: npm test
+      - name: Modelos CSV e XLSX reproduzíveis
+        run: python3 -B -m unittest discover -s scripts -p 'test_*.py'
       - name: Build
         run: npm run build
 

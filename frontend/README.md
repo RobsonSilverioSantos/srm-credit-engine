@@ -88,6 +88,45 @@ continuam selecionáveis e aparecem como desconhecidos. Erros 400 orientam
 conferir os campos; 409 informa possível duplicidade ou outro conflito, sem
 presumir sua causa.
 
+## Importação por CNPJ ou UUID (F09)
+
+Em **Operações / Importação em lote**, baixe o modelo CSV UTF-8 (`;`) ou
+XLSX por CNPJ brasileiro (`cedenteDocumento`). Os modelos UUID (`cedenteId`)
+continuam disponíveis nos endereços originais, inclusive para cedentes
+estrangeiros. Use somente um dos cabeçalhos completos, sem misturá-los.
+Substitua o marcador pelo documento de um cedente ativo já cadastrado.
+Mantenha documentos numéricos/alfanuméricos como **texto**, inclusive ao
+importar CSV em uma planilha, para não perder zeros iniciais. XLSX usa células
+textuais, sem fórmulas, com formato Texto explícito na coluna CNPJ.
+
+`referenciaExterna` identifica o recebível de origem, não a organização.
+O servidor obtém a organização da sessão JWT e resolve o CNPJ para UUID;
+o navegador apenas envia o arquivo e reenvia o comando UUID canônico retornado
+na pré-validação. Documentos inválidos, indisponíveis ou ambíguos aparecem
+como erros por linha e bloqueiam o cadastro inteiro. Nenhum lookup de CNPJ
+ou cálculo financeiro é feito no navegador.
+
+Cadastro B16 e liquidação B17 mantêm confirmações separadas e chaves
+idempotentes independentes, somente em memória. O cadastro não liquida.
+As massas A/B de 200 linhas continuam UUID: para testar por CNPJ, substitua
+a segunda coluna e seu cabeçalho, preservando as referências e os quatro
+repetidos. Após liquidar A, B deve mostrar os quatro `JA_LIQUIDADO`.
+
+Reproduza os modelos com `python3 frontend/scripts/gerar-modelos-lote.py`
+na raiz. Verifique CSV/XLSX e reprodução determinística com
+`python3 -B -m unittest discover -s frontend/scripts -p 'test_*.py'`.
+O teste de abertura/salvamento de CNPJs numéricos, alfanuméricos e mascarados
+no Calc é executado quando LibreOffice estiver instalado; caso contrário,
+é registrado como ignorado, sem substituir a verificação de formato textual.
+Para verificar a UI de produção em Chrome headless, execute em `frontend/`
+`npm run build && node scripts/verificar-importacao-browser.mjs`.
+Requer Chrome e Python 3 (`CHROME_BIN` permite indicar o executável); o script cria e
+encerra seu próprio preview/perfil temporário, testa desktop/mobile, foco,
+formatos preenchidos e A/B 200+200 convertidos para CNPJ, com referências
+preservadas. As respostas BFF correspondem às linhas dos arquivos enviados,
+mas são simuladas (inclusive os preços): não é evidência de
+resolução documental ou transação PostgreSQL real.
+
 ## Administração de usuários (F04)
 
 Depois de autenticar na tela principal, MASTER e ADMIN podem administrar os
