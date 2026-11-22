@@ -5,6 +5,7 @@ import { ThemeProvider } from '@mui/material/styles'
 import { bff } from './infraestrutura/bff'
 import { bffUsuarios } from './infraestrutura/bffUsuarios'
 import { bffLotes } from './infraestrutura/bffLotes'
+import { bffCambio } from './infraestrutura/bffCambio'
 import { fusoHorarioNavegador, idiomaNavegador } from './infraestrutura/idiomaNavegador'
 import { Aplicacao } from './apresentacao/Aplicacao'
 import { bffExtrato } from './infraestrutura/bffExtrato'
@@ -17,7 +18,7 @@ createRoot(raiz).render(
   <StrictMode>
     <ThemeProvider theme={tema}>
       <CssBaseline />
-      <Aplicacao operacoes={bff} gestaoUsuarios={bffUsuarios} extrato={bffExtrato} lotes={bffLotes} locale={idiomaNavegador()} fusoHorario={fusoHorarioNavegador()} />
+      <Aplicacao operacoes={bff} gestaoUsuarios={bffUsuarios} extrato={bffExtrato} lotes={bffLotes} cambio={bffCambio} locale={idiomaNavegador()} fusoHorario={fusoHorarioNavegador()} />
     </ThemeProvider>
   </StrictMode>,
 )

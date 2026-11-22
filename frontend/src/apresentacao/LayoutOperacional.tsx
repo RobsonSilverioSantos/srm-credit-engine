@@ -22,6 +22,7 @@ const paginas: readonly { id: PaginaOperacional; rotulo: string; grupo: string }
   { id: 'importacao', rotulo: 'Importação em lote', grupo: 'Operações' },
   { id: 'extrato', rotulo: 'Extrato', grupo: 'Relatórios' },
   { id: 'usuarios', rotulo: 'Usuários', grupo: 'Administração' },
+  { id: 'cambio', rotulo: 'Câmbio', grupo: 'Administração' },
 ]
 
 export function LayoutOperacional({ children, pagina, usuariosVisiveis, sairDesabilitado, aoNavegar, aoSair }: Props) {
