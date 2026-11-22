@@ -124,15 +124,21 @@ export default function () {
     respostas.filter((r) => r.status === 409).length === 1, 'corrida HTTP: um cadastro integral e um conflito');
   const vencedor = respostas.findIndex((r) => r.status === 201);
   const perdedor = 1 - vencedor;
-  const cadastro = conferirCadastro(respostas[vencedor], refs[vencedor], 'lote vencedor');
+  conferirCadastro(respostas[vencedor], refs[vencedor], 'lote vencedor');
 
   // A união A/B revela 200 identidades cadastradas; nenhuma das 196 exclusivas
   // do perdedor pode ter persistido. As quatro compartilhadas contam uma só vez.
   previa(c, lotes[vencedor], 'vencedor após corrida', refs[vencedor]);
   previa(c, lotes[perdedor], 'perdedor após corrida', refs[vencedor]);
 
-  const replay = conferirCadastro(confirmar(requests[vencedor]), refs[vencedor], 'replay do vencedor');
-  exigir(JSON.stringify(replay) === JSON.stringify(cadastro), 'mesma chave e comando devolvem o resultado cadastral original');
+  const respostaReplay = confirmar(requests[vencedor]);
+  conferirCadastro(respostaReplay, refs[vencedor], 'replay do vencedor');
+  // A ordem das propriedades retornadas por res.json() pode variar no k6;
+  // comparar os corpos HTTP originais evita falso negativo na idempotência.
+  exigir(typeof respostas[vencedor].body === 'string' &&
+    typeof respostaReplay.body === 'string' &&
+    respostaReplay.body === respostas[vencedor].body,
+  'mesma chave e comando devolvem o corpo HTTP original');
 
   const corrigido = lotes[perdedor].filter((linha) => !refs[vencedor].has(linha[0]));
   const refsCorrigidas = new Set(corrigido.map((linha) => linha[0]));
