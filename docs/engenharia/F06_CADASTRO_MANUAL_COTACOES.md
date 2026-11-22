@@ -1,47 +1,58 @@
-# F06 — Cadastro manual e consulta administrativa de cotações
+# F06 — Interface administrativa de câmbio e histórico de cotações
 
-**Situação:** planejada (P1), implementação não iniciada.  
-**Rastreamento:** [issue #55](https://github.com/RobsonSilverioSantos/srm-credit-engine/issues/55); `TASKS.md`, F06.  
-**Executor:** agente `frontend`; revisores `architect`, `qa`, `reviewer`.  
-**Gate:** **B15 e F05 integradas em `origin/develop`** e situação literal da F06 **`Liberada para iniciar`** na mesma branch. Como F05 define o menu e B15 os contratos, não iniciar a F06 antes de ambos.
+**Situação:** B15 integrada em `develop` pelo [PR #90](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/90), F05 integrada pelo PR #61. **F06 ainda não implementada; início somente após merge humano do PR documental de liberação e presença de `Liberada para iniciar` na linha F06 de `origin/develop:TASKS.md`.**
+**Rastreamento:** [issue #55](https://github.com/RobsonSilverioSantos/srm-credit-engine/issues/55); `TASKS.md`, F06.
+**Executor:** `frontend`; revisões `architect`, `qa`, `reviewer` em worktree própria.
+**Referências:** [ADR-026](../adr/ADR-026-ptax-96h-manual-diaria.md), [contrato B15 integrado](../../backend/docs/B15_CAMBIO.md), `CambioHttp.kt`, `CotacaoCambialResposta.kt`, `SelecaoFonteCambial.kt`, documentação F05.
 
-## 1. Estado atual e problema
+## 1. Escopo e regras aprovadas
 
-O caso de uso Kotlin `TaxasPorta.registrarCotacao(taxaBrlPorUsd, vigenteEm)` já permite criar uma cotação na aplicação, mas **não há endpoint REST/BFF nem formulário administrativo de câmbio**. O bootstrap DEMO insere cotações fictícias diretamente no banco; isso não é entrada manual para operadores.
+A F06 cria a seção administrativa **Câmbio**, com histórico de cotações, histórico de seleções/autorização, cadastro de cotação MANUAL, autorização explícita do uso MANUAL, retorno explícito à PTAX e sincronização administrativa de PTAX. Reutilizar menu responsivo, breadcrumbs, capacidades do usuário e sessão JWT **somente em memória** da F05; manter a arquitetura hexagonal de frontend (domínio, aplicação e infraestrutura/adaptadores).
 
-A B15 passa a fornecer integração PTAX de fechamento **e** entrada manual segura, com proveniência e políticas distintas; a F05 reorganiza a navegação principal. A F06 acrescenta a UI após os contratos desses PRs estarem estáveis.
+- Fonte padrão **BCB_PTAX**, boletim Fechamento **VENDA**, último conhecido até **96 horas corridas inclusive** desde referência oficial. Feriados/fins de semana não prorrogam esse limite.
+- MANUAL exige **duas ações distintas**: cadastrar cotação e, depois, selecionar/autorizá-la para a organização. Apenas `MASTER`/`ADMIN` podem realizar ambas; `OPERADOR` somente consulta e utiliza a seleção autorizada, sem visualizar autoria/justificativa de auditoria.
+- A cotação MANUAL é elegível **desde a autorização até a próxima meia-noite exclusiva de `America/Sao_Paulo`**; o servidor determina instantes. Cotação cadastrada não fica automaticamente ativa. Expiração não provoca retorno automático à PTAX; indicar situação sem propor fallback fictício.
+- DEMO é exclusivamente modo de aferição/testes. **Nunca oferecer** alternativa DEMO como contingência administrativa, nem selecionar a fonte no frontend por ordenação de timestamps; a autoridade sobre fonte efetiva é o backend.
+- Histórico somente inclusão; nenhuma UI para editar, excluir ou retroagir cotação/seleção. Para corrigir, cadastrar nova versão e autorizar explicitamente. Uma cotação MANUAL não pode ser reutilizada em nova autorização.
 
-**Política B15 aprovada em 22/11/2026, ainda não implementada (ADR-026):** modo padrão `BCB_PTAX` Fechamento VENDA, último boletim elegível até **96h corridas inclusive**; exceção `MANUAL` requer cadastro e ativação/autorização explícita por MASTER/ADMIN da organização, elegível da autorização até **00:00 exclusive do dia seguinte no fuso `America/Sao_Paulo`**. O OPERADOR só pode consumir a exceção já autorizada. Nunca substituir PTAX por MANUAL ou DEMO automaticamente. A F06 deve exibir em tela fonte efetiva, expiração, escopo de autorização e estado ativo/inativo conforme contratos B15 reais; não arbitrar origem por conta própria.
+## 2. Contratos B15 existentes — não inventar endpoints
 
-## 2. Escopo da interface
+Prefixo BFF `/bff/v1/cotacoes-cambiais`, disponível também sob `/api/v1/cotacoes-cambiais`, com JWT autenticado, organização derivada da identidade. Os nomes abaixo são **contratos já integrados**, não propostas:
 
-- **Menu "Câmbio"** visível apenas aos perfis com capacidade de visualizar; área `Câmbio / Histórico` e `Câmbio / Nova cotação manual` com breadcrumbs responsivos. Evitar repetir a lógica de menu/layout da F05.
-- Formulário somente para usuários autorizados a cadastrar/ativar, segundo capacidades obtidas do backend e verificadas em todo endpoint: política aprovada `MASTER` e `ADMIN`; `OPERADOR` não cadastra nem ativa, somente pode consumir cotação autorizada.
-- Campos: par BRL/USD fixo no MVP, **taxa BRL por 1 USD** (ex.: `5,4321`) como string decimal positiva e escala compatível com o banco; vigência/registro e autorização com instante confiável, sem agendamento futuro ou vigência retroativa; validade até **meia-noite exclusiva do dia seguinte** em `America/Sao_Paulo`, segundo contrato B15; **justificativa obrigatória**. Registro e **ativação explícita** são ações distintas de negócio, ainda que realizadas pelo mesmo MASTER/ADMIN. Não confundir fonte `MANUAL` com `BCB_PTAX` ou `DEMO`. Exibir fonte e definição de compra/venda quando aplicável.
-- Usar campo numérico localizado no formato pt-BR/en-US e converter apenas para **string decimal canônica**; nunca calcular taxas com `Number`/`parseFloat`. Suportar colagem, seleção, teclado móvel, validações e mensagens acessíveis.
-- Exibir resumo e solicitar **confirmação explícita** antes de registrar a cotação; desabilitar reenvio durante o processamento, apresentar o ID da versão criada e o momento de vigência.
-- Histórico paginado/filtrado por período, origem e situação; mostrar identificador, taxa, origem, boletim/lado para BCB, autor da inclusão MANUAL, justificativa, vigência, instante de registro e validade; distinguir cotação elegível, vencida e não publicada.
-- Histórico **somente leitura**: não editar nem excluir versões anteriores. Para corrigir erro, cadastrar **nova versão**; não sobrescrever cotação anterior.
-- Erros: validação `400`, não autenticado `401`, sem permissão `403`, conflito de versão/vigência `409`, indisponibilidade `503` e retry seguro, sem novo envio automático que cause duplicação.
-- A **seleção da cotação para liquidação é do backend**; o frontend não escolhe a última por conta própria nem mistura PTAX/MANUAL/DEMO. Exibir fonte e validade do valor retornado sem afirmar que a PTAX equivale a preço negociado.
+| Método/rota BFF | Autorização | Entrada e resultado |
+|---|---|---|
+| `POST /manuais` | MASTER/ADMIN | JSON `{ "taxaBrlPorUsd": "5.4321", "justificativa": "Motivo operacional" }`; `201`, cotação cadastrada **inativa** |
+| `POST /selecoes` | MASTER/ADMIN | Autorizar MANUAL: `{ "fonte": "MANUAL", "cotacaoId": "<UUID>", "justificativa": "Autorização explícita" }`; ou retornar: `{ "fonte": "BCB_PTAX", "justificativa": "Retorno explícito" }`; `201`, registro de seleção |
+| `POST /ptax/sincronizacoes` | MASTER/ADMIN | Sem body; solicita atualização controlada dos sete dias anteriores, pode falhar `503`, não altera a fonte selecionada |
+| `GET ?pagina=0&tamanho=20&fonte=MANUAL` | Perfis autenticados | Histórico paginado de cotações com filtro opcional por fonte |
+| `GET /selecoes?pagina=0&tamanho=20` | Perfis autenticados | Histórico paginado de autorizações/seleções, mais recentes primeiro |
 
-## 3. Contrato a reutilizar da B15
+**Atenção ao contrato:** `POST /manuais` **não aceita `vigenteEm`, `validaAte`, `origem`, `autorId` nem horário escolhido pelo cliente**; os instantes e a proveniência vêm do backend. Entrada decimal textual canônica exige padrão `[0-9]{1,10}(\.[0-9]{1,10})?`, taxa positiva, justificativa não vazia até 1000 caracteres. Mostrar máscara localizada `5,4321` no pt-BR, enviando `"5.4321"` como **string**. Não calcular câmbio com `Number`, `parseFloat` ou binário em ponto flutuante no frontend.
 
-A B15 deve entregar contratos documentados para **registrar manualmente** e **consultar histórico**, com autenticação/autorizações efetivas, validação de string decimal, proveniência/auditoria e seleção por fonte explícita. Exemplo de rotas a confirmar durante implementação B15: `POST /api/v1/cotacoes-cambiais/manuais` / `POST /bff/v1/cotacoes-cambiais/manuais`, `GET /bff/v1/cotacoes-cambiais`. **As rotas são proposta, não contrato já existente.**
+Resposta `CotacaoCambialResposta`: `id`, `taxaBrlPorUsd` (string), `moedaBase`, `moedaCotada`, `fonte`, `lado`, `versao`, `referencia`, `observadaEm`, `dataBoletim`, `horarioOriginal`, `boletim`, `fuso`, `autorId` e `justificativa` (os últimos dois **nulos para OPERADOR**).
 
-Não criar API fictícia na F06 nem modificar backend ou Flyway em seu worktree. A B15 é fonte de verdade para nomes de campos, regras de uso, janelas e condições de erro.
+Resposta de seleção `SelecaoFonteCambial`: `id`, `fonte`, `cotacaoId`, `autorizadoEm`, `validaAte`, `politicaId`, `autorId`, `justificativa`, com os dois campos de auditoria restritos ao administrador. Os timestamps trafegam como instantes UTC; exibir localmente com fuso explicitado. `validaAte` não deve ser recalculado pelo navegador como autoridade financeira. Listas incluem `itens`, `pagina`, `tamanho` e `total`; página inicial zero, tamanho de 1 a 100.
 
-## 4. Testes e aceite
+Tratamento de erros: `400` para valor/payload inválido, `401` não autenticado, `403` permissão insuficiente, `409` conflito de seleção/cotação, `503` sincronização indisponível ou ausência de câmbio elegível. Garantir retry seguro, proteção contra reenvio ao recuperar resposta incerta e desabilitar submissão duplicada. Não armazenar JWT, CNPJ ou payloads sensíveis em URL, storage ou logs.
 
-- [ ] Menu e breadcrumbs em desktop/mobile, acesso direto, teclado e leitores de tela.
-- [ ] RBAC: cadastro acessível e permitido apenas a perfis autorizados; `401`, `403` e expiração tratados; sessão JWT somente em memória.
-- [ ] Entrada `5,4321` em pt-BR vai como `5.4321` (string) e leitura equivalente em en-US; testes de zeros, negativo, limites de escala, dígitos grandes, copiar/colar, edição/caret.
-- [ ] Vigência/expiração corretamente interpretadas com fuso, UTC transportado e horário local visível; não aceitar ambiguidade silenciosa.
-- [ ] Confirmação antes de registrar; sem múltiplos envios, sem edição/exclusão, sem sobreposição de fontes.
-- [ ] Consulta de histórico com paginação, origem, estado vazio, carregando e falhas; autoria/justificativa visíveis somente a perfis autorizados.
-- [ ] Integração com contrato real B15 e navegação F05; sem alterar C1/C2/C3, política de taxa ou operações já liquidadas.
-- [ ] `cd frontend && npm ci && npm run lint && npm test && npm run build`, CI e PR de implementação para `develop` com revisão independente.
+## 3. Experiência e estados da interface
+
+- Área **Câmbio / Histórico** com filtros, paginação, fonte, lado, taxa, data de boletim/referência, instante de observação, seleção atual, vencimento exibido segundo os campos do servidor e histórico de autorizações. Sinalizar dados não disponíveis sem presumir que PTAX de mercado é preço negociado.
+- Área **Câmbio / Nova cotação manual** somente para MASTER/ADMIN, com moeda fixa BRL por USD, campo decimal localizado, justificativa e confirmação de cadastro; após sucesso, apresentar ID e aviso inequívoco: **cadastrada, ainda não autorizada**.
+- Ação **Autorizar uso da MANUAL** separada, escolhendo uma cotação MANUAL cadastrada da organização, com `cotacaoId`, justificativa e confirmação própria. Mostrar autorização, validade até a meia-noite local e necessidade de nova prévia em operações financeiras.
+- Ação **Retornar à PTAX** exige justificativa e confirmação explícitas, sem alterar histórico. Expor **Sincronizar PTAX** exclusivamente aos administradores, com estado de execução, resultado, indisponibilidade e proteção contra múltiplos envios.
+- Navegação responsiva desktop/mobile, teclado, foco, leitores de tela, máscaras, colagem, seleção e restauração de estado; não interferir no fluxo de simulação/liquidação nem reimplementar cálculo financeiro.
+
+## 4. Testes e critérios de aceite
+
+- [ ] BFF real ou mocks fiéis aos contratos de B15: registrar MANUAL **sem ativar**, autorizar separadamente e voltar explicitamente a PTAX; não enviar propriedades inexistentes nem acionar sincronização por digitação.
+- [ ] RBAC: MASTER/ADMIN podem cadastrar/autorizar/sincronizar; OPERADOR não; autor/justificativa ocultos em consultas; sessão JWT em memória.
+- [ ] Decimal localizado pt-BR/en-US como string, máscara/colar/seleção/caret, zeros, negativos, comprimento e escala; impedir cálculo monetário com float/Number.
+- [ ] Validade à meia-noite `America/Sao_Paulo`, transição de dia e datas UTC: usar `validaAte` do backend como autoridade, sem seleção automática PTAX/MANUAL/DEMO.
+- [ ] Páginas zero-based e tamanho limite, filtros, erros 400/401/403/409/503, rede, loading, idempotência operacional e resposta incerta.
+- [ ] Confirmações separadas, histórico imutável, acessibilidade mobile/desktop e regressões das telas F05/F08/F09.
+- [ ] `cd frontend && npm ci && npm run lint && npm test && npm run build`, registrar resultados reais, solicitar revisões `architect`, `qa`, `reviewer`, PR só para `develop` e **sem merge pelo agente**.
 
 ## 5. Limites e governança
 
-A F06 é evolução **exclusivamente frontend**; o servidor B15 mantém as regras de negócio, autorização, precisão e histórico. Não ativar formulário sem endpoint B15 integrado. Não iniciar implementação enquanto B14/B15/F05 não estiverem integradas e status F06 não for liberado no `TASKS.md`. Um worktree exclusivo; merge exclusivamente humano.
+A F06 **não** altera backend, schema Flyway, política financeira, fontes de autoridade, snapshots existentes, contratos B15 ou implementação da F09. B15 e F09 foram integradas nos PRs #90 e #89; integração real ponta a ponta da UI F06 com backend/PostgreSQL permanece item de validação, não fato já demonstrado. A expressão `Liberada para iniciar` da F06 em `origin/develop:TASKS.md` só produz autorização operacional **após o merge humano deste PR documental**.
