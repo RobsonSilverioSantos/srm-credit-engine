@@ -1,6 +1,6 @@
 # B16 — API de importação de recebíveis em lote por arquivo
 
-**Status:** proposta P1, sem autorização de implementação até homologação de política de lote.  
+**Status:** P1 — **liberada para iniciar somente após integração do PR documental de liberação à `develop`**. Cadastro atômico aprovado em 22/11/2026; [ADR-024](../adr/ADR-024-cadastro-atomico-lotes.md). A B17 permanece bloqueada por política de liquidação própria.  
 **Issue:** [#63](https://github.com/RobsonSilverioSantos/srm-credit-engine/issues/63).  
 **Dependências técnicas:** B04, B08, B08-S01, B14 e B12 já integradas. Interação futura com B15 exige isolar o câmbio de aferição e evitar conflito entre migrations.  
 **Executor proposto:** agente `backend` em worktree exclusivo; `architect`, `qa` e `reviewer` como revisores. Frontend F08 só pode iniciar após integração e documentação do contrato B16.
@@ -14,7 +14,7 @@ A solução atual aceita cadastro de recebíveis individualmente e operações d
 ## Fluxo proposto — duas fases
 
 1. **Pré-validação e pré-simulação sem persistência:** envio de arquivo via `POST /api/v1/lotes/recebiveis/validacoes` e `/bff/v1/lotes/recebiveis/validacoes` (`multipart/form-data`). Extrair e normalizar linhas com adaptador de arquivo, validar organização, cedentes e tipos, calcular valores indicativos no backend pelos casos de uso de simulação existentes, devolver relatório de erros por linha e um modelo canônico dos itens. Não criar recebíveis, não liquidar e não reservar taxa/câmbio nessa fase.
-2. **Confirmação de cadastro:** operador revisa a prévia e confirma o payload canônico em `POST /api/v1/lotes/recebiveis` e `/bff/v1/lotes/recebiveis` com `Idempotency-Key`. O servidor revalida conteúdo, tenant, duplicados e permissões; persiste resultado do lote com IDs criados, autor e instante. **Proposta: tudo-ou-nada**; nenhuma linha gravada se qualquer item falhar, rollback integral em PostgreSQL e replay exato com a mesma chave/payload. Chave igual/payload divergente resulta em `409`. O resultado distingue claramente recebível **cadastrado** de **liquidado**.
+2. **Confirmação de cadastro:** operador revisa a prévia e confirma o payload canônico em `POST /api/v1/lotes/recebiveis` e `/bff/v1/lotes/recebiveis` com `Idempotency-Key`. O servidor revalida conteúdo, tenant, duplicados e permissões; persiste resultado do lote com IDs criados, autor e instante. **Decisão aprovada — tudo-ou-nada:** nenhuma linha cadastrada se qualquer item falhar, incluindo referências duplicadas e conflitos simultâneos; rollback integral em PostgreSQL e replay exato com a mesma chave/payload. Chave igual/payload divergente resulta em `409`. O resultado distingue claramente recebível **cadastrado** de **liquidado**.
 
 A implementação **não poderá usar a sessão HTTP ou a camada de apresentação como autoridade financeira**. API REST e BFF chamam casos de uso idênticos, sem HTTP interno. O backend reconstrói a validação; nunca confia no resultado enviado pelo browser.
 
@@ -22,7 +22,7 @@ A implementação **não poderá usar a sessão HTTP ou a camada de apresentaç�
 
 **Formato primário para MVP:** CSV UTF-8, `;` como delimitador e cabeçalhos em ordem definida, sem `sep=` de Excel; tolerar BOM UTF-8 conforme contrato testado. A carga deve tratar `valorFaceBrl` como **string decimal canônica com ponto**, por exemplo `25000.00`, nunca `Number` ou `Double`.
 
-**Formato adicional:** modelo `.xlsx` com primeira aba padronizada, sem macros, fórmulas, links externos, células calculadas ou objetos embarcados. CSV e XLSX devem gerar os mesmos comandos canônicos e erros; o suporte XLSX será etapa própria dentro da B16 **somente após aprovação do custo/escopo**, sem permitir que a tela prometa suporte não implementado.
+**Formato adicional incluído na B16:** modelo `.xlsx` com primeira aba padronizada, sem macros, fórmulas, links externos, células calculadas ou objetos embarcados. CSV e XLSX devem gerar os mesmos comandos canônicos e erros. É permitido desenvolver/testar CSV antes de XLSX **na mesma feature B16**, mas o PR somente poderá afirmar suporte a ambos após testes dos dois formatos; a interface não pode prometer XLSX antes do contrato backend disponível.
 
 Cabeçalho proposto:
 
@@ -30,7 +30,7 @@ Cabeçalho proposto:
 referenciaExterna;cedenteId;modalidade;valorFaceBrl;prazoMeses;vencimento;moedaPagamento
 ```
 
-- `referenciaExterna`: identificador de negócio único por organização e lote, estável para deduplicação/auditoria, não derivado da posição no arquivo.
+- `referenciaExterna`: identificador de negócio **único por organização entre todos os lotes**, estável para deduplicação/auditoria, não derivado da posição no arquivo nem somente do `idLote`.
 - `cedenteId`: UUID do cedente **já cadastrado** na organização autenticada. Não criar automaticamente cedentes a partir de números fornecidos no arquivo; `B14` permanece autoridade do cadastro.
 - `modalidade`: `DUPLICATA_MERCANTIL` ou `CHEQUE_PRE_DATADO`.
 - `valorFaceBrl`: string decimal positiva e representável na escala financeira já definida.
@@ -45,33 +45,35 @@ Os arquivos [Lote A](../validacao/lotes/SRM_LOTE_A_200_RECEBIVEIS.csv) e [Lote B
 
 **Regra de identidade indispensável:** `referenciaExterna` deve ser única e consultável **por organização em todos os lotes**, não somente no mesmo `idLote`. Persistir o vínculo estável `(organizacao_id, referencia_externa) → recebivel_id` e proteger por constraint/índice UNIQUE no PostgreSQL. O backend deve distinguir `NOVO`, `JA_CADASTRADO` e `JA_LIQUIDADO` e devolver a correspondência de linha/identidade com motivo seguro. **Não considerar igualdade de valor, prazo, modalidade ou moeda prova de título duplicado:** títulos diferentes podem ter termos financeiros idênticos. Não aceitar nova referência para burlar identidade de um recebível que tenha identificador documental de negócio distinto; evoluir regra quando existir documento de título específico.
 
-A validação do Lote B após cadastro e liquidação do Lote A deve acusar **quatro `JA_LIQUIDADO`**, sem nova gravação desses títulos. Na política de cadastro tudo-ou-nada proposta, o lote B não pode ser confirmado enquanto contiver duplicidades; o operador corrige ou exclui as linhas apontadas, confirma somente as 196 novas e pode então seguir para a liquidação B17 com nova confirmação. **Não ignorar duplicidades automaticamente** nem declarar que um processamento sequencial desses arquivos constitui teste de concorrência; a corrida controlada sobre o mesmo `recebivel_id` exige teste separado na B17.
+A validação do Lote B após cadastro e liquidação do Lote A deve acusar **quatro `JA_LIQUIDADO`**, sem nova gravação desses títulos. Na política de cadastro **tudo-ou-nada aprovada**, o lote B não pode ser confirmado enquanto contiver duplicidades; o operador corrige ou exclui as linhas apontadas, confirma somente as 196 novas e pode então seguir para a liquidação B17 com nova confirmação. **Não ignorar duplicidades automaticamente** nem declarar que um processamento sequencial desses arquivos constitui teste de concorrência; a corrida controlada sobre o mesmo `recebivel_id` exige teste separado na B17.
 
 
 ## Integridade, segurança e operação
 
-- Tamanho inicial **proposto**: no máximo 200 linhas e 2 MiB, configurável e sujeito a confirmação; rejeitar arquivos acima do limite antes de consumir integralmente em memória. Retornar `413` para tamanho e erros `400/422` estruturados para formato/linhas, preservando `401/403/409/503` de acordo com causa.
+- Limite operacional inicial **configurável**: no máximo 200 linhas e 2 MiB por arquivo, para incluir integralmente cada massa de demonstração; rejeitar arquivos acima do limite antes de consumir integralmente em memória. Retornar `413` para tamanho e erros `400/422` estruturados para formato/linhas, preservando `401/403/409/503` de acordo com causa.
 - Identificar repetição dentro do arquivo **e entre lotes preexistentes por identidade de negócio persistida e única por organização**; distinguir `JA_CADASTRADO` de `JA_LIQUIDADO`, verificar usuário, tenant e cedente em **todas** as linhas. Não permitir `organizacaoId` livre no payload nem inserir em lote linhas de outros tenants.
 - Reutilizar `BigDecimal`, Strategy, arredondamento `HALF_EVEN`, golden cases C1–C3 e regras de elegibilidade de taxas. Cotação da **prévia** não é compromisso de liquidação futura. Compatibilidade com B15 requer fonte/momento explícitos na simulação, nunca fallback oculto.
 - Abrir nova migration Flyway com **próxima versão disponível na data do desenvolvimento**, considerando B14 V5 e uma possível migration B15 concorrente. Registrar lote, referência, identidade por organização, hash, chave idempotente, autor, carimbo UTC, estado e vínculos dos recebíveis sem reescrever V1–V5. Especificar unicidade e travas para evitar importações simultâneas duplicadas.
 - Não logar conteúdo completo, dados fiscais, JWT ou planilhas; relatar problemas sem PII desnecessária. Exportações CSV devem neutralizar fórmulas. XLSX exige defesa contra ZIP bombs, fórmulas e referências externas. Nunca interpretar célula de fórmula como valor confiável.
 - Parser, validação, aplicação e persistência em portas/adaptadores separados, um tipo Kotlin top-level por arquivo; evitar parser no controller e regras financeiras no adaptador.
 
-## Política ainda não aprovada — gate de implementação
+## Política B16 aprovada e gate de implementação
 
-Antes de alterar `SPEC.md`, `DECISIONS.md` ou iniciar a B16, o responsável deve aprovar expressamente:
-1. **Resultado do upload:** prévia + confirmação de **cadastro**, sem liquidação automática, ou outra operação.
-2. **Atomicidade:** proposta de **tudo-ou-nada** versus aceitação parcial com erros por linha.
-3. **Duplicidade e replay:** `referenciaExterna` globalmente única por organização **entre lotes**, apontando ao mesmo recebível; distinguir já cadastrado/já liquidado, semântica de chave idempotente e retenção de status.
-4. **Escopo e limites:** CSV no primeiro incremento; XLSX na mesma entrega ou posterior; limite de linhas/tamanho e política para USD sem cotação elegível.
+**Decisão de 22/11/2026:** a confirmação do cadastro é **atômica (tudo-ou-nada)**. O upload é pré-validado sem persistência, o cadastro requer confirmação própria e não liquida títulos. A referência externa é única por organização **entre lotes**; erros e duplicidades bloqueiam o **lote inteiro**, sem descarte silencioso. A repetição exata de uma confirmação com mesma chave e comando retorna a resposta persistida; chave igual/comando diferente produz `409`. Política formalizada na [ADR-024](../adr/ADR-024-cadastro-atomico-lotes.md).
+
+**Escopo técnico para implementação:** CSV UTF-8 delimitado por `;` e XLSX em modelo padronizado, ambos convertidos ao mesmo comando canônico; limite inicial configurável de **200 linhas e 2 MiB** por arquivo. O suporte XLSX pode ser implementado após CSV na mesma feature. Toda a massa de dados A/B pode usar a API quando o cedente estiver cadastrado no tenant de demonstração.
+
+**Separação da simulação cambial:** ausência de cotação USD elegível pode impedir a **simulação** de valores, mas **não invalida isoladamente o cadastro** de um recebível BRL com moeda de pagamento futura ainda não escolhida no domínio. Retornar o problema de simulação como alerta distinto do erro de cadastro; a B17 exigirá 100% das simulações válidas antes da confirmação da **liquidação**, revalidando taxas e câmbio. Não associar cotação mockada com obrigação financeira permanente.
+
+**Início pelos agentes:** somente depois do merge da presente liberação, quando `origin/develop:TASKS.md` contiver literalmente `Liberada para iniciar` para B16 e todas as dependências estiverem integradas. A implementação deve respeitar a ADR-024, sem alterar regras financeiras existentes. A B17 ainda requer decisão humana independente sobre liquidação parcial versus atômica.
 
 A liquidação de lote é a tarefa **B17**, planejada de forma independente. Exige confirmação distinta, regras de taxa/câmbio, política de atomicidade e falha parcial, idempotência por título/lote e testes concorrentes sobre **o mesmo recebível**. A política da B16 para cadastro não determina a política da B17 para liquidação. Não implementar liquidação automática por inferência a partir da palavra "lote" do enunciado.
 
-## Critérios de aceite condicionais
+## Critérios de aceite da B16
 
 - [ ] Pré-validação não persiste dados, identifica linha/campo/motivo e calcula prévia pelo motor existente com C1–C3.
-- [ ] Cadastro confirmado é atômico/idempotente; falhas de tenant, duplicidade e concorrência não geram títulos parciais.
+- [ ] Cadastro confirmado é **atômico (todos ou nenhum)** e idempotente; falhas de tenant, duplicidade e concorrência geram rollback completo de recebíveis, identidade de lote e referências.
 - [ ] API/BFF/OpenAPI e testes PostgreSQL reais cobrem limites, formato, BOM, encoding, decimal, CNPJ indireto, autorização e replay.
-- [ ] CSV e, se aprovado, XLSX usam o mesmo contrato sem fórmula, macros, links ou operações inseguras.
+- [ ] CSV e XLSX usam o mesmo contrato canônico, com rejeição de fórmulas, macros, links, XML externo e operações inseguras, e limites 200 linhas/2 MiB configuráveis.
 - [ ] Nenhuma liquidação bancária, transação financeira ou pagamento é criado implicitamente no upload.
 - [ ] PR e CI separados, integração só pelo responsável técnico.
