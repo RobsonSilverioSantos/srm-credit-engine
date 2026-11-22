@@ -9,7 +9,7 @@
 
 O [enunciado original](../requisitos/ENUNCIADO_ORIGINAL_SRM_CREDIT_ENGINE_V2.md) descreve receber **um lote de recebíveis**, calcular o deságio e registrar uma transação auditável no contexto de negócio. Os requisitos técnicos explícitos exigem motor, API REST, liquidação ACID/idempotente e extrato, mas **não estabelecem obrigatoriedade de upload CSV/XLSX**. Esta tarefa amplia a cobertura operacional sem declarar uma exigência técnica não formulada.
 
-A solução atual aceita cadastro de recebíveis individualmente e operações de liquidação individuais. **Importar um lote não deve equivaler a liquidar títulos automaticamente**. A fronteira entre importação e liquidação financeira é relevante para autorização, snapshots, idempotência e integridade.
+A solução atual aceita cadastro de recebíveis individualmente e operações de liquidação individuais. **Importar um lote não deve equivaler a liquidar títulos automaticamente**. A fronteira entre importação e liquidação financeira é relevante para autorização, snapshots, idempotência e integridade. A liquidação explícita posterior de um lote será tratada na [B17](B17_LIQUIDACAO_LOTE_CONCORRENCIA.md), [issue #65](https://github.com/RobsonSilverioSantos/srm-credit-engine/issues/65), com concorrência e semântica transacional próprias.
 
 ## Fluxo proposto — duas fases
 
@@ -56,7 +56,7 @@ Antes de alterar `SPEC.md`, `DECISIONS.md` ou iniciar a B16, o responsável deve
 3. **Duplicidade e replay:** semântica de `referenciaExterna`, unicidade por organização, token/chave idempotente e retenção de status.
 4. **Escopo e limites:** CSV no primeiro incremento; XLSX na mesma entrega ou posterior; limite de linhas/tamanho e política para USD sem cotação elegível.
 
-Liquidação de lote é uma **evolução financeira separada**, que precisará de especificação de confirmação, instantâneo de taxa, atomicidade, comportamento de falha parcial, idempotência por título/lote e testes de concorrência reais. Não implementar por inferência a partir da palavra "lote" do enunciado.
+A liquidação de lote é a tarefa **B17**, planejada de forma independente. Exige confirmação distinta, regras de taxa/câmbio, política de atomicidade e falha parcial, idempotência por título/lote e testes concorrentes sobre **o mesmo recebível**. A política da B16 para cadastro não determina a política da B17 para liquidação. Não implementar liquidação automática por inferência a partir da palavra "lote" do enunciado.
 
 ## Critérios de aceite condicionais
 
