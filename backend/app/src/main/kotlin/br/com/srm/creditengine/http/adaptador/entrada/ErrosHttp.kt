@@ -19,6 +19,7 @@ import org.springframework.web.HttpRequestMethodNotSupportedException
 import org.springframework.web.bind.MissingRequestHeaderException
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
+import org.springframework.web.multipart.MaxUploadSizeExceededException
 import org.springframework.web.server.ResponseStatusException
 import org.springframework.web.servlet.resource.NoResourceFoundException
 
@@ -69,6 +70,10 @@ class ErrosHttp {
     @ExceptionHandler(HttpMediaTypeNotSupportedException::class)
     fun midiaNaoSuportada(): ResponseEntity<ErroHttp> =
         erro(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "MIDIA_NAO_SUPORTADA", "Tipo de conteúdo não suportado.")
+
+    @ExceptionHandler(MaxUploadSizeExceededException::class)
+    fun arquivoExcessivo(): ResponseEntity<ErroHttp> =
+        erro(HttpStatus.valueOf(413), "ARQUIVO_EXCESSIVO", "Arquivo acima do tamanho permitido.")
 
     @ExceptionHandler(Exception::class)
     fun inesperado(ex: Exception): ResponseEntity<ErroHttp> {

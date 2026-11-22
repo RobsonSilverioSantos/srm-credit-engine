@@ -529,3 +529,32 @@ curl -fsS -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' 
 # Repita a última requisição com a mesma chave para obter o mesmo resultado.
 unset TOKEN
 ```
+
+### Importação de recebíveis em lote (B16)
+
+`POST /api/v1/lotes/recebiveis/validacoes` (ou espelho `/bff/v1`) recebe a parte
+multipart `arquivo`, CSV UTF-8 separado por `;` ou XLSX padronizado. A prévia
+devolve `confirmavel` e `itens` na ordem do arquivo, com linha (cabeçalho = 1),
+status, comando normalizado, erros de cadastro e eventual aviso de simulação.
+Não grava nem reserva dados. O cabeçalho, em ordem, é
+`referenciaExterna;cedenteId;modalidade;valorFaceBrl;prazoMeses;vencimento;moedaPagamento`.
+Na primeira aba XLSX, use data ISO como texto e mantenha como texto valores com
+mais algarismos significativos do que a planilha preserva. Fórmulas, vínculos
+externos, macros e componentes ativos não são aceitos.
+
+`POST /api/v1/lotes/recebiveis` (ou espelho `/bff/v1`) recebe JSON
+`{"itens":[...]}` com os comandos da prévia e cabeçalho `Idempotency-Key`.
+Um cadastro válido retorna `201`, `loteId`, `cadastrados` e
+`itens` com referência e identificador. O replay exato repete o resultado
+original; duplicidade entre lotes, conflito ou chave reaproveitada com outro
+comando retornam `409`. Linhas inválidas retornam `422`, sem cadastro. A
+referência tem até 128 caracteres ASCII alfanuméricos ou `._:/-`, com distinção
+de caixa. A moeda no item do lote é somente metadado de intenção, não moeda
+persistida no recebível nem autorização de liquidação. Cotação indisponível
+na prévia é aviso, não motivo isolado para rejeitar o cadastro.
+
+Limites iniciais: 200 linhas e 2 MiB; configure `SRM_LOTES_MAX_LINHAS` e
+`SRM_LOTES_MAX_BYTES`, e mantenha `SRM_LOTES_MAX_REQUEST_BYTES` e o limite do
+proxy acima do tamanho do arquivo para acomodar o envelope multipart.
+Use organização e cedente exclusivos de teste para as massas em
+[`docs/validacao/lotes`](../docs/validacao/lotes).
