@@ -1,10 +1,10 @@
-# DECISIONS.md — Decisões vigentes no novo repositório
+# DECISIONS.md — Decisões arquiteturais vigentes do SRM Credit Engine
 
-**Versão:** 2.4 (baseline do novo repositório em 20/11/2026; ADR-023 registrada em 21/11/2026 após integração da B14). O repositório anterior possui histórico técnico documentado em `AI_USAGE.md`. Este índice é a autoridade normativa **deste novo repositório**, não uma declaração de migração de código ou homologação por autoridades externas.
+**Versão:** 2.5 — 22/11/2026. **Estado:** índice normativo vigente da implementação demonstrativa, consolidado após ADR-023 (B14) e revisão da ADR-010 conforme o código JDBC integrado. As decisões históricas e os documentos originais de planejamento permanecem preservados em [docs/historico/planejamento-anterior/](docs/historico/planejamento-anterior/README.md), sem revogação de fatos ou transferência implícita de evidências. Este documento **não homologa o produto para produção**.
 
 | ID | Decisão | Justificativa / limites |
 |---|---|---|
-| ADR-001 | Repositório novo, sem transportar histórico Git anterior | PRs independentes por tarefa e worktrees desde o bootstrap. O histórico antigo permanece identificado no AI_USAGE, sem falsificar implementação no novo repositório |
+| ADR-001 | Baseline Git independente com documentação histórica preservada | Reinício aprovado em 20/11/2026 para rastreabilidade por feature/worktree e PR; não transportar commits/testes do ciclo anterior como evidência atual. Manter registro no `AI_USAGE.md` e originais em `docs/historico/planejamento-anterior/` |
 | ADR-002 | Git Flow simplificado: `main`, `develop`, `feature/*` e worktrees | Cada tarefa usa branch exclusiva gerada de `TASKS.md` ID + Trabalho; PR obrigatório para `develop`; só o candidato revisa e decide merge |
 | ADR-003 | Agentes podem criar branch/worktree, executar testes, commitar, dar push e abrir PR | Autorização operacional explícita; mensagens descritivas e evidência. Proibidos merges, force-push, resets destrutivos, pushes diretos em `main` e `develop`, alterações de regras financeiras sem aprovação |
 | ADR-004 | Kotlin + Spring Boot, Gradle Kotlin DSL, Java toolchain 21 | Tipagem estática, ecossistema financeiro, build reproduzível; hexagonal em backend e frontend |
@@ -13,12 +13,12 @@
 | ADR-007 | **Remover Keycloak do MVP**; autenticação local com Spring Security, BCrypt e token assinado | Corte consciente por restrição de prazo e capacidade de revisão; não prometer SSO, MFA ou prontidão produtiva. Organização deriva apenas do principal autenticado |
 | ADR-008 | Estratégias por modalidade, `BigDecimal`, HALF_EVEN e golden cases C1–C3 | Valores oficiais e arredondamento não podem mudar para fazer testes passarem |
 | ADR-009 | Simulação financeira **pré-cadastro** sem persistência | Respeita painel reativo; cadastro obrigatório antes de liquidar; preço não reservado e revalidado na liquidação |
-| ADR-010 | Liquidação ACID com `@Version`, unicidade e idempotência | Identidade `(organizacaoId, tipoOperacao, chave)` e hash canônico; mesma resposta no replay, divergência 409; conflito por versão demonstrado em PostgreSQL real |
+| ADR-010 | Liquidação ACID com **controle otimista SQL condicional por versão/estado**, unicidade e idempotência | O mecanismo implementado usa JDBC `UPDATE ... WHERE versao = ? AND status = 'DISPONIVEL'`, não anotação JPA `@Version`. Escopo `(organizacaoId, tipoOperacao, chave)` e hash canônico; replay idêntico e 409 em conflito. Ver `docs/adr/ADR-010-controle-otimista-sql-versionado.md` e PRs #17/#19 |
 | ADR-011 | Câmbio BRL/USD com corte UTC único, snapshot e validade 30m configurável | Hipótese de demonstração P0; sem fallback silencioso e sem HTTP externo dentro da transação |
 | ADR-012 | BFF e API REST chamam os mesmos casos de uso | Evitar chamadas HTTP internas e duplicação de lógica financeira; decimal em string nos contratos |
 | ADR-013 | **Frontend React/TypeScript + Material UI Core** com tema e componentes definidos | Entrega consistente e rápida; evitar MUI X Pro/Premium e custos de licenças. Frontend hexagonal; apresentação sem aritmética financeira |
 | ADR-014 | Extrato com filtros e paginação server-side | SQL nativo parametrizado via adaptador de leitura, inicialmente; comprovar plano/índices antes de afirmar otimização |
-| ADR-015 | Evidência real em AI_USAGE.md | Preservar custo e interrupção do Cursor, mudanças de ferramenta, regressão documental, merge problemático relatado e replanejamento; sem tratar logs do repositório anterior como testes atuais |
+| ADR-015 | Evidências cronológicas de uso de IA no `AI_USAGE.md` | Preservar mudanças de ferramenta, revisão humana, falhas/correções, PRs e testes; delimitar o ciclo de planejamento anterior e as evidências de execução de cada etapa. A responsabilidade técnica e a aprovação de integração cabem ao responsável, sem atribuir a ele a digitação integral do código |
 | ADR-016 | Code review, post-mortem e exercício de alta escala são **três entregáveis independentes** | Versionar em `docs/exercicios/`, fora do `TASKS.md`; não vincular Review/Post-mortem ao backend Kotlin nem tratar a proposta de alta escala como evolução automática do MVP |
 | ADR-017 | Escopo sob prazo apertado: priorizar core, BFF, extrato e frontend | Cortar Keycloak, federação, deploy cloud e refinamentos de baixa prioridade; não cortar integridade financeira, isolamento, autenticação mínima nem evidência dos golden cases |
 | ADR-018 | PostgreSQL versus NoSQL para dados financeiros: PostgreSQL é a fonte de verdade | Integridade referencial, unicidade, transação ACID e consulta analítica. Ver `docs/adr/ADR-018-postgresql-vs-nosql.md`; NoSQL pode servir a read models futuros, não à autoridade da liquidação |
@@ -30,18 +30,20 @@
 
 ## Critérios de arquitetura e defesa
 
-- **ADRs completos:** este índice mantém decisões concisas; análise de opções, rejeições, consequências e gatilhos de mudança em `docs/adr/`. A ADR-005 é detalhada em `docs/adr/ADR-005-monolito-modular-vs-microservicos.md`; a política de documento de cedentes na ADR-023 foi registrada a partir da implementação B14 integrada pelo PR #56, sem atribuir validação fiscal a identificadores estrangeiros.
+- **ADRs completos:** este índice mantém decisões concisas; análise de opções, rejeições, consequências e gatilhos de mudança em `docs/adr/`. A ADR-005 detalha monólito modular; a [ADR-010](docs/adr/ADR-010-controle-otimista-sql-versionado.md) registra controle otimista JDBC e a diferença para a proposta original JPA `@Version`; a ADR-023 documenta a política de identificação da B14, sem atribuir validação fiscal a identificadores estrangeiros.
 - **EDA:** documento de evolução opcional do fluxo do MVP; não prometer broker ou pagamento externo implementados.
 - **Alta escala:** exercício arquitetural **independente e ainda não produzido**. Não confundir a futura proposta com ADRs do MVP, nem marcar como atendido o requisito de 1 milhão/min.
 - **Git Flow:** escolha aprovada pelos PRs pequenos e revisáveis, custo de autonomia dos agentes e necessidade de auditoria. A justificativa versus trunk-based/GitHub Flow aparece no README; processos paralelos devem usar worktrees para isolamento.
 - **Limite das proteções GitHub (ADR-022):** na configuração atual (repositório privado sem GitHub Pro), não há Ruleset aplicado. O workflow fecha PRs de origem diferente da branch `develop` apontados a `main`, quando executado; o hook `pre-push` bloqueia pushes locais para `main` e `develop` apenas onde estiver habilitado. **Nenhum desses mecanismos impede tecnicamente todo push direto ou merge na interface/API do GitHub.** A validação real do workflow e a ativação local do hook devem ser registradas após a integração. O risco residual é aceito apenas para o exercício; a proteção nativa no servidor deve ser reavaliada antes de colaboração ampliada ou produção.
-- **Corte consciente:** ADR-007 e ADR-017 excluem Keycloak, federação e deploy cloud deste MVP. Autenticação mínima e invariantes financeiras permanecem exigidas; nenhum corte implica produção pronta.
+- **Corte consciente:** ADR-007 e ADR-017 substituem a escolha inicial de Keycloak/federação por autenticação local no MVP, preservando os invariantes de isolamento; o ADR-009 substitui a premissa de cadastro obrigatório para simular por **pré-simulação não persistente**, mantendo cadastro obrigatório antes de liquidar. Nenhum corte implica prontidão produtiva. As propostas anteriores permanecem consultáveis no [arquivo histórico](docs/historico/planejamento-anterior/README.md).
 - **Exercícios separados:** code review TypeScript, war room e proposta futura de alta escala permanecem em `docs/exercicios/`; nenhum deles é tarefa de desenvolvimento do `TASKS.md`. A rastreabilidade está em `docs/defesa/RASTREABILIDADE_STAFF_TECH_LEAD.md`.
 
-## Autorizações e limites
+## Responsabilidade técnica e limites de autorização
+
+A responsabilidade pelas decisões vigentes, pela aceitação de riscos, pela revisão e integração das contribuições e pela defesa da solução pertence ao **responsável técnico do desafio**. Agentes de IA podem ter produzido código, testes, documentação e análises específicos; sua participação deve ser atribuída de modo transparente nos PRs e no `AI_USAGE.md`. Esta atribuição de responsabilidade **não equivale a afirmar autoria manual de todas as linhas**, inspeção independente de todas as mudanças ou homologação comercial.
 
 O responsável técnico autoriza **criação da feature, worktree, commits, push da própria feature e abertura de PR para `develop`** pelos agentes, desde que o escopo, os testes e a branch sejam conferidos. A integração permanece humana. Se uma tarefa precisar modificar `SPEC.md` ou alterar regra financeira/segurança, apresentar plano e aguardar aprovação antes de implementar.
 
 ## Revisões futuras
 
-Qualquer alteração de decisão será datada, com ID novo, motivo e riscos. Não editar retroativamente decisões históricas do projeto anterior para sugerir que eram vigentes na nova baseline.
+Qualquer alteração futura de decisão deve ser datada, explicitar motivo, impactos e vínculos aos PRs. Não reescrever o planejamento anterior para sugerir que suas escolhas substituídas são a implementação vigente. Divergências documentais devem ser reconciliadas com o código e testes efetivos, preservando as fontes originais.

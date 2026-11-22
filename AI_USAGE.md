@@ -1,6 +1,33 @@
-# AI_USAGE.md — SRM Credit Engine (novo repositório)
+# AI_USAGE.md — SRM Credit Engine | Uso de IA e responsabilidade técnica
 
-> **Aviso de rastreabilidade — 20/11/2026:** o conteúdo abaixo inclui o **histórico factual do repositório anterior**, marcado como tal. Nenhum commit, teste, artefato compilado ou serviço do repositório anterior equivale a implementação no novo repositório. O novo repositório começa sem código e terá evidências próprias. A escolha de novo Git/repositório e de escopo é decisão do candidato.
+> **Rastreabilidade consolidada — 22/11/2026:** este documento distingue (a) o planejamento e a execução do ciclo anterior, arquivados sem alterações em [docs/historico/planejamento-anterior/](docs/historico/planejamento-anterior/README.md); (b) o reinício da baseline Git em 20/11/2026; e (c) os commits, PRs, testes e validações posteriores que integram a implementação vigente. O estado **“sem código”** das entradas RESET-01/BOOTSTRAP-02 refere-se **exclusivamente à data dessas entradas**; a `develop` atual contém funcionalidades integradas. Nenhum commit ou teste anterior é transferido ou reapresentado como evidência da implementação vigente.
+
+## CONSOLIDACAO-01 — Responsabilidade técnica, decisões e evidências (22/11/2026)
+
+### Responsabilidade pela solução e participação dos agentes
+
+A condução técnica do desafio, a escolha das premissas, a aprovação de mudanças de escopo, a aceitação dos riscos, a verificação dos critérios de aceite e a **revisão e integração das contribuições dos agentes** cabem ao responsável técnico. Ferramentas de IA (Cursor, GitHub Copilot e ChatGPT) foram utilizadas para planejamento, implementação, testes, redação, organização de tarefas, inspeção de código e revisão documental, de acordo com as atribuições registradas nos prompts, branches e PRs. O uso dessas ferramentas **não atribui autoria manual de cada linha ao responsável**, nem autoriza IA a decidir política financeira ou a integrar sua própria feature.
+
+As ações humanas evidenciadas são diferenciadas por origem: decisões de arquitetura e escopo explicitamente aprovadas, merges efetivamente registrados pelo GitHub, validações manuais relatadas e inspeções visuais. **Um merge não equivale a aprovação formal de code review via GitHub, execução independente de testes, homologação do negócio ou teste produtivo**. Quando um resultado consta apenas do relato do agente, essa fonte permanece identificada.
+
+### Evolução do planejamento até o código atual
+
+| Evolução | Proposta anterior | Solução vigente e evidência |
+|---|---|---|
+| Repositório/fluxo de agentes | Trabalho inicial acumulado em branch/sessão e dificuldades de rastreabilidade relatadas pelo responsável | Reinício Git em 20/11/2026; feature/worktree/PR individual por tarefa, merge exclusivamente humano; registro RESET-01 e PRs da baseline vigente |
+| Autenticação | Keycloak/OIDC com possível federação | Autenticação local Spring Security/BCrypt/JWT, sem SSO ou MFA prometidos; ADR-007, S01 [PR #15](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/15) |
+| Simulação pré-cadastro | Necessidade de cadastrar antes de simular | Pré-simulação indicativa e **sem persistência**; recebível precisa existir **antes da liquidação**; ADR-009, B08-S01 [PR #23](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/23) |
+| Concorrência otimista | Proposta de `@Version` em JPA | JDBC **SQL condicional por `versao` e `status`**, atualizado na transação; [ADR-010](docs/adr/ADR-010-controle-otimista-sql-versionado.md), B06 [PR #17](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/17) e B07 [PR #19](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/19) |
+| Segurança de documentos de cedentes | Identificador livre/sem política internacional aprovada | Validação estrutural `BR/CNPJ` e `OUTRO` estrangeiro `NAO_VERIFICADO`, sem verificação fiscal externa; B14 [PR #56](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/56) e ADR-023 |
+| Experiência frontend | Telas isoladas e extrato com sessão independente nas primeiras entregas | Navegação integrada F05 [PR #61](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/61), após correção de formatação cambial [PR #59](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/59) |
+
+### Evidências recentes e limites
+
+- **Aferição C1–C3:** [PR documental #60](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/60) integrado; [registro manual específico](docs/validacao/VALIDACAO_GOLDEN_CASES_C1_C2_C3_2026-11-21.md). O responsável confirmou C1/C2 até os centavos; a captura C3 permitiu conferir diretamente VP **R$ 92.859,94**, deságio **R$ 7.140,06** e pagamento **US$ 17.094,67**. Essa validação demonstra pré-simulação e **não** liquidação bancária nem homologação de produção.
+- **Base integrada:** os PRs #56 (B14), #58 (ADR-023), #59 (formatação cambial), #60 (aferição documental) e #61 (F05) constam integrados à `develop`. Seus resultados de CI e testes devem ser conferidos individualmente; a elaboração deste adendo **não reexecutou** suites Kotlin/React/PostgreSQL.
+- **Evoluções em planejamento:** [PR #66](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/66) encontra-se **aberto na verificação de 22/11/2026**; trata de F07 e propostas B16/B17/F08 (lotes de 200+200, sem API implementada). Não classificar esse planejamento como funcionalidade concluída.
+- **Fontes originais:** os arquivos de planejamento anteriores `AI_USAGE.md`, `DECISIONS.md` e `SPEC.md` foram arquivados **integralmente e sem reconciliação retroativa**, com [índice de proveniência](docs/historico/planejamento-anterior/README.md). A cópia histórica neste documento continua registrada como evidência do processo de decisão, não como conjunto de instruções vigentes.
+- **Separação normativa:** [SPEC.md](SPEC.md) descreve o contrato vigente e premissas ainda pendentes; [DECISIONS.md](DECISIONS.md) registra decisões vigentes e [ADR-010](docs/adr/ADR-010-controle-otimista-sql-versionado.md) esclarece a divergência entre escolha documental inicial e JDBC efetivo. Nenhum documento substitui a evidência de execução real.
 
 ## RESET-01 — Reinício planejado após incidente Git e revisão de custo/prazo (20/11/2026)
 
@@ -28,7 +55,7 @@
 - **Artefatos:** SPEC, DECISIONS, TASKS, README, guia Git, prompts, agentes Cursor/Copilot, template de PR, ADRs/EDA do MVP, matriz de avaliação e exercícios independentes já redigidos.
 - **Estado:** arquivos documentais preparados para extração; **nenhum repositório remoto, commit, push, PR, workflow CI, build, teste ou benchmark novo confirmado**.
 
-## Evidências do novo repositório — atualização 20/11/2026
+## Evidências da baseline Git vigente — registro inicial de 20/11/2026
 
 | Tarefa | Branch / origem | Commit / merge observado | PR e evidência | Testes registrados | Revisão / merge humano |
 |---|---|---|---|---|---|
@@ -137,7 +164,9 @@ Esta coleta inicial documenta B10 e S02, integradas depois da consolidação D03
 - **Limites:** evidência **3/3 dos resultados de pré-simulação conferidos em centavos**, não homologação financeira produtiva, liquidação ponta a ponta, transação bancária, PTAX oficial, disponibilidade contínua ou teste de todas as combinações. A cotação de C3 é mock fixo 5,4321; o problema visual dos zeros de escala está em [PR #59](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/59), sem impacto no valor calculado. Não foram usados tokens JWT nem informações de empresas reais no registro documental.
 - **Documento de apoio:** [VALIDACAO_GOLDEN_CASES_C1_C2_C3_2026-11-21.md](docs/validacao/VALIDACAO_GOLDEN_CASES_C1_C2_C3_2026-11-21.md). Os valores e a origem de cada evidência ficam reunidos nesse relatório.
 
-## Histórico do repositório anterior (preservado, não vigente para o novo código)
+## Histórico do planejamento e da execução anteriores (preservado, não normativo)
+
+**Nota de proveniência:** os relatos, planos, branches e resultados abaixo dizem respeito à etapa anterior ao reinício Git de 20/11/2026. A íntegra da versão original enviada para consolidação está em [AI_USAGE_PLANEJAMENTO_ORIGINAL.md](docs/historico/planejamento-anterior/AI_USAGE_PLANEJAMENTO_ORIGINAL.md); decisões e especificação originais também estão arquivadas. A continuação reproduz o histórico já presente, sem reinterpretá-lo como regras, commits ou testes atuais.
 
 
 **Exceção editorial:** este documento registra explicitamente o uso de IA, inclusive prompts, conversas, verificações, limitações e correções, quando houver evidências. A restrição de linguagem metadiscursiva aplicada aos documentos técnicos não se aplica a este registro.
