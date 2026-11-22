@@ -1,9 +1,20 @@
 # B15 — PTAX de fechamento e política de elegibilidade cambial
 
-**Estado:** planejamento P1; implementação não iniciada.  
+**Estado:** política financeira aprovada em 22/11/2026 pela ADR-026; **implementação B15 não iniciada**. Início autorizado somente após integração humana do PR documental de liberação em `origin/develop`.  
 **Tarefa:** `TASKS.md`, B15; [issue #52](https://github.com/RobsonSilverioSantos/srm-credit-engine/issues/52).  
 **Executor:** agente `backend`, em um único worktree exclusivo. **Revisões:** `architect`, `qa`, `reviewer`.  
 **Gate:** B15 e o documento devem estar integrados em `origin/develop`; **B14 deve estar integrada** antes de iniciar B15 para evitar colisões na numeração Flyway e conflitos de integração. A tarefa não fica automaticamente liberada com o merge deste documento: a coluna `Situação` precisa conter exatamente `Liberada para iniciar` após cumprimento das dependências.
+
+## Decisão vinculante aprovada para a implementação B15
+
+A [ADR-026](../adr/ADR-026-ptax-96h-manual-diaria.md) aprova:
+
+1. **PTAX de fechamento VENDA** (`cotacaoVenda`, BRL por USD), com elegibilidade do último fechamento conhecido e persistido limitada a **96 horas corridas inclusive** desde sua referência até o corte em UTC. Feriados, finais de semana e ausência de boletim não prorrogam esse prazo. Reimportar boletim não o renova. Usar horário/instante do boletim só após confirmar semântica e fuso, preservar primeira observação e impedir conhecimento retroativo.
+2. **MANUAL como alternativa excepcional explicitamente autorizada**, jamais fallback automático: MASTER/ADMIN da organização cadastram e autorizam o uso, com autor/justificativa/escopo registrados; OPERADOR somente pode consumir fonte ativa. Uma cotação cadastrada não se torna elegível automaticamente. A janela é desde a autorização até **00:00 exclusiva do dia seguinte no fuso `America/Sao_Paulo`**. Não usar TTL de 30 minutos na MANUAL.
+3. **PTAX é o modo padrão**. Se não houver fechamento elegível, USD é indisponível até nova publicação/sincronização ou seleção/autorização MANUAL explícita; nunca recorrer à DEMO automaticamente. No modo MANUAL, expiração exige nova cotação/autorização ou mudança explícita da fonte. DEMO somente em ambiente de testes/demonstração.
+4. Manter conversão VP BRL já arredondado / cotação escolhida com `HALF_EVEN` no USD, sem spread cambial novo; snapshot inclui origem/lado/referência/corte/política/autorização. Nova fonte/cotação exige nova prévia e reconfirmação; replay da mesma chave/comando devolve resposta original sem reprecificar. C1–C3 e arquitetura hexagonal permanecem.
+
+**Alcance:** 96 horas é opção de produto, não exigência do BCB. A aprovação substitui os itens de política anteriormente descritos como propostas ao longo deste documento; a implementação e o uso operacional dependem de PR da B15 integrado. Datas/fusos e disponibilidade exata da publicação precisam de comprovação documental/técnica sem alterar esses limites aprovados.
 
 ## 1. Fundamentação e decisão
 
@@ -11,7 +22,7 @@ O enunciado original requer armazenar câmbio com data/hora de vigência, usando
 
 **Decisão de produto aprovada:** para consulta de referência USD/BRL, adotar a **PTAX de Fechamento** publicada pelo Banco Central do Brasil (BCB). A PTAX é uma taxa de **referência**, não representa uma oferta executável de câmbio. O fechamento é uma publicação por dia com boletim, não uma cotação intradiária que deva vencer automaticamente após 30 minutos.
 
-**Ponto ainda sujeito à revisão humana:** o BCB publica **compra e venda**. Para converter valor presente em BRL em valor de pagamento em USD, propõe-se `cotacaoVenda` (perspectiva de aquisição de USD com BRL), com o valor expresso em **BRL por 1 USD**. A confirmação dessa escolha, e eventual aplicação de spread cambial contratual, deve ser registrada por decisão humana/ADR **antes de implementar como regra de negócio**. Não inferir compra/venda silenciosamente. O resultado deverá usar exatamente o lado aprovado e indicá-lo no snapshot.
+**Decisão aprovada:** utilizar `cotacaoVenda` do boletim PTAX `Fechamento` para BRL→USD, em **BRL por 1 USD**, sem spread cambial adicional. O snapshot deve registrar explicitamente o lado. A política de validade e fontes está formalizada na ADR-026.
 
 **Premissas que NÃO são regras oficiais BCB:** janela máxima de defasagem do fechamento, seleção de último dia disponível em fins de semana/feriados, horário de corte e eventuais políticas de fallback. Essas escolhas serão **configuráveis, explícitas e auditáveis**; não declarar que o BCB exige, por exemplo, 30 minutos ou uma janela fixa de N dias.
 
@@ -94,16 +105,19 @@ A porta `TaxasPorta.registrarCotacao(taxaBrlPorUsd, vigenteEm)` **já existe** n
 - [ ] Atualizar documentação factual e **propor** revisão formal de ADR-011/`SPEC.md` compatível com PTAX de fechamento e política de defasagem, sem alterar decisões normativas sem aprovação humana.
 - [ ] Um único PR de implementação B15 para `develop`, com revisão `architect`, `qa`, `reviewer`, sem merge por agente.
 
-## 8. Decisões pendentes para revisão técnica
+## 8. Decisões de política aprovadas e verificações técnicas restantes
 
-1. **Compra versus venda:** proposta `cotacaoVenda` para BRL→USD, requer confirmação humana.
-2. **Defasagem máxima:** duração ou dias úteis permitidos para último fechamento e regras para feriados/falhas prolongadas, precisam ser aprovados e parametrizados.
-3. **Disponibilidade/publicação:** como considerar a data/hora exata de divulgação e eventual revisão de boletim; verificar semântica oficial e definir proteção contra look-ahead.
-4. **Atualização:** agendamento e/ou acionamento sob autorização; critério de sincronização inicial sem sobrecarregar o BCB.
-6. **Operação manual:** política de autorização, validade da fonte MANUAL e precedência frente à PTAX; jamais assumir sobreposição automática.
-5. **Manutenção de legado:** como etiquetar cotações históricas sem proveniência; não falsificar que vieram do BCB.
+**Aprovado em 22/11/2026 (ADR-026):** PTAX VENDA, defasagem de 96 horas corridas inclusive, sem extensão por feriados; MANUAL mediante autorização organizacional explícita por MASTER/ADMIN, elegível da autorização até meia-noite local exclusiva em `America/Sao_Paulo`; PTAX padrão, DEMO somente demonstração, sem fallback automático nem spread cambial novo. C1–C3 preservados.
 
-É permitido iniciar investigação/planejamento de desenho sobre a B15 depois da liberação, mas **não concluir implementação sem essas decisões**.
+**Verificações técnicas necessárias antes de concluir a B15:**
+
+- Confirmar junto ao BCB e às fixtures a semântica temporal de `dataHoraCotacao`/publicação e sua normalização para UTC. Evitar disponibilidade retroativa e registrar primeira observação.
+- Definir e testar contrato seguro para ativar excepcionalmente MANUAL por organização e permitir consumo por OPERADOR sob autorização, com auditoria e histórico.
+- Provar seleção de último boletim disponível sem antevisão e situações de BCB indisponível, sem publicação, fim de semana e feriado prolongado.
+- Contratos OpenAPI, snapshot e migration exclusivamente nova para proveniência, sem alterar migrations aplicadas; assegurar testes PostgreSQL e rollback.
+- Testar exatas 96h inclusivas e 96h+1ms, início/fim de dia São Paulo, `409`, replay após expiração e `503` sem fonte elegível.
+
+Não alterar decisões financeiras além da ADR-026 sem nova aprovação. A F06 depende da B15 integrada e posterior liberação.
 
 ## Referências oficiais
 
