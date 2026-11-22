@@ -68,6 +68,22 @@
 >
 > Na massa A/B de 200 + 200, após liquidar A, evidenciar as quatro referências de B como `JA_LIQUIDADO`, duas na mesma ordem e duas em posições distintas; não ocultar nem descartar automaticamente. Testar UI de 200/200 simulações, bloqueio de botões, duas confirmações, replay, rollback integral, erros por linha, acessibilidade, mobile, teclado/ARIA, locale, sessão e 401/403/409/503. Executar lint/test/build e registrar resultados reais. Solicitar revisões `architect`, `qa` e `reviewer`, commitar/push apenas na feature e abrir PR contra `develop`. **Nunca fazer merge**, nem alterar B15/F06 ou regras financeiras.
 
+## Agente backend — B18 (identificação do cedente por CNPJ na importação)
+
+**Gate:** Política aprovada e planejamento registrado na issue #82. **Somente iniciar após merge humano do PR de liberação e conferência literal de `Liberada para iniciar` na linha B18 de `origin/develop:TASKS.md`**. F09 e B15/F06 não estão autorizadas por esta liberação.
+
+> Você é o agente `backend`. Execute exclusivamente B18 após ler `AGENTS.md`, `.github/copilot-instructions.md`, `TASKS.md`, `SPEC.md`, `DECISIONS.md`, `docs/engenharia/B18_CNPJ_CEDENTE_IMPORTACAO.md`, ADR-023, ADR-024, ADR-025, contratos B14/B16 existentes e a issue #82. Branch derivada do ID + Trabalho em `TASKS.md`, worktree exclusiva, sem modificar políticas financeiras nem outras tarefas.
+>
+> Acrescentar à pré-validação CSV/XLSX B16 um modelo alternativo com cabeçalho `cedenteDocumento` no lugar de `cedenteId`, **preservando integralmente o modelo UUID legado**. Resolver CNPJ brasileiro (numérico/alfanumérico, zeros à esquerda) validado pela B14 exclusivamente na organização autenticada, somente cedentes ativos, sem expor dados de outro tenant. Registros legados sem identificação canônica, documentos desconhecidos/inativos/ambíguos e documentos inválidos devem produzir erro de linha seguro e impedir cadastro integral.
+>
+> Na pré-validação sem escrita, resolver CNPJ para UUID e reaproveitar o comando canônico B16. Na confirmação atômica B16, revalidar vínculo/ativo/organização e preserve replay/idempotência e `referenciaExterna` única por `(organizacao_id, referencia_externa)` — referência NÃO é a organização. Não alterar B17, ADR-024/025, liquidações ou precedência cambial. Hexagonal: domínio/portas sem Spring, HTTP ou JDBC, adaptadores para parser e persistência.
+>
+> Testes PostgreSQL reais e CI: formatos CSV/XLSX CNPJ e UUID, numérico/alfanumérico, DV inválido, documentos legados/inativos/inexistentes e isolamento tenant; concorrência/revalidação, rollback total, A/B 200+200 e quatro referências repetidas. Pedir revisão `architect`, `qa`, `reviewer`; evidências reais. Commit/push somente da própria feature e PR para `develop`, **sem merge**.
+
+## Agente frontend — F09 (modelos e experiência CNPJ, ainda bloqueada)
+
+**Gate:** F09 apenas após B18 integrada em `develop` e posterior PR documental de liberação com status literal `Liberada para iniciar`. **Não iniciar por conta da liberação B18.** A issue #83 e `docs/engenharia/F09_INTERFACE_IMPORTACAO_CNPJ.md` descrevem modelos e interface, mantendo compatibilidade UUID e fluxos B16/B17. F09 usa worktree própria e não altera regras financeiras.
+
 ## Agente QA / revisão de PR
 
 > Leia o enunciado, `SPEC.md`, `DECISIONS.md`, o ID do `TASKS.md` e o diff do PR aberto. Faça análise independente de requisitos, arquitetura hexagonal, segurança, organização/cedente, erros, golden cases e evidência de testes. Classifique achados por severidade, distinga observação de hipótese e formule comentários didáticos. **Não** faça merge ou alteração corretiva fora da tarefa autorizada. Os exercícios independentes de `docs/exercicios/` não são trabalho de QA do backend.
