@@ -2,7 +2,8 @@
 
 **Status:** planejada P1, **bloqueada por política financeira ainda não aprovada**.  
 **Issue:** [#65](https://github.com/RobsonSilverioSantos/srm-credit-engine/issues/65).  
-**Dependências:** B16 (cadastro/importação de lote) integrada; B06/B07/B08/B12 já integradas. F08 depende da integração B16 e B17 para oferecer o fluxo completo.  
+**Dependências:** B16 (cadastro/importação de lote) integrada pelo [PR #71](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/71), merge `186786e27320e83700a81e3922c72d096cefcb86`; B06/B07/B08/B12 já integradas. A dependência técnica está atendida, **sem autorização para iniciar implementação financeira**. F08 ainda depende da integração B17, contratos homologados e nova liberação literal.
+
 **Executor proposto:** agente `backend`, revisores `architect`, `qa` e `reviewer` em feature/worktree exclusivo.
 
 ## Motivação
@@ -71,4 +72,4 @@ Os [CSV A e B](../validacao/lotes/README.md) possuem 200 linhas cada e quatro re
 - [ ] Garantir consistência do extrato, autoria, snapshots, versão do recebível, auditoria e não exposição entre organizações.
 - [ ] Executar CI backend, frontend e Compose; registrar resultados reais e abrir PR para `develop` sem merge pelo agente.
 
-**Gate:** a B17 não poderá iniciar antes de B16 integrada, política de processamento aprovada e status literal `Liberada para iniciar` em `origin/develop:TASKS.md`.
+**Gate (reconciliado pela G02 em 22/11/2026):** B16 já integrada; B17 continua **bloqueada**, sem implementação iniciada. Ainda exige política de processamento aprovada pelo responsável e status literal `Liberada para iniciar` em `origin/develop:TASKS.md`. A atomicidade do cadastro B16 e os scripts QA k6 do PR #70 não aprovam a política nem comprovam concorrência da liquidação em lote.

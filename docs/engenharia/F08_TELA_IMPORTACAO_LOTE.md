@@ -1,8 +1,10 @@
 # F08 — Interface de importação e liquidação explícita de recebíveis em lote
 
-**Status:** planejada P1 e bloqueada até as APIs B16 (importação) e B17 (liquidação em lote) integradas.  
+**Status:** planejada P1 e **bloqueada**; B16 integrada, mas B17 (liquidação em lote) ainda não implementada nem liberada.
+
 **Issue:** [#64](https://github.com/RobsonSilverioSantos/srm-credit-engine/issues/64).  
-**Dependências:** F05 integrada pelo PR #61; B16 e B17 com contratos e autorização homologados e implementações integradas à `develop`. A etapa de importação pode ser desenvolvida separadamente apenas se uma atualização de escopo e gates for aprovada.  
+**Dependências:** F05 integrada pelo PR #61; B16 integrada pelo [PR #71](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/71), merge `186786e27320e83700a81e3922c72d096cefcb86`. Ainda aguarda B17 integrada à `develop`, contratos e autorização homologados e nova liberação literal de F08 em `origin/develop:TASKS.md`. Reconciliação G02 de 22/11/2026 não autoriza iniciar sequer a etapa de importação separadamente; isso exigiria atualização humana de escopo e gates.
+
 **Executor proposto:** agente `frontend`, revisores `architect`, `qa` e `reviewer`; worktree independente de F07/F06.
 
 ## Objetivo de experiência

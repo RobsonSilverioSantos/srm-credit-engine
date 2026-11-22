@@ -1,5 +1,7 @@
 # B16: teste de concorrência do cadastro em lote
 
+**Estado reconciliado pela G02 em 22/11/2026:** scripts integrados em `develop` pelo [PR #70](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/70), merge `9043732b86a4671bf7ea368e288bf68151205fdb`; backend B16 integrado pelo [PR #71](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/71). **Execução real de k6 contra o backend ainda pendente**; os testes do substituto local relatados abaixo não a substituem. B17, B15, F06 e F08 permanecem bloqueadas.
+
 O cenário exercita a API pública de cadastro em ambiente de teste, sem alterações no backend, no contrato ou nas políticas financeiras. Os dois [CSVs sintéticos versionados](../../../docs/validacao/lotes/README.md), com 200 linhas cada, repetem quatro referências em posições iguais e diferentes. O teste não chama endpoints de liquidação, não exige cotação USD elegível para o cadastro e não demonstra carga ou lock otimista de liquidação (B17).
 
 ## Execução
@@ -31,4 +33,4 @@ O teste falha se não conseguir observar o estado esperado. O disparo HTTP em pa
 - **Tarefa QA-B16-k6**, de escopo independente da implementação backend [B16 / #63](https://github.com/RobsonSilverioSantos/srm-credit-engine/issues/63), liberada para cadastro atômico pelo [PR #69](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/69) e pela [ADR-024](../../../docs/adr/ADR-024-cadastro-atomico-lotes.md).
 - O agente QA (ChatGPT) preparou o roteiro, o teste e as verificações contra um substituto local do contrato coordenado com o agente backend. Os artefatos não substituem a revisão, a validação integrada nem o merge pelo responsável técnico. O histórico de [uso de IA](../../../AI_USAGE.md) não foi reescrito.
 - Executados localmente `node --input-type=module --check < qa/k6/b16/concorrencia.js` e `node --test qa/k6/b16/contrato.test.mjs`: cinco testes aprovados, incluindo vencedor A/B, persistência indevida após 409, ambiente com referências pré-existentes e rejeição de destino externo. O substituto não abre rede e não comprova transporte, concorrência real, k6 executado ou PostgreSQL.
-- Não foi executado k6 contra a aplicação nesta entrega. O teste integrado continua pendente até a publicação da implementação B16 e a configuração de um ambiente descartável.
+- Não foi executado k6 contra a aplicação na entrega do PR #70. Após a integração B16 no PR #71, o teste real continua pendente de preparação de ambiente descartável, conferência do contrato integrado e execução com publicação dos resultados verdadeiros. A G02 é documental e não executou k6.

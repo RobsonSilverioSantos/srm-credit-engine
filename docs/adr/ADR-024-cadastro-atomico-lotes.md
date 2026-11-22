@@ -1,13 +1,14 @@
 # ADR-024 — Importação e cadastro atômico de recebíveis em lote
 
-**Estado:** decisão aprovada para a B16 (implementação pendente).  
+**Estado:** decisão aprovada para a B16; implementação integrada em `develop` pelo [PR #71](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/71) em 22/11/2026 (merge `186786e27320e83700a81e3922c72d096cefcb86`). Reconciliação factual G02, sem alteração da decisão.
+
 **Data:** 22/11/2026.  
 **Escopo:** cadastro de recebíveis por arquivo; **não** determina a política de liquidação financeira em lote da B17.  
 **Referências:** [B16](../engenharia/B16_IMPORTACAO_RECEBIVEIS_LOTE.md), [issue #63](https://github.com/RobsonSilverioSantos/srm-credit-engine/issues/63), [B17](../engenharia/B17_LIQUIDACAO_LOTE_CONCORRENCIA.md), [fixtures A/B](../validacao/lotes/README.md).
 
 ## Contexto
 
-O requisito operacional de importar múltiplos recebíveis deve permitir validar e conferir dados antes de efetuar cadastro, inclusive detectar duplicidades entre arquivos distintos. A solução atual cadastra recebíveis individualmente. O cadastro do lote não equivale à liquidação dos seus títulos.
+O requisito operacional de importar múltiplos recebíveis deve permitir validar e conferir dados antes de efetuar cadastro, inclusive detectar duplicidades entre arquivos distintos. Na aprovação desta decisão, a solução cadastrava recebíveis apenas individualmente; o cadastro em lote foi integrado posteriormente pelo PR #71. O cadastro do lote não equivale à liquidação dos seus títulos.
 
 ## Decisão de atomicidade — aprovada pelo responsável técnico
 
@@ -39,4 +40,4 @@ Essa sequência prova deduplicação e atomicidade de cadastro; **não demonstra
 - **Liquidar imediatamente ao carregar o arquivo:** rejeitado. Mistura autorização financeira e importação; B17 define prévia completa e confirmação financeira separada.
 - **Determinar atomicidade da liquidação B17 a partir da B16:** não autorizado. A liquidação poderá ter política própria (tudo-ou-nada ou parcial), ainda pendente de decisão.
 
-**Evidência:** a aprovação humana desta decisão refere-se ao **cadastro atômico**. Validação funcional, migrações e testes de concorrência ainda serão realizados na implementação B16; este ADR isoladamente não comprova execução da API ou liquidação financeira.
+**Evidência na aprovação:** a decisão referia-se ao **cadastro atômico**, com validação funcional, migrations e testes ainda futuros naquele momento. **Atualização G02 (22/11/2026):** o PR #71 integrou a B16 e a migration V6, com CI backend/PostgreSQL, frontend e Compose aprovada; os testes não foram reexecutados nesta atualização documental. Scripts QA k6 integrados pelo PR #70 não equivalem a execução real, que permanece pendente. Este ADR isoladamente não comprova execução da API ou liquidação financeira; a política da B17 continua independente e bloqueada.
