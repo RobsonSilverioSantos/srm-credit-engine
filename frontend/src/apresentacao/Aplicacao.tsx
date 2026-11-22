@@ -14,6 +14,8 @@ import { Painel } from '../tema/componentes/Painel'
 import { InstanteLocal } from '../tema/componentes/InstanteLocal'
 import { formatarEntradaMonetaria, formatarMonetario, formatarPercentual, formatarCotacao, normalizarEntradaMonetaria, separadorDecimalMonetario } from '../dominio/formatacaoMonetaria'
 import { caixaAscii, editarCnpj, erroDocumento, erroTipoDocumento } from '../dominio/documentoCedente'
+import type { PortaLotes } from '../aplicacao/lotes'
+import { PaginaImportacaoLote } from './PaginaImportacaoLote'
 
 const grade = { display: 'grid', gap: 2, gridTemplateColumns: { xs: 'minmax(0, 1fr)', sm: 'repeat(2, minmax(0, 1fr))' } }
 const modalidades = [
@@ -22,9 +24,9 @@ const modalidades = [
 ]
 const moedas = [{ valor: 'BRL', rotulo: 'BRL' }, { valor: 'USD', rotulo: 'USD' }]
 
-type Props = { operacoes: PortaOperacoes; gestaoUsuarios: PortaGestaoUsuarios; extrato: PortaExtrato; locale: string; fusoHorario?: string }
+type Props = { operacoes: PortaOperacoes; gestaoUsuarios: PortaGestaoUsuarios; extrato: PortaExtrato; lotes: PortaLotes; locale: string; fusoHorario?: string }
 
-export function Aplicacao({ operacoes, gestaoUsuarios, extrato, locale, fusoHorario }: Props) {
+export function Aplicacao({ operacoes, gestaoUsuarios, extrato, lotes, locale, fusoHorario }: Props) {
   const [sessao, setSessao] = useState<Sessao | null>(null)
   const [email, setEmail] = useState('')
   const [identidade, setIdentidade] = useState('')
@@ -36,6 +38,8 @@ export function Aplicacao({ operacoes, gestaoUsuarios, extrato, locale, fusoHora
   const [usuariosVisiveis, setUsuariosVisiveis] = useState<boolean | null>(null)
   const [operacaoEmCurso, setOperacaoEmCurso] = useState(false)
   const [operacaoPendente, setOperacaoPendente] = useState(false)
+  const [loteEmCurso, setLoteEmCurso] = useState(false)
+  const [lotePendente, setLotePendente] = useState(false)
   const [confirmarSaida, setConfirmarSaida] = useState(false)
 
   useEffect(() => {
@@ -53,14 +57,14 @@ export function Aplicacao({ operacoes, gestaoUsuarios, extrato, locale, fusoHora
   }, [sessao])
 
   useEffect(() => {
-    if (!operacaoEmCurso && !operacaoPendente) return
+    if (!operacaoEmCurso && !operacaoPendente && !loteEmCurso && !lotePendente) return
     function prevenirDescarte(evento: BeforeUnloadEvent) {
       evento.preventDefault()
       evento.returnValue = ''
     }
     window.addEventListener('beforeunload', prevenirDescarte)
     return () => window.removeEventListener('beforeunload', prevenirDescarte)
-  }, [operacaoEmCurso, operacaoPendente])
+  }, [operacaoEmCurso, operacaoPendente, loteEmCurso, lotePendente])
 
   const navegar = useCallback((destino: PaginaOperacional) => {
     const paginaPermitida = destino === 'usuarios' && usuariosVisiveis === false ? 'cedentes' : destino
@@ -113,18 +117,20 @@ export function Aplicacao({ operacoes, gestaoUsuarios, extrato, locale, fusoHora
     setUsuariosVisiveis(null)
     setOperacaoEmCurso(false)
     setOperacaoPendente(false)
+    setLoteEmCurso(false)
+    setLotePendente(false)
     setConfirmarSaida(false)
     navegar('cedentes')
   }, [navegar])
 
   const solicitarSaida = useCallback(() => {
-    if (operacaoEmCurso) return
-    if (operacaoPendente) {
+    if (operacaoEmCurso || loteEmCurso) return
+    if (operacaoPendente || lotePendente) {
       setConfirmarSaida(true)
       return
     }
     sair()
-  }, [operacaoEmCurso, operacaoPendente, sair])
+  }, [operacaoEmCurso, operacaoPendente, loteEmCurso, lotePendente, sair])
 
   const tratarErro = useCallback((falha: unknown) => {
     if (falha instanceof ErroOperacao && falha.status === 401) expirarSessao()
@@ -154,11 +160,11 @@ export function Aplicacao({ operacoes, gestaoUsuarios, extrato, locale, fusoHora
         <LayoutOperacional
           pagina={pagina}
           usuariosVisiveis={usuariosVisiveis === true}
-          sairDesabilitado={operacaoEmCurso}
+          sairDesabilitado={operacaoEmCurso || loteEmCurso}
           aoNavegar={navegar}
           aoSair={solicitarSaida}
         >
-          {operacaoPendente && (
+          {(operacaoPendente || lotePendente) && (
             <Dialog open={confirmarSaida} onClose={() => setConfirmarSaida(false)} aria-labelledby="confirmar-saida-titulo">
               <DialogTitle id="confirmar-saida-titulo">Sair com operação pendente?</DialogTitle>
               <DialogContent>
@@ -182,7 +188,20 @@ export function Aplicacao({ operacoes, gestaoUsuarios, extrato, locale, fusoHora
             navegar={navegar}
             aoAtualizarOperacaoEmCurso={setOperacaoEmCurso}
             aoAtualizarOperacaoPendente={setOperacaoPendente}
+            bloqueadoPorLote={loteEmCurso || lotePendente}
           />
+          <Box hidden={pagina !== 'importacao'}>
+            <PaginaImportacaoLote
+              porta={lotes}
+              token={sessao?.token ?? null}
+              tratarErro={tratarErro}
+              locale={locale}
+              fusoHorario={fusoHorario}
+              aoAtualizarOperacaoEmCurso={setLoteEmCurso}
+              aoAtualizarOperacaoPendente={setLotePendente}
+              bloqueadoExternamente={operacaoEmCurso || operacaoPendente}
+            />
+          </Box>
           {sessao && <Box hidden={pagina !== 'extrato'}>
             <PaginaExtrato
               porta={extrato}
@@ -215,12 +234,13 @@ type PainelProps = Pick<Props, 'operacoes' | 'locale' | 'fusoHorario'> & {
   navegar: (pagina: PaginaOperacional) => void
   aoAtualizarOperacaoEmCurso: (emCurso: boolean) => void
   aoAtualizarOperacaoPendente: (pendente: boolean) => void
+  bloqueadoPorLote: boolean
 }
 type Previa = { entrada: string; dados: Simulacao }
 
 function PainelOperacoes({
   operacoes, token, tratarErro, locale, fusoHorario, pagina, navegar,
-  aoAtualizarOperacaoEmCurso, aoAtualizarOperacaoPendente,
+  aoAtualizarOperacaoEmCurso, aoAtualizarOperacaoPendente, bloqueadoPorLote,
 }: PainelProps) {
   const [cedentes, setCedentes] = useState<Cedente[] | null>(null)
   const [erroCedentes, setErroCedentes] = useState('')
@@ -329,7 +349,7 @@ function PainelOperacoes({
 
   async function cadastrarCedente(evento: FormEvent) {
     evento.preventDefault()
-    if (!token || trava.current || erroIdentificacao) return
+    if (!token || trava.current || erroIdentificacao || bloqueadoPorLote) return
     trava.current = true
     atualizarOcupado(true)
     setErro('')
@@ -357,7 +377,7 @@ function PainelOperacoes({
   }
 
   async function cadastrarRecebivel() {
-    if (!token || !cedenteId || !previa || previa.entrada !== chaveEntrada || trava.current) return
+    if (!token || !cedenteId || !previa || previa.entrada !== chaveEntrada || trava.current || bloqueadoPorLote) return
     trava.current = true
     atualizarOcupado(true)
     setErro('')
@@ -385,7 +405,7 @@ function PainelOperacoes({
   }
 
   async function liquidar() {
-    if (!token || !pendente || trava.current) return
+    if (!token || !pendente || trava.current || bloqueadoPorLote) return
     trava.current = true
     atualizarOcupado(true)
     setErro('')
@@ -417,6 +437,7 @@ function PainelOperacoes({
       {operacaoAtiva && sucesso && <Mensagem severity="success">{sucesso}</Mensagem>}
       {operacaoAtiva && erro && <Mensagem severity="error">{erro}</Mensagem>}
       {operacaoAtiva && ocupado && <Carregando rotulo="Processando operação…" />}
+      {operacaoAtiva && bloqueadoPorLote && <Mensagem severity="warning">Novas escritas bloqueadas: resolva a confirmação do lote em Importação em lote antes de iniciar outra operação. Consultas e navegação continuam disponíveis.</Mensagem>}
       <Box hidden={pagina !== 'cedentes'}>
         <Typography color="text.secondary" sx={{ mb: 2 }}>Cadastre cedentes e selecione a parte vinculada ao recebível.</Typography>
         <Painel id="cedentes" titulo="Cedentes">
@@ -471,7 +492,7 @@ function PainelOperacoes({
               }} />
           </Box>
           {tipoDocumento === 'OUTRO' && <Typography variant="body2">Identificador não verificado. Não é validação fiscal.</Typography>}
-          <Box><Button type="submit" variant="outlined" disabled={bloqueado || Boolean(erroIdentificacao)}>Cadastrar cedente</Button></Box>
+          <Box><Button type="submit" variant="outlined" disabled={bloqueado || bloqueadoPorLote || Boolean(erroIdentificacao)}>Cadastrar cedente</Button></Box>
         </Stack>
         {erroCedentes && <Mensagem severity="error">{erroCedentes} <Button onClick={() => setAtualizacao((n) => n + 1)}>Tentar novamente</Button></Mensagem>}
         {!cedentes && !erroCedentes && <Carregando rotulo="Carregando cedentes…" />}
@@ -530,19 +551,19 @@ function PainelOperacoes({
         {estadoPrevia === 'carregando' && <Carregando rotulo="Simulando…" />}
         {estadoPrevia === 'erro' && <Mensagem severity="error">{erroPrevia} <Button onClick={() => { alterou(); setTentativaPrevia((n) => n + 1) }}>Tentar novamente</Button></Mensagem>}
         {previaAtual && <Valores dados={previaAtual} locale={locale} fusoHorario={fusoHorario} />}
-        <Box><Button variant="contained" disabled={bloqueado || !cedenteId || !previaAtual || estadoPrevia !== 'pronto'}
+        <Box><Button variant="contained" disabled={bloqueado || bloqueadoPorLote || !cedenteId || !previaAtual || estadoPrevia !== 'pronto'}
           onClick={cadastrarRecebivel}>Cadastrar recebível</Button></Box>
         </Painel>
       </Box>
       <Box hidden={pagina !== 'liquidacao'}>
         {pendente && !liquidacao && <Painel id="liquidacao" titulo="Liquidação">
           <Typography>Recebível: {pendente.id}. A liquidação será recalculada com as taxas vigentes.</Typography>
-          <Box><Button variant="contained" disabled={ocupado} onClick={() => setConfirmando(true)}>Confirmar liquidação</Button></Box>
+          <Box><Button variant="contained" disabled={ocupado || bloqueadoPorLote} onClick={() => setConfirmando(true)}>Confirmar liquidação</Button></Box>
         </Painel>}
         {liquidacao && <Painel id="resultado" titulo="Liquidação confirmada">
         <Typography>Código da liquidação: {liquidacao.liquidacaoId}</Typography>
         <Valores dados={liquidacao} locale={locale} fusoHorario={fusoHorario} />
-        <Box><Button onClick={() => {
+        <Box><Button disabled={bloqueadoPorLote} onClick={() => {
           setPendente(null); setLiquidacao(null); setValor(''); setPrazo(''); setVencimento('')
           setPrevia(null); setEstadoPrevia('vazio'); setSucesso(''); setErro('')
           aoAtualizarOperacaoPendente(false)
@@ -557,7 +578,7 @@ function PainelOperacoes({
       <Dialog open={confirmando} onClose={() => setConfirmando(false)} aria-labelledby="confirmar-titulo">
         <DialogTitle id="confirmar-titulo">Confirmar liquidação?</DialogTitle>
         <DialogContent><DialogContentText>O valor será calculado novamente pelo servidor e pode diferir da simulação indicativa.</DialogContentText></DialogContent>
-        <DialogActions><Button onClick={() => setConfirmando(false)}>Cancelar</Button><Button onClick={liquidar} disabled={ocupado}>Liquidar</Button></DialogActions>
+        <DialogActions><Button onClick={() => setConfirmando(false)}>Cancelar</Button><Button onClick={liquidar} disabled={ocupado || bloqueadoPorLote}>Liquidar</Button></DialogActions>
       </Dialog>
     </Stack>
   )

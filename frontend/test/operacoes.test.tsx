@@ -9,6 +9,7 @@ import { Aplicacao } from '../src/apresentacao/Aplicacao'
 import type { Simulacao } from '../src/dominio/operacoes'
 import { formatarMonetario } from '../src/dominio/formatacaoMonetaria'
 import { tema } from '../src/tema/tema'
+import { criarPortaLotes } from './fixtures/lotes'
 
 beforeEach(() => window.history.replaceState(null, '', '/'))
 
@@ -55,12 +56,14 @@ async function iniciar(
   locale = 'en-US',
   extrato = criarPortaExtrato(),
   gestaoUsuarios = criarPortaGestao(),
+  lotes = criarPortaLotes(),
 ) {
   const user = userEvent.setup()
   render(<ThemeProvider theme={tema}><Aplicacao
     operacoes={operacoes}
     gestaoUsuarios={gestaoUsuarios}
     extrato={extrato}
+    lotes={lotes}
     locale={locale}
     fusoHorario="America/Sao_Paulo"
   /></ThemeProvider>)
@@ -238,6 +241,7 @@ test('cadastra cedente e permite nova tentativa de simulação indisponível', a
     operacoes={porta}
     gestaoUsuarios={criarPortaGestao()}
     extrato={criarPortaExtrato()}
+    lotes={criarPortaLotes()}
     locale="en-US"
     fusoHorario="America/Sao_Paulo"
   /></ThemeProvider>)
@@ -572,3 +576,85 @@ test('cursor em caracteres repetidos e substituição entre separadores', async 
   expect(campo).toHaveValue('1A.B11.111/1111-1')
   expect(campo.selectionStart).toBe(4)
 })
+
+test('importação mantém retry ao navegar e reautenticar, usa sessão principal e confirma saída pendente', async () => {
+  const porta = criarPorta()
+  const lotes = criarPortaLotes()
+  lotes.cadastrar.mockRejectedValueOnce(new ErroOperacao('Sessão expirada.', 401))
+  const user = await iniciar(porta, 'pt-BR', criarPortaExtrato(), criarPortaGestao(), lotes)
+  await navegarA(user, 'Importação em lote')
+  expect(screen.getByRole('navigation', { name: 'Caminho de navegação' })).toHaveTextContent('Início/Operações/Importação em lote')
+  await user.upload(screen.getByLabelText('Arquivo CSV ou XLSX'), new File(['arquivo'], 'lote.csv'))
+  await user.click(screen.getByRole('button', { name: 'Pré-validar arquivo' }))
+  await user.click(await screen.findByRole('button', { name: 'Conferir cadastro' }))
+  await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Confirmar cadastro' }))
+  await screen.findByText(/Sessão expirada. Entre novamente com a mesma conta/)
+  expect(screen.getByLabelText(/E-mail/)).toBeDisabled()
+  await user.type(screen.getByLabelText(/Senha/), 'senha')
+  await user.click(screen.getByRole('button', { name: 'Entrar' }))
+  await screen.findByRole('button', { name: 'Repetir confirmação de cadastro' })
+  await navegarA(user, 'Extrato')
+  await screen.findByText('Nenhuma liquidação encontrada')
+  await navegarA(user, 'Importação em lote')
+  expect(screen.getByRole('button', { name: 'Repetir confirmação de cadastro' })).toBeVisible()
+  const eventoSaida = new Event('beforeunload', { cancelable: true })
+  window.dispatchEvent(eventoSaida)
+  expect(eventoSaida.defaultPrevented).toBe(true)
+  await user.click(screen.getByRole('button', { name: 'Sair' }))
+  const dialogoSaida = screen.getByRole('dialog', { name: 'Sair com operação pendente?' })
+  await user.click(within(dialogoSaida).getByRole('button', { name: 'Continuar operação' }))
+  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+  await user.click(screen.getByRole('button', { name: 'Repetir confirmação de cadastro' }))
+  await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Confirmar cadastro' }))
+  await screen.findByRole('table', { name: 'Recebíveis cadastrados para auditoria' })
+  expect(lotes.cadastrar.mock.calls[0]).toEqual(lotes.cadastrar.mock.calls[1])
+  expect(porta.autenticar).toHaveBeenCalledTimes(2)
+}, 15000)
+
+test('cadastro de lote incerto bloqueia novas escritas individuais sem bloquear consultas', async () => {
+  const porta = criarPorta()
+  const lotes = criarPortaLotes()
+  lotes.cadastrar.mockRejectedValueOnce(new ErroOperacao('Resposta perdida.'))
+  const user = await iniciar(porta, 'en-US', criarPortaExtrato(), criarPortaGestao(), lotes)
+  await preencher(user)
+  await screen.findByText(/Valor presente:/)
+  expect(screen.getByRole('button', { name: 'Cadastrar recebível' })).toBeEnabled()
+  await navegarA(user, 'Importação em lote')
+  await user.upload(screen.getByLabelText('Arquivo CSV ou XLSX'), new File(['arquivo'], 'lote.csv'))
+  await user.click(screen.getByRole('button', { name: 'Pré-validar arquivo' }))
+  await user.click(await screen.findByRole('button', { name: 'Conferir cadastro' }))
+  await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Confirmar cadastro' }))
+  await screen.findByRole('button', { name: 'Repetir confirmação de cadastro' })
+  await navegarA(user, 'Simulação')
+  expect(screen.getByRole('button', { name: 'Cadastrar recebível' })).toBeDisabled()
+  fireEvent.click(screen.getByRole('button', { name: 'Cadastrar recebível' }))
+  await navegarA(user, 'Cedentes')
+  expect(screen.getByRole('button', { name: 'Cadastrar cedente' })).toBeDisabled()
+  fireEvent.submit(screen.getByRole('button', { name: 'Cadastrar cedente' }).closest('form')!)
+  expect(porta.cadastrarRecebivel).not.toHaveBeenCalled()
+  expect(porta.cadastrarCedente).not.toHaveBeenCalled()
+  await navegarA(user, 'Extrato')
+  expect(await screen.findByText('Nenhuma liquidação encontrada')).toBeVisible()
+}, 15000)
+
+test('operação individual pendente bloqueia importação até sua própria confirmação resolver', async () => {
+  const porta = criarPorta()
+  const lotes = criarPortaLotes()
+  const user = await iniciar(porta, 'en-US', criarPortaExtrato(), criarPortaGestao(), lotes)
+  await preencher(user)
+  await screen.findByText(/Valor presente:/)
+  await user.click(screen.getByRole('button', { name: 'Cadastrar recebível' }))
+  await screen.findByRole('button', { name: 'Confirmar liquidação' })
+  await navegarA(user, 'Importação em lote')
+  expect(screen.getByLabelText('Arquivo CSV ou XLSX')).toBeDisabled()
+  expect(screen.getByRole('button', { name: 'Pré-validar arquivo' })).toBeDisabled()
+  expect(screen.getByText(/Resolva a operação individual pendente/)).toBeVisible()
+  expect(lotes.prevalidar).not.toHaveBeenCalled()
+  await navegarA(user, 'Liquidação')
+  await user.click(screen.getByRole('button', { name: 'Confirmar liquidação' }))
+  await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Liquidar' }))
+  await screen.findByText('Liquidação confirmada.')
+  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+  await navegarA(user, 'Importação em lote')
+  expect(screen.getByLabelText('Arquivo CSV ou XLSX')).toBeEnabled()
+}, 15000)

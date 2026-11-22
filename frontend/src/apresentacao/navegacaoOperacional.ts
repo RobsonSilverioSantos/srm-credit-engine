@@ -1,8 +1,8 @@
-export type PaginaOperacional = 'cedentes' | 'simulacao' | 'liquidacao' | 'extrato' | 'usuarios'
+export type PaginaOperacional = 'cedentes' | 'simulacao' | 'liquidacao' | 'importacao' | 'extrato' | 'usuarios'
 
 export function paginaDaHash(hash: string): PaginaOperacional {
   const pagina = hash.replace(/^#\/?/, '').split(/[/?]/)[0]
-  if (pagina === 'simulacao' || pagina === 'liquidacao' || pagina === 'extrato' || pagina === 'usuarios') return pagina
+  if (pagina === 'simulacao' || pagina === 'liquidacao' || pagina === 'importacao' || pagina === 'extrato' || pagina === 'usuarios') return pagina
   return 'cedentes'
 }
 
