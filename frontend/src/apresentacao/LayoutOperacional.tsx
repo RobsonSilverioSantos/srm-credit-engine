@@ -19,6 +19,7 @@ const paginas: readonly { id: PaginaOperacional; rotulo: string; grupo: string }
   { id: 'cedentes', rotulo: 'Cedentes', grupo: 'Operações' },
   { id: 'simulacao', rotulo: 'Simulação', grupo: 'Operações' },
   { id: 'liquidacao', rotulo: 'Liquidação', grupo: 'Operações' },
+  { id: 'importacao', rotulo: 'Importação em lote', grupo: 'Operações' },
   { id: 'extrato', rotulo: 'Extrato', grupo: 'Relatórios' },
   { id: 'usuarios', rotulo: 'Usuários', grupo: 'Administração' },
 ]
