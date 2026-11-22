@@ -125,6 +125,8 @@ para inspeção e auditoria.
 
 Os valores financeiros e os snapshots históricos são exibidos conforme
 recebidos do backend, sem recálculo no frontend.
+O nome do cedente é o nome atual do cadastro. O botão de detalhes abre um
+diálogo com o identificador do cedente e o snapshot, sem expandir a linha.
 
 A apresentação usa `navigator.languages` e `pt-BR` como fallback. Valores,
 taxas e cotações são formatados somente para exibição, preservando as strings

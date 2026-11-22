@@ -297,7 +297,8 @@ e `total`, ordenados por `liquidadaEm` e `liquidacaoId` decrescentes.
 
 Os valores e taxas são strings decimais lidas dos snapshots de liquidação;
 os campos cambiais são nulos para BRL. O ID do cedente é obtido do recebível
-vinculado. Cada resposta calcula itens e total no mesmo snapshot do banco;
+vinculado. `cedenteNome` contém o nome atual do cadastro, não um nome
+histórico congelado na liquidação. Cada resposta calcula itens e total no mesmo snapshot do banco;
 inserções entre requisições podem deslocar itens entre páginas.
 
 ## Precificação

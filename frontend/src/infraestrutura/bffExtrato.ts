@@ -7,7 +7,7 @@ function objeto(valor: unknown): valor is Record<string, unknown> {
 
 function itemValido(valor: unknown): valor is ItemExtrato {
   if (!objeto(valor)) return false
-  const textos = ['liquidacaoId', 'recebivelId', 'cedenteId', 'modalidade', 'valorFaceBrl', 'taxaBaseId',
+  const textos = ['liquidacaoId', 'recebivelId', 'cedenteId', 'cedenteNome', 'modalidade', 'valorFaceBrl', 'taxaBaseId',
     'taxaBaseMensal', 'taxaBaseVigenteEm', 'spreadId', 'spreadMensal', 'spreadVigenteEm',
     'valorPresenteBrl', 'desagioBrl', 'valorPagamento', 'liquidadaEm']
   const opcionais = ['cotacaoCambialId', 'taxaBrlPorUnidade', 'cotacaoVigenteEm', 'cotacaoValidaAte']

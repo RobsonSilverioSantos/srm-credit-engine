@@ -6,6 +6,7 @@ data class ItemExtratoResposta(
     val liquidacaoId: UUID,
     val recebivelId: UUID,
     val cedenteId: UUID,
+    val cedenteNome: String,
     val modalidade: String,
     val valorFaceBrl: String,
     val prazoMeses: Int,

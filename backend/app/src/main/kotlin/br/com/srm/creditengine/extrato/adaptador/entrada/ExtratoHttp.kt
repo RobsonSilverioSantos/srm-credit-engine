@@ -22,7 +22,7 @@ import org.springframework.web.bind.annotation.RestController
 @SecurityRequirement(name = "bearerAuth")
 class ExtratoHttp(private val extrato: ObjectProvider<ConsultarExtrato>) {
     private fun ItemExtrato.resposta() = ItemExtratoResposta(
-        liquidacaoId, recebivelId, cedenteId, modalidade, valorFaceBrl.toPlainString(), prazoMeses, versaoRecebivel,
+        liquidacaoId, recebivelId, cedenteId, cedenteNome, modalidade, valorFaceBrl.toPlainString(), prazoMeses, versaoRecebivel,
         taxaBaseId, taxaBaseMensal.toPlainString(), taxaBaseVigenteEm.toString(), spreadId, spreadMensal.toPlainString(),
         spreadVigenteEm.toString(), valorPresenteBrl.toPlainString(), desagioBrl.toPlainString(), moeda.name,
         cotacaoCambialId, taxaBrlPorUnidade?.toPlainString(), cotacaoVigenteEm?.toString(),
