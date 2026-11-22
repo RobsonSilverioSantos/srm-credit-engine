@@ -28,7 +28,7 @@ O endpoint, formato exato de payload/resposta e semântica de códigos HTTP são
 
 A confirmação exige **etapa deliberada adicional** (modal contendo resumo e quantidade, com ação `Confirmar liquidação`). O backend **revalida todas as condições no momento efetivo da escrita**; a verificação da UI não substitui autorização, controle de versão nem transação. Se taxa/câmbio/estado variar entre prévia e confirmação, aplicar a política financeira aprovada: devolver erro/novo snapshot para reconfirmação ou resultado por item conforme a semântica atômica/parcial homologada; **não liquidar silenciosamente com preço diferente**. O request deve identificar uma versão/revisão da prévia ou hash canônico para detectar prévia obsoleta, sujeito ao desenho definitivo do contrato.
 
-**Separação:** a aprovação do botão e da conferência total **não escolhe** se a transação do lote será tudo-ou-nada ou parcial por recebível. Essa decisão permanece pendente.
+**Separação:** o gate de simulações 100% válidas é obrigatório, mas não substitui a **política A de atomicidade financeira agora aprovada na ADR-025**: cada tentativa confirma todos os itens ou nenhum, com rollback total. A opção B permanece não adotada.
 
 ### Arquivos de aferição de duplicidades
 
