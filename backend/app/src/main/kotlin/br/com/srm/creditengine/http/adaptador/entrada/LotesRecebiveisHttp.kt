@@ -49,7 +49,8 @@ class LotesRecebiveisHttp(
 
     @PostMapping("/validacoes", consumes = [MediaType.MULTIPART_FORM_DATA_VALUE])
     @Operation(summary = "Pré-validar arquivo CSV UTF-8 ou XLSX padronizado sem persistência",
-        description = "Parte multipart arquivo; aviso de simulação não impede cadastro.")
+        description = "Parte multipart arquivo; cabeçalho com cedenteId ou cedenteDocumento (BR/CNPJ). " +
+            "A confirmação usa o comando canônico com cedenteId; aviso de simulação não impede cadastro.")
     @ApiResponse(responseCode = "200", description = "Prévia, sem cadastro e sem liquidação.")
     @ApiResponse(responseCode = "400", description = "Arquivo, cabeçalho ou formato inválido.")
     @ApiResponse(responseCode = "401", description = "Autenticação necessária.")

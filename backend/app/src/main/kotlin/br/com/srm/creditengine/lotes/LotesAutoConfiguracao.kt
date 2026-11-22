@@ -14,6 +14,7 @@ import io.micrometer.core.instrument.MeterRegistry
 import org.slf4j.LoggerFactory
 import tools.jackson.databind.ObjectMapper
 import br.com.srm.creditengine.lotes.adaptador.saida.LotesJdbc
+import br.com.srm.creditengine.lotes.adaptador.saida.CedentePorCnpjJdbc
 import br.com.srm.creditengine.lotes.aplicacao.ServicoImportacaoLote
 import br.com.srm.creditengine.lotes.aplicacao.porta.entrada.ImportarRecebiveis
 import br.com.srm.creditengine.simulacao.aplicacao.porta.entrada.SimularRecebivel
@@ -81,5 +82,6 @@ class LotesAutoConfiguracao {
             }
         },
         maxLinhas,
+        CedentePorCnpjJdbc(jdbc),
     )
 }

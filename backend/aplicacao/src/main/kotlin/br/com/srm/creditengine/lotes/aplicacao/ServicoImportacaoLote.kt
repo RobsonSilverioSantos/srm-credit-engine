@@ -1,7 +1,9 @@
 package br.com.srm.creditengine.lotes.aplicacao
 
 import br.com.srm.creditengine.cadastro.aplicacao.porta.saida.Cedentes
+import br.com.srm.creditengine.cadastro.dominio.ValidadorCnpj
 import br.com.srm.creditengine.lotes.aplicacao.porta.entrada.ImportarRecebiveis
+import br.com.srm.creditengine.lotes.aplicacao.porta.saida.BuscarCedentePorCnpj
 import br.com.srm.creditengine.lotes.aplicacao.porta.saida.PersistenciaLote
 import br.com.srm.creditengine.simulacao.aplicacao.porta.entrada.ComandoSimulacao
 import br.com.srm.creditengine.simulacao.aplicacao.porta.entrada.SimularRecebivel
@@ -17,10 +19,12 @@ class ServicoImportacaoLote(
     private val persistencia: PersistenciaLote,
     private val simulacoes: SimularRecebivel,
     private val maxLinhas: Int,
+    private val buscarPorCnpj: BuscarCedentePorCnpj,
 ) : ImportarRecebiveis {
     override fun prevalidar(linhas: List<LinhaImportacao>): List<PreviaLinhaLote> {
+        require(linhas.size in 1..maxLinhas) { "Quantidade de linhas inválida." }
         val id = contexto.identidade()
-        return validar(id.organizacaoId, linhas).map { previa ->
+        return validar(id.organizacaoId, linhas.map { resolverDocumento(id.organizacaoId, it) }).map { previa ->
             if (previa.status != StatusLinhaLote.NOVO) previa else {
                 val item = checkNotNull(previa.comando)
                 try {
@@ -36,6 +40,20 @@ class ServicoImportacaoLote(
                 }
             }
         }
+    }
+
+    private fun resolverDocumento(org: UUID, linha: LinhaImportacao): LinhaImportacao {
+        val informado = linha.documentoInformado ?: return linha
+        val canonico = try {
+            ValidadorCnpj().normalizarEValidar(informado)
+        } catch (_: IllegalArgumentException) {
+            return LinhaImportacao(linha.linha, null, linha.erros + ErroLinhaLote("cedenteDocumento", "Documento inválido."))
+        }
+        val cedenteId = buscarPorCnpj.buscar(org, canonico)
+            ?: return LinhaImportacao(linha.linha, null,
+                linha.erros + ErroLinhaLote("cedenteDocumento", "Cedente indisponível para a organização."))
+        val documento = linha.documento ?: return LinhaImportacao(linha.linha, null, linha.erros)
+        return LinhaImportacao(linha.linha, documento.comCedente(cedenteId), linha.erros)
     }
 
     override fun confirmar(chave: String, linhas: List<LinhaImportacao>): ResultadoCadastroLote {
