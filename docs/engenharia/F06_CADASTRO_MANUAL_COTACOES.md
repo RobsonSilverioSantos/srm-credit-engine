@@ -1,6 +1,6 @@
 # F06 — Interface administrativa de câmbio e histórico de cotações
 
-**Situação:** B15 integrada em `develop` pelo [PR #90](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/90), F05 integrada pelo PR #61. **F06 ainda não implementada; início somente após merge humano do PR documental de liberação e presença de `Liberada para iniciar` na linha F06 de `origin/develop:TASKS.md`.**
+**Situação:** **F06 integrada em `develop` pelo [PR #92](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/92)** (merge `9153e5d8cefb51008e19b5089664bfbb9d1c4b5e` em 22/11/2026), após F05 PR #61, B15 PR #90 e liberação documental PR #91. Implementação encerrada; **homologação integrada real ainda pendente**.
 **Rastreamento:** [issue #55](https://github.com/RobsonSilverioSantos/srm-credit-engine/issues/55); `TASKS.md`, F06.
 **Executor:** `frontend`; revisões `architect`, `qa`, `reviewer` em worktree própria.
 **Referências:** [ADR-026](../adr/ADR-026-ptax-96h-manual-diaria.md), [contrato B15 integrado](../../backend/docs/B15_CAMBIO.md), `CambioHttp.kt`, `CotacaoCambialResposta.kt`, `SelecaoFonteCambial.kt`, documentação F05.
@@ -43,7 +43,10 @@ Tratamento de erros: `400` para valor/payload inválido, `401` não autenticado,
 - Ação **Retornar à PTAX** exige justificativa e confirmação explícitas, sem alterar histórico. Expor **Sincronizar PTAX** exclusivamente aos administradores, com estado de execução, resultado, indisponibilidade e proteção contra múltiplos envios.
 - Navegação responsiva desktop/mobile, teclado, foco, leitores de tela, máscaras, colagem, seleção e restauração de estado; não interferir no fluxo de simulação/liquidação nem reimplementar cálculo financeiro.
 
-## 4. Testes e critérios de aceite
+## 4. Testes realizados e critérios de homologação pendentes
+
+**Evidência do PR #92:** o executor reportou `npm ci`, `npm run lint`, `npm test` (**221 testes em 16 arquivos**), `npm run build` e validações Chrome desktop/mobile (390/1280 px) com **BFF simulado**, incluindo fluxo separado de cadastro MANUAL e autorização, RBAC, histórico e regressão F09. Os revisores `architect`, `qa` e `reviewer` emitiram pareceres; QA reportou **55 testes focados**. A execução do GitHub Actions vinculada ao commit de feature teve **4/4 jobs aprovados**. Essas evidências não equivalem a uma jornada real Chrome→BFF B15→PostgreSQL; manter os itens abaixo para aferição integrada sem declará-los fechados retroativamente.
+
 
 - [ ] BFF real ou mocks fiéis aos contratos de B15: registrar MANUAL **sem ativar**, autorizar separadamente e voltar explicitamente a PTAX; não enviar propriedades inexistentes nem acionar sincronização por digitação.
 - [ ] RBAC: MASTER/ADMIN podem cadastrar/autorizar/sincronizar; OPERADOR não; autor/justificativa ocultos em consultas; sessão JWT em memória.
@@ -55,4 +58,4 @@ Tratamento de erros: `400` para valor/payload inválido, `401` não autenticado,
 
 ## 5. Limites e governança
 
-A F06 **não** altera backend, schema Flyway, política financeira, fontes de autoridade, snapshots existentes, contratos B15 ou implementação da F09. B15 e F09 foram integradas nos PRs #90 e #89; integração real ponta a ponta da UI F06 com backend/PostgreSQL permanece item de validação, não fato já demonstrado. A expressão `Liberada para iniciar` da F06 em `origin/develop:TASKS.md` só produz autorização operacional **após o merge humano deste PR documental**.
+A F06 foi integrada isoladamente, sem alterar backend, schema Flyway, política financeira, fontes de autoridade, snapshots existentes, contratos B15 ou implementação da F09. B15 e F09 foram integradas nos PRs #90 e #89. O gate documental PR #91 foi satisfeito antes de iniciar a feature. **Integração real ponta a ponta da UI F06 com BFF/PostgreSQL, consulta BCB ao vivo e homologação humana/mobile físico permanecem pendentes**; a execução da CI e os testes de browser com BFF simulado não substituem essas provas. Respostas incertas de POST exigem reconciliação humana pelo histórico, pois a B15 não dispõe de idempotência para essas escritas administrativas; o bloqueio preventivo da UI vale para a sessão atual, não entre abas ou após recarregamento.
