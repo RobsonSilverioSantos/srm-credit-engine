@@ -21,6 +21,17 @@ Em desenvolvimento, o Vite encaminha `/api` e `/bff` para
 `http://localhost:8080`. Em produção, publique ambas as rotas na mesma
 origem do frontend, utilizando HTTPS e um proxy reverso.
 
+Após autenticar na página principal, utilize o menu responsivo e os
+breadcrumbs para navegar entre Cedentes, Simulação, Liquidação, Extrato e
+Usuários. As rotas operacionais ficam no fragmento (`/#/simulacao`, por
+exemplo), portanto podem ser abertas diretamente ou atualizadas sem exigir
+fallback de rota no Nginx. A navegação mantém o estado em memória. Atualizar ou
+fechar a página pede confirmação do navegador quando há solicitação em curso ou
+operação pendente; se a saída for confirmada, a sessão termina e os dados em
+memória são descartados.
+O Catálogo visual permanece separado do menu operacional e identificado como
+demonstração em `/catalogo.html`.
+
 ## Painel de simulação e liquidação (F01)
 
 Abra a URL principal exibida pelo Vite e autentique-se com um usuário
@@ -41,7 +52,20 @@ conta. Essa chave não sobrevive ao recarregamento ou fechamento da página.
 
 O cadastro de recebível não é idempotente. Se seu resultado for incerto,
 o painel bloqueia novas tentativas e orienta o operador a consultar o
-estado da operação no servidor antes de prosseguir.
+estado da operação no servidor antes de prosseguir. A troca entre páginas
+operacionais mantém a simulação, a intenção, a chave de idempotência e o estado
+incerto no React; nenhuma navegação dispara cadastro ou liquidação.
+O botão Sair fica desabilitado durante uma solicitação. Com intenção pendente
+ou cadastro incerto, sair exige confirmação e avisa que o estado em memória será
+descartado; antes de iniciar outro cadastro, o operador deve conferir o estado
+no servidor.
+
+O valor de face usa os separadores e dígitos do locale do navegador, com
+fallback para `pt-BR`; a normalização valida o agrupamento daquele locale.
+Enquanto o campo está em edição, o texto permanece selecionável e sem máscara
+monetária; ao sair do campo, uma entrada válida é exibida como moeda localizada.
+O foco restaura o texto editável e a posição do cursor. Simulação e liquidação
+continuam enviando ao BFF somente strings decimais canônicas.
 
 ## Identificação de cedentes (B14)
 
@@ -82,31 +106,29 @@ revalida os campos e continua sendo a autoridade final.
 
 ## Extrato de liquidações (F03)
 
-Acesse `/extrato.html` para utilizar o extrato de liquidações.
+Na sessão principal, abra **Extrato** pelo menu para reutilizar o JWT mantido em
+memória, sem um segundo login. A entrada legada `/extrato.html` continua
+disponível para acesso direto e mantém autenticação própria; nenhum token é
+transferido entre páginas, gravado em URL ou persistido no navegador.
 
-O extrato utiliza autenticação própria, mantendo o token JWT somente em
-memória. Respostas HTTP 401 exigem nova autenticação.
+Respostas HTTP 401 exigem nova autenticação.
 
 O extrato consome o BFF e permite filtrar liquidações por período, cedente
 (UUID) e moeda. Os filtros de datas seguem o contrato atual da API,
 que considera dias inclusivos em UTC.
 
 A paginação e a ordenação são realizadas no servidor. Inserções entre
-consultas de páginas diferentes podem deslocar registros.
+consultas de páginas diferentes podem deslocar registros. As datas dos filtros
+continuam inclusivas em UTC; timestamps são apresentados no locale e fuso
+horário do navegador. O elemento temporal conserva o valor ISO UTC original
+para inspeção e auditoria.
 
 Os valores financeiros e os snapshots históricos são exibidos conforme
 recebidos do backend, sem recálculo no frontend.
 
 A apresentação usa `navigator.languages` e `pt-BR` como fallback. Valores,
 taxas e cotações são formatados somente para exibição, preservando as strings
-decimais do BFF. O campo de valor aceita os separadores de `pt-BR` e `en-US`,
-valida agrupamento/escala e envia ao BFF uma string decimal canônica com ponto
-decimal; nenhum cálculo financeiro é realizado no navegador.
-
-O extrato é uma entrada independente da interface principal: o login e a
-sessão autenticada não são compartilhados com o painel de operações e a
-administração de usuários. Essa separação é uma limitação conhecida da
-experiência de navegação atual, não uma dependência de implementação pendente.
+decimais do BFF; nenhum cálculo financeiro é realizado no navegador.
 
 ## Catálogo de componentes
 
@@ -139,9 +161,9 @@ reais nem é necessário para executar o painel, a administração ou o extrato.
 ## Fronteiras
 
 
-`main.tsx` compõe os adaptadores HTTP do BFF (`infraestrutura/`), as portas e os casos de uso (`aplicacao/`) e a apresentação da F01.
+`main.tsx` compõe os adaptadores HTTP do BFF (`infraestrutura/`), as portas e os casos de uso (`aplicacao/`) e a apresentação autenticada. O layout operacional usa o fragmento do navegador para navegação; a tela de extrato recebe a porta BFF e o token em memória da sessão.
 
-`extrato.tsx` compõe os adaptadores HTTP de autenticação e consulta, as portas e a apresentação independente da F03.
+`extrato.tsx` mantém a entrada legada com autenticação própria. `catalogo.tsx` compõe a demonstração visual independente dos fluxos financeiros.
 
 A F04 reutiliza a sessão em memória da entrada principal. `infraestrutura/bffUsuarios.ts`
 implementa `PortaGestaoUsuarios`; `aplicacao/gestaoUsuarios.ts` valida capacidades
@@ -160,10 +182,11 @@ O catálogo visual permanece isolado para demonstração e testes, utilizando da
 
 O ESLint bloqueia imports diretos indevidos entre as camadas.
 
-F01 e F04 reutilizam a mesma sessão em memória da interface principal; F03 mantém autenticação e navegação separadas. As três funcionalidades preservam portas e adaptadores independentes.
+F01, F03 e F04 reutilizam a sessão em memória da interface principal, cada qual mantendo porta e adaptador independentes. O acesso direto a `extrato.html` continua isolado e exige autenticação própria.
 
 
 Preferiu-se MUI Core a CSS/componentes próprios para aproveitar semântica,
 foco e controles já implementados. `Table` substitui a necessidade de um Data
-Grid; ainda não há roteador para a página única. O catálogo não introduz
-cálculos ou fluxos de negócio como dependências do design.
+Grid; a navegação usa o fragmento e o histórico nativos do navegador, sem
+dependência de roteador. O catálogo não introduz cálculos ou fluxos de negócio
+como dependências do design.

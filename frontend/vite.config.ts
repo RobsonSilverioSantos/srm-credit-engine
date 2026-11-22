@@ -10,6 +10,7 @@ export default defineConfig({
       input: {
         principal: 'index.html',
         extrato: 'extrato.html',
+        catalogo: 'catalogo.html',
       },
     },
   },

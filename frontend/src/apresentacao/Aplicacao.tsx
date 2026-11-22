@@ -1,13 +1,18 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
-import { Box, Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Stack, Typography } from '@mui/material'
+import { Box, Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Link, Stack, Typography } from '@mui/material'
 import type { PortaGestaoUsuarios } from '../aplicacao/gestaoUsuarios'
+import type { PortaExtrato } from '../aplicacao/extrato'
 import { cadastrarParaLiquidacao, confirmarLiquidacao, ErroOperacao, mensagemErro, type PortaOperacoes } from '../aplicacao/operacoes'
 import type { Cedente, IntencaoLiquidacao, Liquidacao, Modalidade, Moeda, Sessao, Simulacao, TipoDocumento } from '../dominio/operacoes'
 import { PaginaAdministracaoUsuarios } from './PaginaAdministracaoUsuarios'
+import { PaginaExtrato } from './PaginaExtrato'
+import { LayoutOperacional } from './LayoutOperacional'
+import { hashDaPagina, paginaDaHash, type PaginaOperacional } from './navegacaoOperacional'
 import { CampoFormulario } from '../tema/componentes/CampoFormulario'
 import { Carregando, EstadoVazio, Mensagem } from '../tema/componentes/Feedback'
 import { Painel } from '../tema/componentes/Painel'
-import { formatarMonetario, formatarPercentual, formatarCotacao, normalizarEntradaMonetaria } from '../dominio/formatacaoMonetaria'
+import { InstanteLocal } from '../tema/componentes/InstanteLocal'
+import { formatarEntradaMonetaria, formatarMonetario, formatarPercentual, formatarCotacao, normalizarEntradaMonetaria, separadorDecimalMonetario } from '../dominio/formatacaoMonetaria'
 import { caixaAscii, editarCnpj, erroDocumento, erroTipoDocumento } from '../dominio/documentoCedente'
 
 const grade = { display: 'grid', gap: 2, gridTemplateColumns: { xs: 'minmax(0, 1fr)', sm: 'repeat(2, minmax(0, 1fr))' } }
@@ -17,9 +22,9 @@ const modalidades = [
 ]
 const moedas = [{ valor: 'BRL', rotulo: 'BRL' }, { valor: 'USD', rotulo: 'USD' }]
 
-type Props = { operacoes: PortaOperacoes; gestaoUsuarios: PortaGestaoUsuarios; locale: string }
+type Props = { operacoes: PortaOperacoes; gestaoUsuarios: PortaGestaoUsuarios; extrato: PortaExtrato; locale: string; fusoHorario?: string }
 
-export function Aplicacao({ operacoes, gestaoUsuarios, locale }: Props) {
+export function Aplicacao({ operacoes, gestaoUsuarios, extrato, locale, fusoHorario }: Props) {
   const [sessao, setSessao] = useState<Sessao | null>(null)
   const [email, setEmail] = useState('')
   const [identidade, setIdentidade] = useState('')
@@ -27,12 +32,52 @@ export function Aplicacao({ operacoes, gestaoUsuarios, locale }: Props) {
   const [erro, setErro] = useState('')
   const [entrando, setEntrando] = useState(false)
   const [expirada, setExpirada] = useState(false)
+  const [pagina, setPagina] = useState<PaginaOperacional>(() => paginaDaHash(window.location.hash))
+  const [usuariosVisiveis, setUsuariosVisiveis] = useState<boolean | null>(null)
+  const [operacaoEmCurso, setOperacaoEmCurso] = useState(false)
+  const [operacaoPendente, setOperacaoPendente] = useState(false)
+  const [confirmarSaida, setConfirmarSaida] = useState(false)
+
+  useEffect(() => {
+    function atualizarPagina() {
+      setPagina(paginaDaHash(window.location.hash))
+    }
+    window.addEventListener('hashchange', atualizarPagina)
+    return () => window.removeEventListener('hashchange', atualizarPagina)
+  }, [])
 
   useEffect(() => {
     if (!sessao) return
     const timer = window.setTimeout(() => { setSessao(null); setExpirada(true) }, Math.max(0, sessao.expiraEm - Date.now()))
     return () => window.clearTimeout(timer)
   }, [sessao])
+
+  useEffect(() => {
+    if (!operacaoEmCurso && !operacaoPendente) return
+    function prevenirDescarte(evento: BeforeUnloadEvent) {
+      evento.preventDefault()
+      evento.returnValue = ''
+    }
+    window.addEventListener('beforeunload', prevenirDescarte)
+    return () => window.removeEventListener('beforeunload', prevenirDescarte)
+  }, [operacaoEmCurso, operacaoPendente])
+
+  const navegar = useCallback((destino: PaginaOperacional) => {
+    const paginaPermitida = destino === 'usuarios' && usuariosVisiveis === false ? 'cedentes' : destino
+    const hash = hashDaPagina(paginaPermitida)
+    if (window.location.hash === hash) setPagina(paginaPermitida)
+    else window.location.hash = hash
+  }, [usuariosVisiveis])
+
+  const verificarAcessoUsuarios = useCallback((permitido: boolean) => {
+    setUsuariosVisiveis(permitido)
+  }, [])
+
+  useEffect(() => {
+    if (sessao && pagina === 'usuarios' && usuariosVisiveis === false) {
+      window.location.hash = hashDaPagina('cedentes')
+    }
+  }, [pagina, sessao, usuariosVisiveis])
 
   async function entrar(evento: FormEvent) {
     evento.preventDefault()
@@ -42,6 +87,7 @@ export function Aplicacao({ operacoes, gestaoUsuarios, locale }: Props) {
     try {
       const novaSessao = await operacoes.autenticar(email, senha)
       setIdentidade(email.trim())
+      setUsuariosVisiveis(null)
       setSessao(novaSessao)
       setSenha('')
       setExpirada(false)
@@ -57,39 +103,125 @@ export function Aplicacao({ operacoes, gestaoUsuarios, locale }: Props) {
     setExpirada(true)
   }, [])
 
+  const sair = useCallback(() => {
+    setSessao(null)
+    setExpirada(false)
+    setIdentidade('')
+    setEmail('')
+    setSenha('')
+    setErro('')
+    setUsuariosVisiveis(null)
+    setOperacaoEmCurso(false)
+    setOperacaoPendente(false)
+    setConfirmarSaida(false)
+    navegar('cedentes')
+  }, [navegar])
+
+  const solicitarSaida = useCallback(() => {
+    if (operacaoEmCurso) return
+    if (operacaoPendente) {
+      setConfirmarSaida(true)
+      return
+    }
+    sair()
+  }, [operacaoEmCurso, operacaoPendente, sair])
+
   const tratarErro = useCallback((falha: unknown) => {
     if (falha instanceof ErroOperacao && falha.status === 401) expirarSessao()
     return mensagemErro(falha)
   }, [expirarSessao])
 
   return (
-    <Box component="main" sx={{ maxWidth: 1120, mx: 'auto', p: { xs: 2, md: 4 } }}>
-      <Typography component="h1" variant="h1" gutterBottom>SRM Credit Engine</Typography>
+    <Box>
       {!sessao && (
-        <Painel id="acesso" titulo="Acesso">
-          {expirada && <Mensagem severity="warning">Sessão expirada. Entre novamente com a mesma conta para continuar a operação em andamento.</Mensagem>}
-          <Stack component="form" onSubmit={entrar} spacing={2}>
-            <CampoFormulario label="E-mail" type="email" required autoComplete="username" value={email}
-              disabled={Boolean(identidade)} onChange={(e) => setEmail(e.target.value)} />
-            <CampoFormulario label="Senha" type="password" required autoComplete="current-password" value={senha}
-              onChange={(e) => setSenha(e.target.value)} />
-            {erro && <Mensagem severity="error">{erro}</Mensagem>}
-            <Box><Button type="submit" variant="contained" disabled={entrando}>{entrando ? 'Entrando…' : 'Entrar'}</Button></Box>
-          </Stack>
-        </Painel>
+        <Box component="main" sx={{ maxWidth: 1120, mx: 'auto', p: { xs: 2, md: 4 } }}>
+          <Typography component="h1" variant="h1" gutterBottom>SRM Credit Engine</Typography>
+          <Painel id="acesso" titulo="Acesso">
+            {expirada && <Mensagem severity="warning">Sessão expirada. Entre novamente com a mesma conta para continuar a operação em andamento.</Mensagem>}
+            <Stack component="form" onSubmit={entrar} spacing={2}>
+              <CampoFormulario label="E-mail" type="email" required autoComplete="username" value={email}
+                disabled={Boolean(identidade)} onChange={(e) => setEmail(e.target.value)} />
+              <CampoFormulario label="Senha" type="password" required autoComplete="current-password" value={senha}
+                onChange={(e) => setSenha(e.target.value)} />
+              {erro && <Mensagem severity="error">{erro}</Mensagem>}
+              <Box><Button type="submit" variant="contained" disabled={entrando}>{entrando ? 'Entrando…' : 'Entrar'}</Button></Box>
+              <Link href="/catalogo.html">Catálogo visual (demonstração)</Link>
+            </Stack>
+          </Painel>
+        </Box>
       )}
-      <Box hidden={!sessao}>
-        <PainelOperacoes operacoes={operacoes} token={sessao?.token ?? null} tratarErro={tratarErro} locale={locale} />
-        {sessao && <PaginaAdministracaoUsuarios key={sessao.token} porta={gestaoUsuarios} token={sessao.token} aoExpirar={expirarSessao} />}
-      </Box>
+      {(sessao || expirada) && <Box hidden={!sessao}>
+        <LayoutOperacional
+          pagina={pagina}
+          usuariosVisiveis={usuariosVisiveis === true}
+          sairDesabilitado={operacaoEmCurso}
+          aoNavegar={navegar}
+          aoSair={solicitarSaida}
+        >
+          {operacaoPendente && (
+            <Dialog open={confirmarSaida} onClose={() => setConfirmarSaida(false)} aria-labelledby="confirmar-saida-titulo">
+              <DialogTitle id="confirmar-saida-titulo">Sair com operação pendente?</DialogTitle>
+              <DialogContent>
+                <DialogContentText>
+                  Sair encerra a sessão e descarta a intenção ou o bloqueio mantido apenas em memória. Antes de iniciar outro cadastro, consulte os recebíveis no servidor e confirme o resultado da operação.
+                </DialogContentText>
+              </DialogContent>
+              <DialogActions>
+                <Button onClick={() => setConfirmarSaida(false)}>Continuar operação</Button>
+                <Button color="error" onClick={sair}>Sair mesmo assim</Button>
+              </DialogActions>
+            </Dialog>
+          )}
+          <PainelOperacoes
+            operacoes={operacoes}
+            token={sessao?.token ?? null}
+            tratarErro={tratarErro}
+            locale={locale}
+            fusoHorario={fusoHorario}
+            pagina={pagina}
+            navegar={navegar}
+            aoAtualizarOperacaoEmCurso={setOperacaoEmCurso}
+            aoAtualizarOperacaoPendente={setOperacaoPendente}
+          />
+          {sessao && <Box hidden={pagina !== 'extrato'}>
+            <PaginaExtrato
+              porta={extrato}
+              token={sessao.token}
+              aoExpirar={expirarSessao}
+              locale={locale}
+              fusoHorario={fusoHorario}
+              ativa={pagina === 'extrato'}
+              mostrarTitulo={false}
+            />
+          </Box>}
+          {sessao && <Box hidden={pagina !== 'usuarios'}>
+            <PaginaAdministracaoUsuarios
+              porta={gestaoUsuarios}
+              token={sessao.token}
+              aoExpirar={expirarSessao}
+              aoVerificarCapacidade={verificarAcessoUsuarios}
+            />
+          </Box>}
+        </LayoutOperacional>
+      </Box>}
     </Box>
   )
 }
 
-type PainelProps = Pick<Props, 'operacoes' | 'locale'> & { token: string | null; tratarErro: (erro: unknown) => string }
+type PainelProps = Pick<Props, 'operacoes' | 'locale' | 'fusoHorario'> & {
+  token: string | null
+  tratarErro: (erro: unknown) => string
+  pagina: PaginaOperacional
+  navegar: (pagina: PaginaOperacional) => void
+  aoAtualizarOperacaoEmCurso: (emCurso: boolean) => void
+  aoAtualizarOperacaoPendente: (pendente: boolean) => void
+}
 type Previa = { entrada: string; dados: Simulacao }
 
-function PainelOperacoes({ operacoes, token, tratarErro, locale }: PainelProps) {
+function PainelOperacoes({
+  operacoes, token, tratarErro, locale, fusoHorario, pagina, navegar,
+  aoAtualizarOperacaoEmCurso, aoAtualizarOperacaoPendente,
+}: PainelProps) {
   const [cedentes, setCedentes] = useState<Cedente[] | null>(null)
   const [erroCedentes, setErroCedentes] = useState('')
   const [atualizacao, setAtualizacao] = useState(0)
@@ -118,6 +250,14 @@ function PainelOperacoes({ operacoes, token, tratarErro, locale }: PainelProps) 
   const [confirmando, setConfirmando] = useState(false)
   const [liquidacao, setLiquidacao] = useState<Liquidacao | null>(null)
   const trava = useRef(false)
+  const campoValor = useRef<HTMLInputElement>(null)
+  const cursorValor = useRef<{ inicio: number; fim: number; formatado: string } | null>(null)
+  const [valorEmFoco, setValorEmFoco] = useState(false)
+
+  function atualizarOcupado(emCurso: boolean) {
+    setOcupado(emCurso)
+    aoAtualizarOperacaoEmCurso(emCurso)
+  }
 
   const erroIdentificacao = erroDocumento(pais, tipoDocumento, documento)
   const erroTipo = erroTipoDocumento(pais, tipoDocumento)
@@ -126,6 +266,17 @@ function PainelOperacoes({ operacoes, token, tratarErro, locale }: PainelProps) 
     if (cursor && document.activeElement === cursor.campo) cursor.campo.setSelectionRange(cursor.posicao, cursor.posicao)
     cursorDocumento.current = null
   }, [documento])
+  useLayoutEffect(() => {
+    const cursor = cursorValor.current
+    const campo = campoValor.current
+    if (!cursor || !campo || document.activeElement !== campo) return
+    const editavel = valor
+    campo.setSelectionRange(
+      mapearCursorMonetario(cursor.formatado, editavel, cursor.inicio, locale),
+      mapearCursorMonetario(cursor.formatado, editavel, cursor.fim, locale),
+    )
+    cursorValor.current = null
+  }, [locale, valor, valorEmFoco])
   const entradaMonetaria = normalizarEntradaMonetaria(valor, locale)
   const valorCanonico = entradaMonetaria.valida ? entradaMonetaria.valorCanonico : ''
   const valido = entradaMonetaria.valida
@@ -180,7 +331,7 @@ function PainelOperacoes({ operacoes, token, tratarErro, locale }: PainelProps) 
     evento.preventDefault()
     if (!token || trava.current || erroIdentificacao) return
     trava.current = true
-    setOcupado(true)
+    atualizarOcupado(true)
     setErro('')
     setSucesso('')
     try {
@@ -201,14 +352,14 @@ function PainelOperacoes({ operacoes, token, tratarErro, locale }: PainelProps) 
       setAtualizacao((n) => n + 1)
     } finally {
       trava.current = false
-      setOcupado(false)
+      atualizarOcupado(false)
     }
   }
 
   async function cadastrarRecebivel() {
     if (!token || !cedenteId || !previa || previa.entrada !== chaveEntrada || trava.current) return
     trava.current = true
-    setOcupado(true)
+    atualizarOcupado(true)
     setErro('')
     setSucesso('')
     try {
@@ -217,43 +368,58 @@ function PainelOperacoes({ operacoes, token, tratarErro, locale }: PainelProps) 
         cedenteId, modalidade, valorFaceBrl: valorCanonico, prazoMeses: Number(prazo), vencimento: vencimento || null,
       }, moeda, chave)
       setPendente(intencao)
+      aoAtualizarOperacaoPendente(true)
       setSucesso('Recebível cadastrado. Confirme a liquidação para prosseguir.')
+      navegar('liquidacao')
     } catch (falha) {
       const conclusivo = falha instanceof ErroOperacao && [400, 401, 403, 404, 409].includes(falha.status ?? 0)
-      if (!conclusivo) setIncerto(true)
+      if (!conclusivo) {
+        setIncerto(true)
+        aoAtualizarOperacaoPendente(true)
+      }
       setErro(`${tratarErro(falha)}${conclusivo ? '' : ' O resultado do cadastro é incerto. Não repita o cadastro antes de verificar os recebíveis no servidor.'}`)
     } finally {
       trava.current = false
-      setOcupado(false)
+      atualizarOcupado(false)
     }
   }
 
   async function liquidar() {
     if (!token || !pendente || trava.current) return
     trava.current = true
-    setOcupado(true)
+    atualizarOcupado(true)
     setErro('')
     setSucesso('')
     setConfirmando(false)
     try {
       const resultado = await confirmarLiquidacao(operacoes, token, pendente)
       setLiquidacao(resultado)
+      aoAtualizarOperacaoPendente(false)
       setSucesso('Liquidação confirmada.')
     } catch (falha) {
-      setErro(`${tratarErro(falha)} A mesma chave será usada ao tentar novamente.`)
+      const conclusivo = falha instanceof ErroOperacao && [400, 401, 403, 404, 409].includes(falha.status ?? 0)
+      const mensagem = tratarErro(falha)
+      setErro(conclusivo
+        ? `${mensagem} A mesma chave será usada ao tentar novamente.`
+        : `${mensagem} O resultado da liquidação é incerto; uma nova tentativa usará a mesma chave de idempotência.`)
     } finally {
       trava.current = false
-      setOcupado(false)
+      atualizarOcupado(false)
     }
   }
 
   const bloqueado = ocupado || Boolean(pendente) || incerto || Boolean(liquidacao)
   const previaAtual = previa?.entrada === chaveEntrada ? previa.dados : null
   const cedenteSelecionado = cedentes?.find((cedente) => cedente.id === cedenteId)
+  const operacaoAtiva = pagina === 'cedentes' || pagina === 'simulacao' || pagina === 'liquidacao'
   return (
     <Stack spacing={3} sx={{ mt: 3 }}>
-      <Typography color="text.secondary">Simule antes de cadastrar e liquidar um recebível.</Typography>
-      <Painel id="cedentes" titulo="Cedente">
+      {operacaoAtiva && sucesso && <Mensagem severity="success">{sucesso}</Mensagem>}
+      {operacaoAtiva && erro && <Mensagem severity="error">{erro}</Mensagem>}
+      {operacaoAtiva && ocupado && <Carregando rotulo="Processando operação…" />}
+      <Box hidden={pagina !== 'cedentes'}>
+        <Typography color="text.secondary" sx={{ mb: 2 }}>Cadastre cedentes e selecione a parte vinculada ao recebível.</Typography>
+        <Painel id="cedentes" titulo="Cedentes">
         <Stack component="form" onSubmit={cadastrarCedente} spacing={2}>
           <Box sx={grade}>
             <CampoFormulario label="Nome do cedente" required value={nome} disabled={bloqueado}
@@ -319,18 +485,38 @@ function PainelOperacoes({ operacoes, token, tratarErro, locale }: PainelProps) 
               : cedenteSelecionado.statusDocumento === 'NAO_VERIFICADO' ? 'não verificado' : 'desconhecido'
           }.
         </Typography>}
-      </Painel>
-      <Painel id="simulacao" titulo="Simulação pré-cadastro">
+        </Painel>
+      </Box>
+      <Box hidden={pagina !== 'simulacao'}>
+        <Typography color="text.secondary" sx={{ mb: 2 }}>Simule antes de cadastrar e liquidar um recebível.</Typography>
+        <Painel id="simulacao" titulo="Simulação pré-cadastro">
         <Mensagem severity="warning">Simulação indicativa, sem garantia de taxas ou câmbio até a liquidação. Nenhum recebível é criado nesta etapa.</Mensagem>
         <Box sx={grade}>
           <CampoFormulario label="Modalidade" value={modalidade} opcoes={modalidades} disabled={bloqueado}
             onChange={(e) => { setModalidade(e.target.value as Modalidade); alterou() }} />
-          <CampoFormulario label="Valor de face em BRL" value={valor} required disabled={bloqueado}
+          <CampoFormulario label="Valor de face em BRL"
+            value={valorEmFoco ? valor : entradaMonetaria.valida ? formatarMonetario(entradaMonetaria.valorCanonico, 'BRL', locale) : valor}
+            required disabled={bloqueado}
             type="text" inputMode="decimal"
+            inputRef={campoValor}
             helperText={valor && !entradaMonetaria.valida
               ? entradaMonetaria.erro
-              : locale.toLowerCase().startsWith('en') ? 'Example: 1,234.56.' : 'Exemplo: 1.234,56.'}
+              : valorEmFoco
+                ? (locale.toLowerCase().startsWith('en') ? 'Edit the decimal value; currency formatting is applied when you leave the field.' : 'Edite o valor decimal; a formatação monetária é aplicada ao sair do campo.')
+                : locale.toLowerCase().startsWith('en') ? 'Example: 1,234.56.' : 'Exemplo: 1.234,56.'}
             erro={valor && !entradaMonetaria.valida ? entradaMonetaria.erro : undefined}
+            onFocus={(evento) => {
+              const campo = evento.target
+              const inicio = campo.selectionStart ?? campo.value.length
+              const fim = campo.selectionEnd ?? campo.value.length
+              cursorValor.current = { inicio, fim, formatado: campo.value }
+              const editavel = entradaMonetaria.valida
+                ? formatarEntradaMonetaria(entradaMonetaria.valorCanonico, locale)
+                : valor
+              if (editavel !== valor) setValor(editavel)
+              setValorEmFoco(true)
+            }}
+            onBlur={() => setValorEmFoco(false)}
             onChange={(e) => { setValor(e.target.value); alterou() }} />
           <CampoFormulario label="Prazo em meses" value={prazo} required disabled={bloqueado} type="number"
             slotProps={{ htmlInput: { min: 1, step: 1 } }} onChange={(e) => { setPrazo(e.target.value); alterou() }} />
@@ -343,25 +529,31 @@ function PainelOperacoes({ operacoes, token, tratarErro, locale }: PainelProps) 
         {valido && estadoPrevia === 'vazio' && !pendente && !incerto && !liquidacao && <Carregando rotulo="Aguardando simulação…" />}
         {estadoPrevia === 'carregando' && <Carregando rotulo="Simulando…" />}
         {estadoPrevia === 'erro' && <Mensagem severity="error">{erroPrevia} <Button onClick={() => { alterou(); setTentativaPrevia((n) => n + 1) }}>Tentar novamente</Button></Mensagem>}
-        {previaAtual && <Valores dados={previaAtual} locale={locale} />}
+        {previaAtual && <Valores dados={previaAtual} locale={locale} fusoHorario={fusoHorario} />}
         <Box><Button variant="contained" disabled={bloqueado || !cedenteId || !previaAtual || estadoPrevia !== 'pronto'}
           onClick={cadastrarRecebivel}>Cadastrar recebível</Button></Box>
-      </Painel>
-      {sucesso && <Mensagem severity="success">{sucesso}</Mensagem>}
-      {erro && <Mensagem severity="error">{erro}</Mensagem>}
-      {ocupado && <Carregando rotulo="Processando operação…" />}
-      {pendente && !liquidacao && <Painel id="liquidacao" titulo="Liquidação">
-        <Typography>Recebível: {pendente.id}. A liquidação será recalculada com as taxas vigentes.</Typography>
-        <Box><Button variant="contained" disabled={ocupado} onClick={() => setConfirmando(true)}>Confirmar liquidação</Button></Box>
-      </Painel>}
-      {liquidacao && <Painel id="resultado" titulo="Liquidação confirmada">
-        <Typography>Identificador: {liquidacao.liquidacaoId}</Typography>
-        <Valores dados={liquidacao} locale={locale} />
+        </Painel>
+      </Box>
+      <Box hidden={pagina !== 'liquidacao'}>
+        {pendente && !liquidacao && <Painel id="liquidacao" titulo="Liquidação">
+          <Typography>Recebível: {pendente.id}. A liquidação será recalculada com as taxas vigentes.</Typography>
+          <Box><Button variant="contained" disabled={ocupado} onClick={() => setConfirmando(true)}>Confirmar liquidação</Button></Box>
+        </Painel>}
+        {liquidacao && <Painel id="resultado" titulo="Liquidação confirmada">
+        <Typography>Código da liquidação: {liquidacao.liquidacaoId}</Typography>
+        <Valores dados={liquidacao} locale={locale} fusoHorario={fusoHorario} />
         <Box><Button onClick={() => {
           setPendente(null); setLiquidacao(null); setValor(''); setPrazo(''); setVencimento('')
           setPrevia(null); setEstadoPrevia('vazio'); setSucesso(''); setErro('')
+          aoAtualizarOperacaoPendente(false)
+          navegar('simulacao')
         }}>Nova operação</Button></Box>
-      </Painel>}
+        </Painel>}
+        {!pendente && !liquidacao && <Painel id="liquidacao" titulo="Liquidação">
+          <EstadoVazio titulo="Nenhuma operação aguardando liquidação" descricao="Conclua uma simulação e cadastre o recebível antes de confirmar a liquidação." />
+          <Button onClick={() => navegar('simulacao')}>Ir para simulação</Button>
+        </Painel>}
+      </Box>
       <Dialog open={confirmando} onClose={() => setConfirmando(false)} aria-labelledby="confirmar-titulo">
         <DialogTitle id="confirmar-titulo">Confirmar liquidação?</DialogTitle>
         <DialogContent><DialogContentText>O valor será calculado novamente pelo servidor e pode diferir da simulação indicativa.</DialogContentText></DialogContent>
@@ -371,7 +563,11 @@ function PainelOperacoes({ operacoes, token, tratarErro, locale }: PainelProps) 
   )
 }
 
-function Valores({ dados, locale }: { dados: Simulacao | Liquidacao; locale: string }) {
+function Valores({ dados, locale, fusoHorario }: { dados: Simulacao | Liquidacao; locale: string; fusoHorario?: string }) {
+  const liquidacao = 'liquidadaEm' in dados
+  const instantePrincipal = 'liquidadaEm' in dados
+    ? { isoUtc: dados.liquidadaEm, rotulo: 'Data/hora da liquidação' }
+    : { isoUtc: dados.referencia, rotulo: 'Referência da simulação' }
   return <Stack spacing={0.5} aria-label="Valores retornados pelo servidor">
     <Typography>Valor presente: {formatarMonetario(dados.valorPresenteBrl, 'BRL', locale)}</Typography>
     <Typography>Deságio: {formatarMonetario(dados.desagioBrl, 'BRL', locale)}</Typography>
@@ -380,8 +576,36 @@ function Valores({ dados, locale }: { dados: Simulacao | Liquidacao; locale: str
       <Typography>Taxa base mensal: {formatarPercentual(dados.taxaBaseMensal, locale)}</Typography>
       <Typography>Spread mensal: {formatarPercentual(dados.spreadMensal, locale)}</Typography>
       {dados.cotacaoBrlPorUsd && <Typography>Cotação: 1 USD = R$ {formatarCotacao(dados.cotacaoBrlPorUsd, locale)}</Typography>}
-      <Typography>Referência: {dados.referencia}</Typography>
-      {dados.cotacaoValidaAte && <Typography>Cotação válida até: {dados.cotacaoValidaAte}</Typography>}
+      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={{ xs: 0, sm: 1 }}>
+        <Typography>{instantePrincipal.rotulo}:</Typography>
+        <InstanteLocal isoUtc={instantePrincipal.isoUtc} locale={locale} rotulo={instantePrincipal.rotulo} fusoHorario={fusoHorario} />
+      </Stack>
+      {dados.cotacaoValidaAte && <Stack direction={{ xs: 'column', sm: 'row' }} spacing={{ xs: 0, sm: 1 }}>
+        <Typography>Cotação válida até:</Typography>
+        <InstanteLocal isoUtc={dados.cotacaoValidaAte} locale={locale} rotulo="Cotação válida até" fusoHorario={fusoHorario} />
+      </Stack>}
     </>}
+    {liquidacao && !('taxaBaseMensal' in dados) && <Stack direction={{ xs: 'column', sm: 'row' }} spacing={{ xs: 0, sm: 1 }}>
+      <Typography>Data/hora da liquidação:</Typography>
+      <InstanteLocal isoUtc={dados.liquidadaEm} locale={locale} rotulo="Data/hora da liquidação" fusoHorario={fusoHorario} />
+    </Stack>}
   </Stack>
+}
+
+function mapearCursorMonetario(formatado: string, editavel: string, cursor: number, locale: string): number {
+  const separador = separadorDecimalMonetario(locale)
+  const prefixo = formatado.slice(0, cursor)
+  const digitosAntes = (prefixo.match(/\p{Decimal_Number}/gu) ?? []).length
+  const passouDecimal = prefixo.includes(separador)
+  let digitos = 0
+
+  for (let indice = 0; indice < editavel.length; indice += 1) {
+    const caractere = editavel[indice]
+    if (caractere === separador && digitos === digitosAntes) return indice + (passouDecimal ? 1 : 0)
+    if (/\p{Decimal_Number}/u.test(caractere ?? '')) {
+      if (digitos === digitosAntes) return indice
+      digitos += 1
+    }
+  }
+  return editavel.length
 }
