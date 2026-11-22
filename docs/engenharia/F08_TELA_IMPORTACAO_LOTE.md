@@ -14,7 +14,7 @@ Criar `Operações / Importação em lote` no menu operacional, com **cadastro e
 4. **Confirmar cadastro:** habilitar somente com todas as linhas válidas e revisão explícita; apresentar resumo antes de enviar o payload canônico confirmado, manter uma chave de idempotência estável para retry do mesmo comando e bloquear duplo clique. Não liquidar automaticamente nem criar recebíveis na etapa de prévia.
 5. **Resultado do cadastro:** exibir `idLote` e contagem de recebíveis cadastrados, IDs para auditoria, status e eventuais avisos. Falhas de conexão com resultado incerto não autorizam nova chave automática para repetir inserção.
 6. **Conferir liquidação:** após cadastro, acessar prévia da B17 por lote, mostrando recebíveis `DISPONIVEL`, moedas, VP, deságio e câmbio **indicativos**. Não sugerir que a importação realizou qualquer liquidação.
-7. **Confirmar liquidação:** botão **`Liquidar lote`** distinto de `Confirmar cadastro`, com confirmação adicional, resumo de riscos e idempotência estável, sem duplo clique. Exibir status por item, inclusive conflitos de concorrência e falhas/resultado parcial, conforme política B17 aprovada. Nunca inferir sucesso de item por sucesso HTTP geral.
+7. **Confirmar liquidação:** mostrar todas as simulações e um resumo financeiro por moeda; **bloquear `Liquidar lote` enquanto alguma simulação não estiver concluída e válida**. Após conferência explícita, o botão `Liquidar lote`, distinto de `Confirmar cadastro`, abre modal com resumo, quantidade e aviso de preços indicativos; somente `Confirmar liquidação` aciona o backend revalidando elegibilidade/taxas, com chave de idempotência estável e sem duplo clique. Exibir status por item, inclusive conflito, repetição de recebível liquidado e falha parcial/rollback conforme B17 aprovada. Nunca inferir sucesso de item por HTTP 2xx parcial.
 8. **Acessibilidade:** MUI Core, foco, teclado, etiquetas, progresso anunciável, linhas inválidas navegáveis, viewport mobile e sessão JWT somente em memória, respeitando `403` e `401`.
 
 ## Arquitetura frontend
@@ -23,11 +23,16 @@ Criar `Operações / Importação em lote` no menu operacional, com **cadastro e
 - Nenhuma lógica de Strategy, arredondamento ou consulta a taxa no navegador; valores financeiros chegam como **strings decimais** da API e são somente formatados por locale.
 - Não persistir conteúdo do arquivo, token, dados de recebíveis ou histórico bancário no `localStorage`; não enviar credenciais em URL/logs. A prévia não reserva taxas, e a confirmação financeira usa a cotação elegível no instante efetivo segundo B17. Mostrar explicitamente diferenças entre prévia e resultado efetivo.
 
+## Massa de teste e inspeção
+
+Disponibilizar ao operador os dois [arquivos de aferição](../validacao/lotes/README.md), cada um com 200 linhas, e testar a identificação de quatro referências iguais entre A e B: duas nas mesmas posições, duas fora de ordem. Após liquidar o A, a pré-validação do B apresenta quatro `JA_LIQUIDADO` **antes** de qualquer botão de confirmação. A interface permite identificar as quatro linhas, baixar erros e corrigir o arquivo; não omite títulos já existentes. A comparação ocorre no backend por referência estável de negócio por organização, não por valor/preço coincidentes.
+
+
 ## Critérios de aceite
 
 - [ ] Modelo publicado com cabeçalhos B16, instruções e formatos coerentes com API.
 - [ ] Upload CSV e XLSX somente conforme suporte backend aprovado; erro por linha/campo e totais visíveis.
-- [ ] Prévias de importação e liquidação não fazem escrita; cadastro e liquidação exigem **confirmações explícitas separadas**, replays idempotentes e tratamento seguro de estado incerto.
+- [ ] Prévias de importação e liquidação não fazem escrita; **100% das simulações devem estar concluídas e válidas antes de habilitar `Liquidar lote`**; cadastro e liquidação exigem confirmações explícitas separadas, replays idempotentes e tratamento seguro de estado incerto.
 - [ ] `Liquidar lote` aparece apenas após cadastro confirmado; conflitos do **mesmo recebível** e resultado atômico/parcial são apresentados segundo B17, sem inventar sucesso.
 - [ ] C1–C3 podem compor prévias de demonstração sem contaminar taxas de produção.
 - [ ] Testes React para arquivo inválido, cancelamento, retry, expiração de token, telas estreitas e navegação.
