@@ -128,6 +128,7 @@ class BootstrapTaxasDemoPostgresTest {
                 id UUID PRIMARY KEY,
                 moeda_base CHAR(3) NOT NULL DEFAULT 'BRL',
                 moeda_cotada CHAR(3) NOT NULL DEFAULT 'USD',
+                fonte VARCHAR(16) NOT NULL DEFAULT 'DEMO',
                 taxa_brl_por_unidade NUMERIC(20,10) NOT NULL,
                 vigente_em TIMESTAMPTZ NOT NULL,
                 criado_em TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,

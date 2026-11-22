@@ -268,6 +268,7 @@ function PainelOperacoes({
   const [incerto, setIncerto] = useState(false)
   const [pendente, setPendente] = useState<IntencaoLiquidacao | null>(null)
   const [confirmando, setConfirmando] = useState(false)
+  const [previaObsoleta, setPreviaObsoleta] = useState(false)
   const [liquidacao, setLiquidacao] = useState<Liquidacao | null>(null)
   const trava = useRef(false)
   const campoValor = useRef<HTMLInputElement>(null)
@@ -386,7 +387,7 @@ function PainelOperacoes({
       const chave = crypto.randomUUID()
       const intencao = await cadastrarParaLiquidacao(operacoes, token, {
         cedenteId, modalidade, valorFaceBrl: valorCanonico, prazoMeses: Number(prazo), vencimento: vencimento || null,
-      }, moeda, chave)
+      }, moeda, chave, previa.dados.revisaoCambial ?? undefined)
       setPendente(intencao)
       aoAtualizarOperacaoPendente(true)
       setSucesso('Recebível cadastrado. Confirme a liquidação para prosseguir.')
@@ -404,8 +405,29 @@ function PainelOperacoes({
     }
   }
 
+  async function renovarPrevia() {
+    if (!token || !pendente || !previaObsoleta || trava.current || bloqueadoPorLote) return
+    trava.current = true
+    atualizarOcupado(true)
+    try {
+      const dados = await operacoes.simular(token, {
+        modalidade, valorFaceBrl: valorCanonico, prazoMeses: Number(prazo), moeda: pendente.moeda,
+      }, new AbortController().signal)
+      setPrevia({ entrada: chaveEntrada, dados })
+      setPendente({ ...pendente, chave: crypto.randomUUID(), revisaoCambial: dados.revisaoCambial ?? undefined })
+      setPreviaObsoleta(false)
+      setErro('')
+      setSucesso('Prévia atualizada. Confira os valores e confirme novamente a liquidação do mesmo recebível.')
+    } catch (falha) {
+      setErro(tratarErro(falha))
+    } finally {
+      trava.current = false
+      atualizarOcupado(false)
+    }
+  }
+
   async function liquidar() {
-    if (!token || !pendente || trava.current || bloqueadoPorLote) return
+    if (!token || !pendente || previaObsoleta || trava.current || bloqueadoPorLote) return
     trava.current = true
     atualizarOcupado(true)
     setErro('')
@@ -418,8 +440,11 @@ function PainelOperacoes({
       setSucesso('Liquidação confirmada.')
     } catch (falha) {
       const conclusivo = falha instanceof ErroOperacao && [400, 401, 403, 404, 409].includes(falha.status ?? 0)
+      if (falha instanceof ErroOperacao && falha.status === 409) setPreviaObsoleta(true)
       const mensagem = tratarErro(falha)
-      setErro(conclusivo
+      setErro(falha instanceof ErroOperacao && falha.status === 409
+        ? `${mensagem} Atualize a prévia e confirme novamente o mesmo recebível, sem recadastrá-lo.`
+        : conclusivo
         ? `${mensagem} A mesma chave será usada ao tentar novamente.`
         : `${mensagem} O resultado da liquidação é incerto; uma nova tentativa usará a mesma chave de idempotência.`)
     } finally {
@@ -550,22 +575,24 @@ function PainelOperacoes({
         {valido && estadoPrevia === 'vazio' && !pendente && !incerto && !liquidacao && <Carregando rotulo="Aguardando simulação…" />}
         {estadoPrevia === 'carregando' && <Carregando rotulo="Simulando…" />}
         {estadoPrevia === 'erro' && <Mensagem severity="error">{erroPrevia} <Button onClick={() => { alterou(); setTentativaPrevia((n) => n + 1) }}>Tentar novamente</Button></Mensagem>}
-        {previaAtual && <Valores dados={previaAtual} locale={locale} fusoHorario={fusoHorario} />}
+        {previaAtual && !pendente && <Valores dados={previaAtual} locale={locale} fusoHorario={fusoHorario} />}
         <Box><Button variant="contained" disabled={bloqueado || bloqueadoPorLote || !cedenteId || !previaAtual || estadoPrevia !== 'pronto'}
           onClick={cadastrarRecebivel}>Cadastrar recebível</Button></Box>
         </Painel>
       </Box>
       <Box hidden={pagina !== 'liquidacao'}>
         {pendente && !liquidacao && <Painel id="liquidacao" titulo="Liquidação">
-          <Typography>Recebível: {pendente.id}. A liquidação será recalculada com as taxas vigentes.</Typography>
-          <Box><Button variant="contained" disabled={ocupado || bloqueadoPorLote} onClick={() => setConfirmando(true)}>Confirmar liquidação</Button></Box>
+          <Typography>Recebível: {pendente.id}. Alterações financeiras exigem nova prévia e confirmação.</Typography>
+          {previaAtual && <Valores dados={previaAtual} locale={locale} fusoHorario={fusoHorario} />}
+          {previaObsoleta && <Button disabled={ocupado || bloqueadoPorLote} onClick={renovarPrevia}>Atualizar prévia do recebível</Button>}
+          <Box><Button variant="contained" disabled={ocupado || bloqueadoPorLote || previaObsoleta} onClick={() => setConfirmando(true)}>Confirmar liquidação</Button></Box>
         </Painel>}
         {liquidacao && <Painel id="resultado" titulo="Liquidação confirmada">
         <Typography>Código da liquidação: {liquidacao.liquidacaoId}</Typography>
         <Valores dados={liquidacao} locale={locale} fusoHorario={fusoHorario} />
         <Box><Button disabled={bloqueadoPorLote} onClick={() => {
           setPendente(null); setLiquidacao(null); setValor(''); setPrazo(''); setVencimento('')
-          setPrevia(null); setEstadoPrevia('vazio'); setSucesso(''); setErro('')
+          setPrevia(null); setEstadoPrevia('vazio'); setSucesso(''); setErro(''); setPreviaObsoleta(false)
           aoAtualizarOperacaoPendente(false)
           navegar('simulacao')
         }}>Nova operação</Button></Box>
@@ -577,7 +604,7 @@ function PainelOperacoes({
       </Box>
       <Dialog open={confirmando} onClose={() => setConfirmando(false)} aria-labelledby="confirmar-titulo">
         <DialogTitle id="confirmar-titulo">Confirmar liquidação?</DialogTitle>
-        <DialogContent><DialogContentText>O valor será calculado novamente pelo servidor e pode diferir da simulação indicativa.</DialogContentText></DialogContent>
+        <DialogContent><DialogContentText>O servidor revalidará a prévia. Se o preço ou a fonte mudar, obtenha nova prévia e confirme novamente.</DialogContentText></DialogContent>
         <DialogActions><Button onClick={() => setConfirmando(false)}>Cancelar</Button><Button onClick={liquidar} disabled={ocupado || bloqueadoPorLote}>Liquidar</Button></DialogActions>
       </Dialog>
     </Stack>

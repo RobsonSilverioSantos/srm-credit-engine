@@ -60,15 +60,15 @@ class BootstrapTaxasDemo {
             )
             val cambio = jdbc.update(
                 """
-                INSERT INTO cotacoes_cambiais (id, taxa_brl_por_unidade, vigente_em)
-                SELECT gen_random_uuid(), 5.4321000000, CURRENT_TIMESTAMP
+                INSERT INTO cotacoes_cambiais (id, taxa_brl_por_unidade, vigente_em, fonte)
+                SELECT gen_random_uuid(), 5.4321000000, CURRENT_TIMESTAMP, 'DEMO'
                 WHERE NOT EXISTS (
                     SELECT 1 FROM cotacoes_cambiais
-                    WHERE moeda_base = 'BRL' AND moeda_cotada = 'USD'
+                    WHERE fonte = 'DEMO' AND moeda_base = 'BRL' AND moeda_cotada = 'USD'
                       AND vigente_em <= CURRENT_TIMESTAMP AND criado_em <= CURRENT_TIMESTAMP
                       AND vigente_em + (CAST(? AS bigint) * INTERVAL '1 microsecond') >= CURRENT_TIMESTAMP
                 )
-                ON CONFLICT (moeda_base, moeda_cotada, vigente_em) DO NOTHING
+                ON CONFLICT (moeda_base, moeda_cotada, vigente_em) WHERE fonte = 'DEMO' DO NOTHING
                 """.trimIndent(),
                 limiteMicros,
             )

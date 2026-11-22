@@ -26,4 +26,11 @@ data class ItemExtratoResposta(
     val cotacaoValidaAte: String?,
     val valorPagamento: String,
     val liquidadaEm: String,
+    val fonteCambial: String? = null,
+    val ladoCambial: String? = null,
+    val versaoCotacao: Int? = null,
+    val politicaCambialId: UUID? = null,
+    val selecaoCambialId: UUID? = null,
+    val cotacaoObservadaEm: String? = null,
+    val autorizacaoCambialId: String? = null,
 )

@@ -23,6 +23,9 @@ function simulacao(valor: unknown): valor is Simulacao {
   return objeto(valor) && valores(valor) && typeof valor.taxaBaseMensal === 'string'
     && typeof valor.spreadMensal === 'string' && (typeof valor.cotacaoBrlPorUsd === 'string' || valor.cotacaoBrlPorUsd === null)
     && typeof valor.referencia === 'string' && (typeof valor.cotacaoValidaAte === 'string' || valor.cotacaoValidaAte === null)
+    && (valor.revisaoCambial === undefined || valor.revisaoCambial === null
+      || (typeof valor.revisaoCambial === 'string' && /^[0-9a-f]{64}$/.test(valor.revisaoCambial)))
+    && (valor.fonteCambial === undefined || valor.fonteCambial === null || typeof valor.fonteCambial === 'string')
 }
 
 function liquidacao(valor: unknown): valor is Liquidacao {
@@ -93,9 +96,9 @@ export const bff: PortaOperacoes = {
     (valor): valor is Recebivel => objeto(valor) && typeof valor.id === 'string' && valor.id.length > 0, {
     method: 'POST', body: JSON.stringify(entrada),
   }, token),
-  async liquidar(token, id, moeda: Moeda, chave) {
+  async liquidar(token, id, moeda: Moeda, chave, revisaoCambial) {
     const resultado = await requisitar(`/bff/v1/recebiveis/${encodeURIComponent(id)}/liquidacoes`, liquidacao, {
-      method: 'POST', headers: { 'Idempotency-Key': chave }, body: JSON.stringify({ moeda }),
+      method: 'POST', headers: { 'Idempotency-Key': chave }, body: JSON.stringify({ moeda, revisaoCambial }),
     }, token)
     if (resultado.recebivelId !== id || resultado.moeda !== moeda) {
       throw new ErroOperacao('Resposta de liquidação incompatível com a solicitação.')

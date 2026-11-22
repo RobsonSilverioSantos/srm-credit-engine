@@ -167,6 +167,37 @@ test('cadastra após prévia e mantém a chave na retentativa após expiração'
   expect(porta.liquidar.mock.calls[1]?.[3]).toBe(porta.liquidar.mock.calls[0]?.[3])
 }, 10000)
 
+test('B15 reconfirma nova revisao apos 409 sem recadastrar ou trocar chave em resultado incerto', async () => {
+  const porta = criarPorta()
+  const revisaoInicial = 'a'.repeat(64)
+  const revisaoNova = 'b'.repeat(64)
+  porta.simular.mockResolvedValueOnce({ ...simulacao, revisaoCambial: revisaoInicial })
+    .mockResolvedValue({ ...simulacao, valorPagamento: '92000.01', revisaoCambial: revisaoNova })
+  porta.liquidar.mockRejectedValueOnce(new ErroOperacao('Prévia obsoleta', 409))
+    .mockRejectedValueOnce(new ErroOperacao('Resposta perdida'))
+  const user = await iniciar(porta)
+  await preencher(user)
+  await screen.findByText(/Valor presente:.*92,859\.94/)
+  await user.click(screen.getByRole('button', { name: 'Cadastrar recebível' }))
+  await user.click(await screen.findByRole('button', { name: 'Confirmar liquidação' }))
+  await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Liquidar' }))
+  await user.click(await screen.findByRole('button', { name: 'Atualizar prévia do recebível' }))
+  await user.click(await screen.findByRole('button', { name: 'Confirmar liquidação' }))
+  await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Liquidar' }))
+  await screen.findByText(/O resultado da liquidação é incerto/)
+  expect(screen.queryByRole('button', { name: 'Atualizar prévia do recebível' })).not.toBeInTheDocument()
+  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+  await user.click(screen.getByRole('button', { name: 'Confirmar liquidação' }))
+  await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Liquidar' }))
+  await screen.findByText(/Código da liquidação: liquidacao-1/)
+  const chamadas = porta.liquidar.mock.calls
+  expect(chamadas[0]?.[4]).toBe(revisaoInicial)
+  expect(chamadas[1]?.[4]).toBe(revisaoNova)
+  expect(chamadas[1]?.[3]).not.toBe(chamadas[0]?.[3])
+  expect(chamadas[2]).toEqual(chamadas[1])
+  expect(porta.cadastrarRecebivel).toHaveBeenCalledTimes(1)
+}, 15000)
+
 test('impede saída durante cadastro e confirma antes de descartar intenção pendente', async () => {
   const porta = criarPorta()
   let concluirCadastro: (resposta: { id: string }) => void = () => { throw new Error('cadastro não iniciado') }

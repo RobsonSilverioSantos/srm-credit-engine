@@ -8,6 +8,8 @@ import br.com.srm.creditengine.lotes.aplicacao.porta.entrada.LiquidarLote
 import br.com.srm.creditengine.taxas.adaptador.saida.HistoricoFinanceiroJdbc
 import br.com.srm.creditengine.taxas.aplicacao.ManterEConsultarTaxas
 import br.com.srm.creditengine.taxas.dominio.SeletorTaxas
+import br.com.srm.creditengine.taxas.aplicacao.ServicoCambio
+import br.com.srm.creditengine.taxas.adaptador.saida.HistoricoCambioJdbc
 import java.time.Clock
 import java.time.Duration
 import io.micrometer.core.instrument.MeterRegistry
@@ -46,6 +48,8 @@ class LotesAutoConfiguracao {
         identidade: IdentidadeConfiavel,
         json: ObjectMapper,
         metricas: MeterRegistry,
+        cambio: ServicoCambio,
+        historicoCambio: HistoricoCambioJdbc,
         @Value("\${srm.lotes.max-linhas:200}") maxTitulos: Int,
         @Value("\${srm.cambio.validade:PT30M}") validade: Duration,
     ): LiquidarLote {
@@ -59,9 +63,10 @@ class LotesAutoConfiguracao {
                     .addKeyValue("quantidade", quantidade).log("Liquidação integral do lote confirmada após commit")
             },
             aposReplay = { metricas.counter("srm.lotes.liquidacoes.replays").increment() },
+            historicoCambio = historicoCambio,
         )
         // Revalidação local JDBC: não usar o executor/retry cambial fora da conexão transacional.
-        val taxas = ManterEConsultarTaxas(HistoricoFinanceiroJdbc(jdbc), SeletorTaxas(validade), relogio)
+        val taxas = ManterEConsultarTaxas(HistoricoFinanceiroJdbc(jdbc), SeletorTaxas(validade), relogio, cambio)
         return ServicoLiquidacaoLote(identidade, CedentesJdbc(jdbc), persistencia, taxas, relogio, maxTitulos)
     }
 

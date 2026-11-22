@@ -16,6 +16,7 @@ class SeletorTaxas(private val validadeCambial: Duration) {
         referencia: Instant,
         exigirCotacao: Boolean,
         historico: HistoricoElegivel,
+        cambio: CotacaoAplicavel? = null,
     ): TaxasParaSnapshot {
         validarModalidade(modalidade)
         val base = historico.taxaBase ?: throw DadosFinanceirosIndisponiveis("Taxa base indisponível")
@@ -33,10 +34,18 @@ class SeletorTaxas(private val validadeCambial: Duration) {
         } else null
         val validaAte = cotacao?.let {
             validarInstantes(it.vigenteEm, it.criadoEm)
+            if (cambio != null) {
+                check(cambio.cotacao == it)
+                cambio.validar(referencia)
+                return@let cambio.validaAte
+            }
+            if (it.fonte != FonteCambial.DEMO) {
+                throw DadosFinanceirosIndisponiveis("Fonte cambial exige política explícita")
+            }
             val limite = it.vigenteEm.plus(validadeCambial)
             if (referencia > limite) throw DadosFinanceirosIndisponiveis("Cotação BRL/USD vencida")
             limite
         }
-        return TaxasParaSnapshot(referencia, base, spread, cotacao, validaAte)
+        return TaxasParaSnapshot(referencia, base, spread, cotacao, validaAte, cambio)
     }
 }

@@ -11,6 +11,8 @@ import br.com.srm.creditengine.liquidacao.dominio.Liquidacao
 import br.com.srm.creditengine.liquidacao.dominio.MoedaPagamento
 import br.com.srm.creditengine.liquidacao.dominio.ResultadoLiquidacao
 import br.com.srm.creditengine.taxas.dominio.DadosFinanceirosIndisponiveis
+import br.com.srm.creditengine.taxas.adaptador.saida.ValidadorCambioJdbc
+import br.com.srm.creditengine.taxas.aplicacao.porta.saida.HistoricoCambio
 import java.security.MessageDigest
 import java.time.Clock
 import java.time.Instant
@@ -26,7 +28,9 @@ class LiquidacaoJdbc(
     private val relogio: Clock,
     private val aoConfirmarAposCommit: (IdentidadeLiquidacao, Liquidacao) -> Unit = { _, _ -> },
     private val aoReproduzir: () -> Unit = {},
+    historicoCambio: HistoricoCambio? = null,
 ) : IdempotenciaLiquidacao, TransacaoLiquidacao, PersistenciaLiquidacao, AuditoriaLiquidacao {
+    private val cambio = ValidadorCambioJdbc(jdbc, transacao, relogio, historicoCambio)
     private fun Instant.utc(): OffsetDateTime = atOffset(ZoneOffset.UTC)
 
     override fun consultar(organizacaoId: UUID, chave: String, hash: ByteArray): ResultadoOperacaoLiquidacao? {
@@ -83,6 +87,7 @@ class LiquidacaoJdbc(
             }
             val recebivel = liquidacao.recebivel
             check(recebivel.organizacaoId == organizacao) { "Organização inconsistente" }
+            cambio.validar(organizacao, liquidacao.taxas)
             val limite = liquidacao.taxas.cotacaoValidaAte
             if (limite != null && relogio.instant() > limite) {
                 throw DadosFinanceirosIndisponiveis("Cotação BRL/USD venceu antes da liquidação")
@@ -99,6 +104,7 @@ class LiquidacaoJdbc(
                 precificacao.desagioBrl, liquidacao.valorPagamento, taxas.referencia,
             )
             registrar(identidade, liquidacao)
+            cambio.validar(organizacao, liquidacao.taxas)
             jdbc.update(
                 """UPDATE idempotencia SET situacao = 'CONCLUIDA', liquidacao_id = ?, resposta_http = ?,
                    resposta_corpo = jsonb_build_object(
@@ -137,14 +143,32 @@ class LiquidacaoJdbc(
                (id, organizacao_id, recebivel_id, modalidade, valor_face_brl, prazo_meses, versao_recebivel,
                 taxa_base_id, taxa_base_mensal, taxa_base_vigente_em, spread_id, spread_mensal, spread_vigente_em,
                 valor_presente_brl, desagio_brl, moeda_pagamento, cotacao_cambial_id, taxa_brl_por_unidade,
-                cotacao_vigente_em, cotacao_valida_ate, valor_pagamento, liquidada_em)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                cotacao_vigente_em, cotacao_valida_ate, valor_pagamento, liquidada_em,
+                politica_cambial_id, selecao_cambial_id, cambio_snapshot)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                 CASE WHEN CAST(? AS text) IS NULL THEN NULL ELSE jsonb_build_object(
+                   'fonte', CAST(? AS text), 'lado', 'VENDA', 'versaoCotacao', CAST(? AS integer),
+                   'cotacaoId', CAST(? AS text), 'referencia', CAST(? AS text), 'observadaEm', CAST(? AS text),
+                   'dataBoletim', CAST(? AS text), 'horarioOriginal', CAST(? AS text),
+                   'fuso', 'America/Sao_Paulo', 'boletim', CAST(? AS text),
+                   'politicaId', CAST(? AS text), 'selecaoId', CAST(? AS text), 'autorizacaoId', CAST(? AS text),
+                   'validaDesde', CAST(? AS text), 'validaAte', CAST(? AS text), 'limiteExclusivo', CAST(? AS boolean),
+                   'corte', CAST(? AS text), 'autorId', CAST(? AS text), 'justificativa', CAST(? AS text))
+                 END)""",
             liquidacao.id, recebivel.organizacaoId, recebivel.id, recebivel.modalidade, recebivel.valorFaceBrl,
             recebivel.prazoMeses, recebivel.versao + 1, taxas.taxaBase.id, taxas.taxaBase.taxaMensal,
             taxas.taxaBase.vigenteEm.utc(), taxas.spread.id, taxas.spread.spreadMensal, taxas.spread.vigenteEm.utc(),
             precificacao.valorPresenteBrl, precificacao.desagioBrl, liquidacao.moeda.name, cotacao?.id,
             cotacao?.taxaBrlPorUsd, cotacao?.vigenteEm?.utc(), taxas.cotacaoValidaAte?.utc(), liquidacao.valorPagamento,
             taxas.referencia.utc(),
+            taxas.cambio?.politicaId, taxas.cambio?.selecaoId, cotacao?.fonte?.name,
+            cotacao?.fonte?.name, cotacao?.versao, cotacao?.id?.toString(), cotacao?.vigenteEm?.toString(),
+            cotacao?.criadoEm?.toString(), cotacao?.dataBoletim?.toString(), cotacao?.horarioOriginal,
+            if (cotacao?.fonte == br.com.srm.creditengine.taxas.dominio.FonteCambial.BCB_PTAX) "FECHAMENTO" else null,
+            taxas.cambio?.politicaId?.toString(), taxas.cambio?.selecaoId?.toString(),
+            taxas.cambio?.autorizacaoId?.toString(), taxas.cambio?.validaDesde?.toString(),
+            taxas.cotacaoValidaAte?.toString(), taxas.cambio?.limiteExclusivo ?: false,
+            taxas.referencia.toString(), cotacao?.autorId?.toString(), cotacao?.justificativa,
         )
     }
 

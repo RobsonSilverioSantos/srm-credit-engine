@@ -8,4 +8,5 @@ data class ResultadoSimulacao(
     val moeda: MoedaPagamento,
     val precificacao: ResultadoPrecificacao,
     val taxas: TaxasParaSnapshot,
+    val revisaoCambial: String? = null,
 )

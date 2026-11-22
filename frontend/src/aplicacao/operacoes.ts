@@ -6,7 +6,7 @@ export interface PortaOperacoes {
   cadastrarCedente(token: string, entrada: EntradaCedente): Promise<Cedente>
   simular(token: string, entrada: EntradaSimulacao, sinal: AbortSignal): Promise<Simulacao>
   cadastrarRecebivel(token: string, entrada: EntradaRecebivel): Promise<Recebivel>
-  liquidar(token: string, id: string, moeda: Moeda, chave: string): Promise<Liquidacao>
+  liquidar(token: string, id: string, moeda: Moeda, chave: string, revisaoCambial?: string): Promise<Liquidacao>
 }
 
 export class ErroOperacao extends Error {
@@ -22,11 +22,13 @@ export function mensagemErro(erro: unknown): string {
 
 export async function cadastrarParaLiquidacao(
   porta: PortaOperacoes, token: string, entrada: EntradaRecebivel, moeda: Moeda, chave: string,
+  revisaoCambial?: string,
 ): Promise<IntencaoLiquidacao> {
   const recebivel = await porta.cadastrarRecebivel(token, entrada)
-  return { id: recebivel.id, moeda, chave }
+  return { id: recebivel.id, moeda, chave, ...(revisaoCambial ? { revisaoCambial } : {}) }
 }
 
 export function confirmarLiquidacao(porta: PortaOperacoes, token: string, intencao: IntencaoLiquidacao): Promise<Liquidacao> {
-  return porta.liquidar(token, intencao.id, intencao.moeda, intencao.chave)
+  if (!intencao.revisaoCambial) return porta.liquidar(token, intencao.id, intencao.moeda, intencao.chave)
+  return porta.liquidar(token, intencao.id, intencao.moeda, intencao.chave, intencao.revisaoCambial)
 }

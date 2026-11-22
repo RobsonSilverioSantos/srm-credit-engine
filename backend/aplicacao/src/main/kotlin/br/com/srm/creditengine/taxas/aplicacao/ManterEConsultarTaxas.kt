@@ -1,6 +1,7 @@
 package br.com.srm.creditengine.taxas.aplicacao
 
 import br.com.srm.creditengine.taxas.aplicacao.porta.entrada.TaxasPorta
+import br.com.srm.creditengine.taxas.aplicacao.porta.entrada.ConsultarCambio
 import br.com.srm.creditengine.taxas.aplicacao.porta.saida.HistoricoFinanceiroPorta
 import br.com.srm.creditengine.taxas.dominio.CotacaoCambial
 import br.com.srm.creditengine.taxas.dominio.SeletorTaxas
@@ -17,6 +18,7 @@ class ManterEConsultarTaxas(
     private val historico: HistoricoFinanceiroPorta,
     private val seletor: SeletorTaxas,
     private val relogio: Clock,
+    private val cambio: ConsultarCambio? = null,
 ) : TaxasPorta {
     private fun agora(): Instant = relogio.instant().truncatedTo(ChronoUnit.MICROS)
     private fun validarPrecisao(instante: Instant) {
@@ -43,6 +45,9 @@ class ManterEConsultarTaxas(
 
     override fun consultarEm(modalidade: String, exigirCotacao: Boolean, referencia: Instant): TaxasParaSnapshot {
         validarPrecisao(referencia)
-        return seletor.selecionar(modalidade, referencia, exigirCotacao, historico.consultar(modalidade, referencia, exigirCotacao))
+        val cotacao = if (exigirCotacao) cambio?.consultar(referencia) else null
+        val dados = historico.consultar(modalidade, referencia, exigirCotacao && cambio == null)
+        return seletor.selecionar(modalidade, referencia, exigirCotacao,
+            if (cotacao != null) dados.copy(cotacao = cotacao.cotacao) else dados, cotacao)
     }
 }

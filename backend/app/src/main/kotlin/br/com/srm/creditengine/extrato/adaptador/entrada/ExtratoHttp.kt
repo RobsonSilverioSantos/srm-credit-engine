@@ -27,6 +27,7 @@ class ExtratoHttp(private val extrato: ObjectProvider<ConsultarExtrato>) {
         spreadVigenteEm.toString(), valorPresenteBrl.toPlainString(), desagioBrl.toPlainString(), moeda.name,
         cotacaoCambialId, taxaBrlPorUnidade?.toPlainString(), cotacaoVigenteEm?.toString(),
         cotacaoValidaAte?.toString(), valorPagamento.toPlainString(), liquidadaEm.toString(),
+        fonteCambial, ladoCambial, versaoCotacao, politicaCambialId, selecaoCambialId, cotacaoObservadaEm, autorizacaoCambialId,
     )
 
     @GetMapping("/extrato")

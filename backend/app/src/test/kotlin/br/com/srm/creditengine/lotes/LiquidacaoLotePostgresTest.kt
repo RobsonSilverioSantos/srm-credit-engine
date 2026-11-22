@@ -23,6 +23,9 @@ import br.com.srm.creditengine.lotes.aplicacao.ServicoLiquidacaoLote
 import br.com.srm.creditengine.lotes.aplicacao.StatusLinhaLote
 import br.com.srm.creditengine.lotes.aplicacao.porta.saida.PersistenciaLiquidacaoLote
 import br.com.srm.creditengine.taxas.adaptador.saida.HistoricoFinanceiroJdbc
+import br.com.srm.creditengine.taxas.adaptador.saida.HistoricoCambioJdbc
+import br.com.srm.creditengine.taxas.aplicacao.BoletimPtax
+import br.com.srm.creditengine.taxas.aplicacao.porta.entrada.ConsultarCambio
 import br.com.srm.creditengine.taxas.aplicacao.ManterEConsultarTaxas
 import br.com.srm.creditengine.taxas.dominio.DadosFinanceirosIndisponiveis
 import br.com.srm.creditengine.taxas.dominio.SeletorTaxas
@@ -63,7 +66,7 @@ class LiquidacaoLotePostgresTest {
     @Autowired private lateinit var gerenciador: PlatformTransactionManager
     @Autowired private lateinit var json: ObjectMapper
 
-    private fun fixture(quantidade: Int = 200): Fixture {
+    private fun fixture(quantidade: Int = 200, ptax: Boolean = false): Fixture {
         val org = UUID.randomUUID()
         val usuario = UUID.randomUUID()
         val cedente = UUID.randomUUID()
@@ -73,16 +76,22 @@ class LiquidacaoLotePostgresTest {
             usuario, org, "$usuario@example.invalid")
         jdbc.update("INSERT INTO cedentes (id, organizacao_id, nome, documento) VALUES (?, ?, 'B17 teste', 'teste')",
             cedente, org)
-        val taxas = ManterEConsultarTaxas(HistoricoFinanceiroJdbc(jdbc), SeletorTaxas(Duration.ofMinutes(30)), clock)
+        val cambio = HistoricoCambioJdbc(jdbc, TransactionTemplate(gerenciador), clock)
+        val taxas = ManterEConsultarTaxas(HistoricoFinanceiroJdbc(jdbc), SeletorTaxas(Duration.ofMinutes(30)), clock,
+            if (ptax) ConsultarCambio { cambio.consultar(org, it) } else null)
         taxas.registrarTaxaBase(BigDecimal("0.01"), clock.instant())
         taxas.registrarSpread("DUPLICATA_MERCANTIL", BigDecimal("0.015"), clock.instant())
         taxas.registrarSpread("CHEQUE_PRE_DATADO", BigDecimal("0.025"), clock.instant())
-        taxas.registrarCotacao(BigDecimal("5.4321"), clock.instant())
+        if (ptax) {
+            val local = clock.instant().atZone(ZoneId.of("America/Sao_Paulo"))
+            cambio.sincronizar(listOf(BoletimPtax(BigDecimal("6.0994"), BigDecimal("6.1000"),
+                clock.instant(), local.toLocalDate(), local.toLocalDateTime().toString().replace('T', ' '))))
+        } else taxas.registrarCotacao(BigDecimal("5.4321"), clock.instant())
         val itens = (1..quantidade).map {
             ItemImportacao("b17-$it", cedente,
                 if (it == 2) "CHEQUE_PRE_DATADO" else "DUPLICATA_MERCANTIL",
                 BigDecimal(if (it == 2) "25000.00" else "100000.00"), if (it == 2) 2 else 3,
-                null, if (it == 3) MoedaPagamento.USD else MoedaPagamento.BRL)
+                null, if (ptax || it == 3) MoedaPagamento.USD else MoedaPagamento.BRL)
         }
         val lote = LotesJdbc(jdbc, TransactionTemplate(gerenciador)).confirmar(
             IdentidadeUsuario(usuario, org), "cadastro", "a".repeat(64), itens,
@@ -144,6 +153,27 @@ class LiquidacaoLotePostgresTest {
                 """SELECT count(*) FROM (SELECT recebivel_id FROM liquidacoes WHERE organizacao_id = ?
                    GROUP BY recebivel_id HAVING count(*) > 1) duplicadas""", Int::class.java, org)).isZero()
         }
+    }
+
+    @Test
+    fun `PTAX em 200 itens concorrentes confirma atomicamente uma vez e replay sobrevive a 97h`() {
+        val f = fixture(ptax = true)
+        val hash = f.hash()
+        val barreira = CyclicBarrier(2)
+        val porta = sincronizar(f.repositorio()) { barreira.await(20, TimeUnit.SECONDS) }
+        val resultados = paralelo({ f.confirmar("ptax-a", hash, porta) }, { f.confirmar("ptax-b", hash, porta) })
+        assertThat(resultados.count { it.isSuccess }).isEqualTo(1)
+        assertThat(resultados.single { it.isFailure }.exceptionOrNull()).isInstanceOf(ConflitoLiquidacao::class.java)
+        val vencedor = resultados.single { it.isSuccess }.getOrThrow()
+        f.verificar(200, 1)
+        assertThat(jdbc.queryForObject(
+            """SELECT count(*) FROM liquidacoes WHERE organizacao_id = ?
+               AND cambio_snapshot->>'fonte' = 'BCB_PTAX' AND politica_cambial_id IS NOT NULL""",
+            Int::class.java, f.org)).isEqualTo(200)
+        f.clock.instante.set(f.clock.instant().plus(Duration.ofHours(97)))
+        val chave = if (resultados[0].isSuccess) "ptax-a" else "ptax-b"
+        assertThat(f.confirmar(chave, hash)).isEqualTo(vencedor)
+        f.verificar(200, 1)
     }
 
     @Test

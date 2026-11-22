@@ -38,6 +38,15 @@ test('envia a chave idempotente e informa conflito HTTP', async () => {
     method: 'POST', headers: { Authorization: 'Bearer token', 'Content-Type': 'application/json', 'Idempotency-Key': 'chave-1' },
     body: '{"moeda":"USD"}',
   })
+
+})
+
+test('preserva a revisao financeira no corpo e na retentativa idempotente', async () => {
+  const fetchMock = vi.fn().mockResolvedValue(new Response('', { status: 409 }))
+  vi.stubGlobal('fetch', fetchMock)
+  const revisao = 'a'.repeat(64)
+  await expect(bff.liquidar('token', 'recebivel', 'USD', 'chave', revisao)).rejects.toMatchObject({ status: 409 })
+  expect(fetchMock.mock.calls[0]?.[1].body).toBe(JSON.stringify({ moeda: 'USD', revisaoCambial: revisao }))
 })
 
 test('autentica no endpoint próprio e trata 401 e indisponibilidade de rede', async () => {

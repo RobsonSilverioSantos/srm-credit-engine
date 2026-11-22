@@ -7,6 +7,7 @@ import br.com.srm.creditengine.liquidacao.aplicacao.ServicoLiquidacao
 import br.com.srm.creditengine.liquidacao.aplicacao.porta.entrada.LiquidarRecebivel
 import br.com.srm.creditengine.liquidacao.aplicacao.porta.saida.IdentidadeConfiavel
 import br.com.srm.creditengine.taxas.aplicacao.porta.entrada.TaxasPorta
+import br.com.srm.creditengine.taxas.adaptador.saida.HistoricoCambioJdbc
 import java.time.Clock
 import io.micrometer.core.instrument.MeterRegistry
 import org.slf4j.LoggerFactory
@@ -33,6 +34,7 @@ class LiquidacaoAutoConfiguracao {
         taxas: TaxasPorta,
         identidade: IdentidadeConfiavel,
         meterRegistry: MeterRegistry,
+        historicoCambio: HistoricoCambioJdbc,
     ): LiquidarRecebivel {
         val clock = Clock.systemUTC()
         val metricas = MetricasLiquidacao(meterRegistry)
@@ -55,6 +57,7 @@ class LiquidacaoAutoConfiguracao {
                     .addKeyValue("operation", "liquidacao")
                     .log("Resposta de liquidação reproduzida por idempotência")
             },
+            historicoCambio = historicoCambio,
         )
         val servico = ServicoLiquidacao(identidade, RecebiveisJdbc(jdbc), persistencia, taxas, persistencia, clock)
         return LiquidarRecebivel {
