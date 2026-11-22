@@ -9,12 +9,24 @@ const fonte = ler('./concorrencia.js').replace(/^import .*;$/gm, '')
   .replace('export default function ()', 'function cenario()');
 const cedente = '10000000-0000-4000-8000-000000000001';
 
-function executar({ vencedor = 0, parcial = false, organizacaoOcupada = false, origem = 'http://127.0.0.1:8080' } = {}) {
+function executar({
+  vencedor = 0, parcial = false, organizacaoOcupada = false,
+  origem = 'http://127.0.0.1:8080',
+  replayJsonReordenado = false, replayCorpoDivergente = false,
+} = {}) {
   const recebiveis = new Map(organizacaoOcupada ? [['SRM-DEMO-A-0001', 'externo']] : []);
   const idempotencia = new Map();
   let batchs = 0;
   let repositorios = 0;
-  const res = (status, corpo = {}) => ({ status, json: () => corpo });
+  const res = (status, corpo = {}, jsonReordenado = false) => ({
+    status,
+    body: JSON.stringify(corpo),
+    // Simula a diferença de ordenação observada em res.json() do k6
+    // mantendo os bytes HTTP originais inalterados.
+    json: () => jsonReordenado
+      ? { itens: corpo.itens, cadastrados: corpo.cadastrados, loteId: corpo.loteId }
+      : corpo,
+  });
   function commit(comandos, chave) {
     const corpo = {
       loteId: 'lote-' + idempotencia.size,
@@ -53,9 +65,13 @@ function executar({ vencedor = 0, parcial = false, organizacaoOcupada = false, o
       },
       request: (_metodo, _url, corpo, { headers }) => {
         const chave = headers['Idempotency-Key'];
-        return idempotencia.has(chave)
-          ? res(201, idempotencia.get(chave))
-          : commit(JSON.parse(corpo).itens, chave);
+        if (idempotencia.has(chave)) {
+          const original = idempotencia.get(chave);
+          return res(201,
+            replayCorpoDivergente ? { ...original, loteId: 'lote-replay-incorreto' } : original,
+            replayJsonReordenado);
+        }
+        return commit(JSON.parse(corpo).itens, chave);
       },
       batch: (requests) => {
         batchs++;
@@ -92,4 +108,14 @@ test('organização com uma referência já cadastrada não inicia a corrida', (
 });
 test('recusa destino fora do loopback antes de enviar pedidos', () => {
   assert.throws(() => executar({ origem: 'https://example.com' }), /URL HTTP restrita ao loopback/);
+});
+
+test('replay não falha por ordem distinta de propriedades em res.json()', () => {
+  assert.deepEqual(executar({ replayJsonReordenado: true }), {
+    cadastrados: 396, lotes: 2, batchs: 1,
+  });
+});
+test('replay com corpo HTTP efetivamente divergente não passa', () => {
+  assert.throws(() => executar({ replayCorpoDivergente: true }),
+    /mesma chave e comando devolvem o corpo HTTP original/);
 });
