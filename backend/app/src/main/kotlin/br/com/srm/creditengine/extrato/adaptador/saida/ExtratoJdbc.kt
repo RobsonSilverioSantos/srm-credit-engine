@@ -40,7 +40,12 @@ class ExtratoJdbc(jdbc: JdbcTemplate) : LeituraExtrato {
         }
         val sql = """
             WITH filtradas AS NOT MATERIALIZED (
-                SELECT l.*, r.cedente_id, c.nome AS cedente_nome
+                SELECT l.*, r.cedente_id, c.nome AS cedente_nome,
+                       l.cambio_snapshot->>'fonte' AS cambio_fonte,
+                       l.cambio_snapshot->>'lado' AS cambio_lado,
+                       (l.cambio_snapshot->>'versaoCotacao')::integer AS cambio_versao,
+                       l.cambio_snapshot->>'observadaEm' AS cambio_observada,
+                       l.cambio_snapshot->>'autorizacaoId' AS cambio_autorizacao
                 FROM liquidacoes l
                 JOIN recebiveis r ON r.id = l.recebivel_id AND r.organizacao_id = l.organizacao_id
                 JOIN cedentes c ON c.id = r.cedente_id AND c.organizacao_id = l.organizacao_id
@@ -75,5 +80,8 @@ class ExtratoJdbc(jdbc: JdbcTemplate) : LeituraExtrato {
         getBigDecimal("taxa_brl_por_unidade"), getObject("cotacao_vigente_em", OffsetDateTime::class.java)?.toInstant(),
         getObject("cotacao_valida_ate", OffsetDateTime::class.java)?.toInstant(), getBigDecimal("valor_pagamento"),
         getObject("liquidada_em", OffsetDateTime::class.java).toInstant(),
+        getString("cambio_fonte"), getString("cambio_lado"), getObject("cambio_versao", Int::class.javaObjectType),
+        getObject("politica_cambial_id", UUID::class.java), getObject("selecao_cambial_id", UUID::class.java),
+        getString("cambio_observada"), getString("cambio_autorizacao"),
     )
 }

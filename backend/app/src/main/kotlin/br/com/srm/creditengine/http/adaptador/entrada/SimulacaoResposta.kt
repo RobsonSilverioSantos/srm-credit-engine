@@ -12,4 +12,7 @@ data class SimulacaoResposta(
     @field:Schema(example = "5.4321000000", nullable = true) val cotacaoBrlPorUsd: String?,
     val referencia: String,
     @field:Schema(nullable = true) val cotacaoValidaAte: String?,
+    val fonteCambial: String? = null,
+    @field:Schema(description = "Revisão financeira completa (dados, taxas, preço e câmbio). Reenviar na confirmação; obrigatória em USD PTAX/MANUAL.")
+    val revisaoCambial: String? = null,
 )

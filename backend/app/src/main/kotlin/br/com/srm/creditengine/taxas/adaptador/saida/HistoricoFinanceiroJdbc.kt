@@ -32,7 +32,7 @@ class HistoricoFinanceiroJdbc(private val jdbc: JdbcTemplate) : HistoricoFinance
 
     override fun incluir(cotacao: CotacaoCambial) {
         jdbc.update(
-            "INSERT INTO cotacoes_cambiais (id, taxa_brl_por_unidade, vigente_em, criado_em) VALUES (?, ?, ?, ?)",
+            "INSERT INTO cotacoes_cambiais (id, taxa_brl_por_unidade, vigente_em, criado_em, fonte) VALUES (?, ?, ?, ?, 'DEMO')",
             cotacao.id, cotacao.taxaBrlPorUsd, cotacao.vigenteEm.utc(), cotacao.criadoEm.utc(),
         )
     }
@@ -54,7 +54,7 @@ class HistoricoFinanceiroJdbc(private val jdbc: JdbcTemplate) : HistoricoFinance
             ) s ON true
             LEFT JOIN LATERAL (
                 SELECT * FROM cotacoes_cambiais
-                WHERE ? AND moeda_base = 'BRL' AND moeda_cotada = 'USD'
+                WHERE ? AND fonte = 'DEMO' AND moeda_base = 'BRL' AND moeda_cotada = 'USD'
                   AND vigente_em <= r.referencia AND criado_em <= r.referencia
                 ORDER BY vigente_em DESC LIMIT 1
             ) c ON true

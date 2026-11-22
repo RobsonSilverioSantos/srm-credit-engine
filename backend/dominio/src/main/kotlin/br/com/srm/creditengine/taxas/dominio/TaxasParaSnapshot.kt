@@ -8,4 +8,5 @@ data class TaxasParaSnapshot(
     val spread: SpreadRecebivel,
     val cotacao: CotacaoCambial?,
     val cotacaoValidaAte: Instant?,
+    val cambio: CotacaoAplicavel? = null,
 )

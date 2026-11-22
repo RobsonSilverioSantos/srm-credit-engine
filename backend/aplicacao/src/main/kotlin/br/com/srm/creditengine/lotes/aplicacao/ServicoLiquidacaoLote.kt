@@ -133,7 +133,7 @@ class ServicoLiquidacaoLote(
         taxas.taxaBase.id, taxas.taxaBase.taxaMensal.toPlainString(), taxas.taxaBase.vigenteEm.toString(),
         taxas.spread.id, taxas.spread.spreadMensal.toPlainString(), taxas.spread.vigenteEm.toString(),
         taxas.cotacao?.id, taxas.cotacao?.taxaBrlPorUsd?.toPlainString(), taxas.cotacao?.vigenteEm?.toString(),
-        taxas.cotacaoValidaAte?.toString(), if (taxas.cotacao != null) "DEMO" else null,
+        taxas.cotacaoValidaAte?.toString(), taxas.cotacao?.fonte?.name,
     )
 
     private fun itemInvalido(r: Recebivel, moeda: MoedaPagamento, motivo: String) =
@@ -149,6 +149,7 @@ class ServicoLiquidacaoLote(
             listOf(it.recebivel.id, it.recebivel.cedenteId, it.recebivel.modalidade, it.recebivel.versao,
                 it.recebivel.valorFaceBrl.toPlainString(), it.recebivel.prazoMeses, it.moeda,
                 it.taxas.taxaBase.id, it.taxas.spread.id, it.taxas.cotacao?.id, it.taxas.cotacaoValidaAte,
+                it.taxas.cambio?.politicaId, it.taxas.cambio?.selecaoId, it.taxas.cambio?.autorizacaoId,
                 it.precificacao.valorPresenteBrl.toPlainString(), it.precificacao.desagioBrl.toPlainString(),
                 it.valorPagamento.toPlainString()).joinToString("|")
         }

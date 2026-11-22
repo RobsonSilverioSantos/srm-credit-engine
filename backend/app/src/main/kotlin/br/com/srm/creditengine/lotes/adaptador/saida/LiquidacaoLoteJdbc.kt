@@ -10,6 +10,8 @@ import br.com.srm.creditengine.liquidacao.dominio.RecebivelNaoEncontrado
 import br.com.srm.creditengine.lotes.aplicacao.ItemLiquidadoLote
 import br.com.srm.creditengine.lotes.aplicacao.ResultadoLiquidacaoLote
 import br.com.srm.creditengine.lotes.aplicacao.porta.saida.PersistenciaLiquidacaoLote
+import br.com.srm.creditengine.taxas.adaptador.saida.ValidadorCambioJdbc
+import br.com.srm.creditengine.taxas.aplicacao.porta.saida.HistoricoCambio
 import java.security.MessageDigest
 import java.time.Clock
 import java.util.UUID
@@ -25,8 +27,10 @@ class LiquidacaoLoteJdbc(
     private val json: ObjectMapper,
     private val aposCommit: (Int) -> Unit = {},
     private val aposReplay: () -> Unit = {},
+    historicoCambio: HistoricoCambio? = null,
 ) : PersistenciaLiquidacaoLote {
     private val financeiro = LiquidacaoJdbc(jdbc, transacao, relogio)
+    private val cambio = ValidadorCambioJdbc(jdbc, transacao, relogio, historicoCambio)
 
     override fun recebiveis(organizacaoId: UUID, loteId: UUID): List<Recebivel> {
         val itens = jdbc.query(
@@ -77,6 +81,7 @@ class LiquidacaoLoteJdbc(
             check(liquidacoes.isNotEmpty())
             for (liquidacao in liquidacoes) {
                 check(liquidacao.recebivel.organizacaoId == org)
+                cambio.validar(org, liquidacao.taxas)
                 if (!financeiro.atualizarRecebivel(liquidacao)) {
                     throw ConflitoLiquidacao("Recebível alterado; nenhuma liquidação do lote foi confirmada.")
                 }
@@ -84,6 +89,7 @@ class LiquidacaoLoteJdbc(
                 financeiro.registrar(identidade, liquidacao)
             }
             revalidar(liquidacoes)
+            liquidacoes.forEach { cambio.validar(org, it.taxas) }
             val resultado = ResultadoLiquidacaoLote(loteId, liquidacoes.first().taxas.referencia.toString(),
                 liquidacoes.map {
                     ItemLiquidadoLote(it.id, it.recebivel.id, it.moeda.name,

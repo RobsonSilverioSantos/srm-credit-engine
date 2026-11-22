@@ -18,6 +18,8 @@ export type Simulacao = {
   cotacaoBrlPorUsd: string | null
   referencia: string
   cotacaoValidaAte: string | null
+  fonteCambial?: string | null
+  revisaoCambial?: string | null
 }
 
 export type TipoDocumento = 'CNPJ' | 'OUTRO'
@@ -32,7 +34,7 @@ export type EntradaRecebivel = Omit<EntradaSimulacao, 'moeda'> & {
   vencimento: string | null
 }
 export type Recebivel = { id: string }
-export type IntencaoLiquidacao = { id: string; moeda: Moeda; chave: string }
+export type IntencaoLiquidacao = { id: string; moeda: Moeda; chave: string; revisaoCambial?: string }
 export type Liquidacao = {
   liquidacaoId: string
   recebivelId: string

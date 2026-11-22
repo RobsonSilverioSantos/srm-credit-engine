@@ -29,4 +29,11 @@ data class ItemExtrato(
     val cotacaoValidaAte: Instant?,
     val valorPagamento: BigDecimal,
     val liquidadaEm: Instant,
+    val fonteCambial: String? = null,
+    val ladoCambial: String? = null,
+    val versaoCotacao: Int? = null,
+    val politicaCambialId: UUID? = null,
+    val selecaoCambialId: UUID? = null,
+    val cotacaoObservadaEm: String? = null,
+    val autorizacaoCambialId: String? = null,
 )

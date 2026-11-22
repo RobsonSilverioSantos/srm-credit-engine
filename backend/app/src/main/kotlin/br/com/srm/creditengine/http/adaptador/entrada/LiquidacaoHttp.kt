@@ -52,8 +52,12 @@ class LiquidacaoHttp(private val liquidacoes: ObjectProvider<LiquidarRecebivel>)
         @RequestHeader("Idempotency-Key") chave: String,
         @RequestBody corpo: JsonNode,
     ): ResponseEntity<LiquidacaoResposta> {
-        corpo.validarCampos("moeda")
-        val comando = ComandoLiquidacao(uuid(id), MoedaPagamento.valueOf(corpo.texto("moeda")), chave)
+        corpo.validarCampos("moeda", "revisaoCambial")
+        val revisao = corpo.get("revisaoCambial")?.takeUnless { it.isNull }?.let {
+            require(it.isString) { "Revisão inválida" }
+            it.stringValue()
+        }
+        val comando = ComandoLiquidacao(uuid(id), MoedaPagamento.valueOf(corpo.texto("moeda")), chave, revisao)
         val resultado = liquidacoes.`object`.liquidar(comando)
         return ResponseEntity.status(resultado.metadado).body(resultado.liquidacao.resposta())
     }

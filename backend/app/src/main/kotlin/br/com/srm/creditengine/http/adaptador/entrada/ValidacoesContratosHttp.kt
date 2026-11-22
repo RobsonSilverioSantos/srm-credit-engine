@@ -29,6 +29,7 @@ internal fun ResultadoSimulacao.resposta() = SimulacaoResposta(
     (if (moeda == MoedaPagamento.USD) checkNotNull(precificacao.valorPresenteUsd) else precificacao.valorPresenteBrl).toPlainString(),
     taxas.taxaBase.taxaMensal.toPlainString(), taxas.spread.spreadMensal.toPlainString(),
     taxas.cotacao?.taxaBrlPorUsd?.toPlainString(), taxas.referencia.toString(), taxas.cotacaoValidaAte?.toString(),
+    taxas.cotacao?.fonte?.name, revisaoCambial,
 )
 
 internal fun JsonNode.validarCampos(vararg permitidos: String) {
