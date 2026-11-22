@@ -1,4 +1,5 @@
 import { afterEach, expect, test, vi } from 'vitest'
+import { readFileSync } from 'node:fs'
 import { bffLotes } from '../src/infraestrutura/bffLotes'
 import { dadosLote } from './fixtures/lotes'
 
@@ -30,6 +31,43 @@ test('cadastro B16 envia apenas itens canônicos e chave independente', async ()
     method: 'POST', headers: { Authorization: 'Bearer jwt', 'Content-Type': 'application/json', 'Idempotency-Key': 'chave-cadastro' },
     body: JSON.stringify({ itens }),
   }))
+})
+
+test.each([
+  '00000000000191', '00.000.000/0001-91', '12ABC34501DE35', '12.abc.345/01de-35',
+])('CSV transmite documento %s literalmente no arquivo, nunca na URL', async (documento) => {
+  const modelo = readFileSync('public/modelos/modelo-lote-cnpj.csv', 'utf8')
+  const conteudo = modelo.replace('CEDENTE_CNPJ_AQUI', documento)
+  responder(dadosLote().previa)
+  const arquivo = new File([conteudo], 'lote.csv', { type: 'text/csv' })
+  await bffLotes.prevalidar('jwt', arquivo)
+  const [url, opcoes] = vi.mocked(fetch).mock.calls[0]!
+  expect(url).toBe('/bff/v1/lotes/recebiveis/validacoes')
+  const enviado = (opcoes!.body as FormData).get('arquivo') as File
+  const texto = await new Promise((resolve, reject) => {
+    const leitor = new FileReader()
+    leitor.onload = () => resolve(leitor.result)
+    leitor.onerror = () => reject(leitor.error)
+    leitor.readAsText(enviado)
+  })
+  expect(texto).toBe(conteudo)
+  expect(opcoes!.headers).toEqual({ Authorization: 'Bearer jwt' })
+})
+
+test.each(['modelo-lote-cnpj.xlsx', 'modelo-lote.xlsx'])('XLSX publicado %s é enviado sem transformação', async (nome) => {
+  responder(dadosLote().previa)
+  const bytes = new Uint8Array(readFileSync(`public/modelos/${nome}`))
+  const arquivo = new File([bytes], nome)
+  await bffLotes.prevalidar('jwt', arquivo)
+  const [, opcoes] = vi.mocked(fetch).mock.calls[0]!
+  const enviado = (opcoes!.body as FormData).get('arquivo') as File
+  const resultado = await new Promise<ArrayBuffer>((resolve, reject) => {
+    const leitor = new FileReader()
+    leitor.onload = () => resolve(leitor.result as ArrayBuffer)
+    leitor.onerror = () => reject(leitor.error)
+    leitor.readAsArrayBuffer(enviado)
+  })
+  expect(new Uint8Array(resultado)).toEqual(bytes)
 })
 
 test('prévia B17 usa todos os itens sem chave, liquidação usa mesmo hash e confirmação explícita', async () => {

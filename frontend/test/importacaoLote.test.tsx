@@ -2,15 +2,16 @@ import { ThemeProvider } from '@mui/material/styles'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, expect, test, vi } from 'vitest'
-import { ErroLote } from '../src/aplicacao/lotes'
+import { ErroLote, type PortaLotes } from '../src/aplicacao/lotes'
+import { bffLotes } from '../src/infraestrutura/bffLotes'
 import { mensagemErro } from '../src/aplicacao/operacoes'
 import { PaginaImportacaoLote } from '../src/apresentacao/PaginaImportacaoLote'
 import { criarPortaLotes, dadosLote, dadosLoteMisto } from './fixtures/lotes'
 import { tema } from '../src/tema/tema'
 
-afterEach(() => vi.useRealTimers())
+afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals() })
 
-function iniciar(porta = criarPortaLotes(), token: string | null = 'jwt') {
+function iniciar(porta: PortaLotes = criarPortaLotes(), token: string | null = 'jwt') {
   const props = {
     porta, token, locale: 'pt-BR', fusoHorario: 'America/Sao_Paulo',
     tratarErro: vi.fn(mensagemErro), aoAtualizarOperacaoEmCurso: vi.fn(), aoAtualizarOperacaoPendente: vi.fn(),
@@ -95,6 +96,96 @@ test('quatro JA_LIQUIDADO permanecem visíveis em B de 200, navegáveis e no rel
   expect(linhas).toHaveLength(4)
   expect(linhas.every((linha) => linha.status === 'JA_LIQUIDADO')).toBe(true)
   expect(porta.cadastrar).not.toHaveBeenCalled()
+}, 15000)
+
+test('modelos CNPJ e UUID têm links distintos e instruções de identidade e preservação textual', () => {
+  iniciar()
+  for (const [nome, arquivo] of [
+    ['CSV por CNPJ', 'modelo-lote-cnpj.csv'], ['XLSX por CNPJ', 'modelo-lote-cnpj.xlsx'],
+    ['CSV por UUID (legado)', 'modelo-lote.csv'], ['XLSX por UUID (legado)', 'modelo-lote.xlsx'],
+  ]) {
+    expect(screen.getByRole('link', { name: `Baixar modelo ${nome}` })).toHaveAttribute('href', `/modelos/${arquivo}`)
+  }
+  expect(screen.getByText(/não identifica a organização/)).toHaveTextContent('sessão JWT')
+  expect(screen.getByText(/Mantenha a coluna como texto/)).toHaveTextContent('zeros à esquerda')
+  expect(screen.getByText(/Não misture os dois cabeçalhos/)).toBeVisible()
+})
+
+test.each([
+  ['inválido', 'CNPJ inválido.'],
+  ['inexistente', 'Cedente indisponível.'],
+  ['inativo', 'Cedente indisponível.'],
+  ['legado ambíguo', 'Identificação do cedente indisponível para importação.'],
+])('CNPJ %s: erro seguro por linha preserva as 200 linhas e bloqueia o lote inteiro', async (_, mensagem) => {
+  const porta = criarPortaLotes(200)
+  const previa = dadosLote(200).previa
+  previa.confirmavel = false
+  previa.itens[120] = {
+    ...previa.itens[120]!, status: 'INVALIDO', comando: null, simulacao: null,
+    erros: [{ campo: 'cedenteDocumento', mensagem }],
+  }
+  porta.prevalidar.mockResolvedValue(previa)
+  const { user } = iniciar(porta)
+  await prevalidar(user)
+  expect(screen.getByText('199/200 linhas válidas para cadastro')).toBeVisible()
+  expect(within(screen.getByRole('table', { name: 'Pré-validação de todas as linhas' })).getAllByRole('row')).toHaveLength(201)
+  expect(screen.getByText(`cedenteDocumento: ${mensagem}`)).toBeVisible()
+  await user.click(screen.getByRole('link', { name: 'Ir à linha 122: INVALIDO' }))
+  expect(document.activeElement).toHaveAttribute('id', 'linha-lote-122')
+  expect(screen.getByRole('button', { name: 'Conferir cadastro' })).toBeDisabled()
+  expect(porta.cadastrar).not.toHaveBeenCalled()
+  expect(porta.liquidar).not.toHaveBeenCalled()
+}, 15000)
+
+test.each(['csv', 'xlsx'])('upload %s por CNPJ confirma somente UUID canônico e mantém chave no retry 503', async (extensao) => {
+  const dados = dadosLote()
+  const cedenteId = 'c523d05c-00a5-43e7-a1ba-a206e8aa9391'
+  dados.previa.itens.forEach((item) => { item.comando!.cedenteId = cedenteId })
+  const transporte = vi.fn()
+    .mockResolvedValueOnce(new Response(JSON.stringify(dados.previa), { status: 200 }))
+    .mockResolvedValueOnce(new Response('{}', { status: 503 }))
+    .mockResolvedValueOnce(new Response(JSON.stringify(dados.cadastro), { status: 201 }))
+  vi.stubGlobal('fetch', transporte)
+  const { user } = iniciar(bffLotes)
+  await prevalidar(user, `lote.${extensao}`)
+  expect(screen.getAllByText(cedenteId)).toHaveLength(2)
+  expect(transporte).toHaveBeenCalledTimes(1)
+  await user.click(screen.getByRole('button', { name: 'Conferir cadastro' }))
+  await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Confirmar cadastro' }))
+  expect(await screen.findByRole('alert')).toHaveTextContent('indisponíveis')
+  await user.click(screen.getByRole('button', { name: 'Repetir confirmação de cadastro' }))
+  await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Confirmar cadastro' }))
+  await screen.findByRole('table', { name: 'Recebíveis cadastrados para auditoria' })
+  expect(transporte.mock.calls[1]).toEqual(transporte.mock.calls[2])
+  const [url, opcoes] = transporte.mock.calls[1]!
+  expect(url).toBe('/bff/v1/lotes/recebiveis')
+  expect(JSON.parse(opcoes.body)).toEqual({ itens: dados.previa.itens.map((item) => item.comando) })
+  expect(opcoes.body).not.toContain('cedenteDocumento')
+  expect(transporte).toHaveBeenCalledTimes(3)
+})
+
+test.each([403, 422])('cadastro por CNPJ rejeitado com HTTP %s preserva 200 linhas sem retry ou liquidação', async (status) => {
+  const dados = dadosLote(200)
+  const rejeitado = structuredClone(dados.previa)
+  rejeitado.itens[120] = {
+    ...rejeitado.itens[120]!, comando: null, status: 'INVALIDO',
+    erros: [{ campo: 'cedenteDocumento', mensagem: 'Cedente indisponível.' }],
+  }
+  const transporte = vi.fn()
+    .mockResolvedValueOnce(new Response(JSON.stringify(dados.previa), { status: 200 }))
+    .mockResolvedValueOnce(new Response(JSON.stringify({ itens: status === 422 ? [rejeitado.itens[120]] : [] }), { status }))
+  vi.stubGlobal('fetch', transporte)
+  const { user } = iniciar(bffLotes)
+  await prevalidar(user)
+  await user.click(screen.getByRole('button', { name: 'Conferir cadastro' }))
+  await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Confirmar cadastro' }))
+  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+  expect(screen.getByRole('button', { name: 'Conferir cadastro' })).toBeDisabled()
+  expect(within(screen.getByRole('table', { name: 'Pré-validação de todas as linhas' })).getAllByRole('row')).toHaveLength(201)
+  if (status === 422) expect(screen.getByText('cedenteDocumento: Cedente indisponível.')).toBeVisible()
+  else expect(screen.getByText('Acesso não autorizado. Nenhuma confirmação permitida.')).toBeVisible()
+  expect(screen.queryByRole('button', { name: 'Liquidar lote' })).not.toBeInTheDocument()
+  expect(transporte).toHaveBeenCalledTimes(2)
 }, 15000)
 
 test('arquivo inválido e substituição descartam prévia anterior sem chamar parser financeiro local', async () => {

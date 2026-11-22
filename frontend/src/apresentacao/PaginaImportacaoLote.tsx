@@ -137,14 +137,21 @@ export function PaginaImportacaoLote({
       <Painel id="arquivo-lote" titulo="1. Selecionar e pré-validar arquivo">
         <Stack spacing={2}>
           <Typography>CSV UTF-8 separado por ponto e vírgula (;) ou XLSX padronizado, sem fórmulas, macros ou vínculos. Limites iniciais: 200 linhas e 2 MiB, sujeitos à configuração do servidor.</Typography>
-          <Typography>Colunas na ordem do modelo: referenciaExterna, cedenteId, modalidade, valorFaceBrl, prazoMeses, vencimento, moedaPagamento. Use o UUID de um cedente ativo da sua organização; referência única entre lotes; DUPLICATA_MERCANTIL ou CHEQUE_PRE_DATADO; valor decimal canônico 25000.00; meses inteiros; vencimento opcional como texto ISO 2027-02-04; moeda BRL ou USD.</Typography>
+          <Typography>Modelo por CNPJ brasileiro: referenciaExterna, cedenteDocumento, modalidade, valorFaceBrl, prazoMeses, vencimento, moedaPagamento. Use alternativamente o modelo UUID (cedenteId), inclusive para cedentes estrangeiros. Não misture os dois cabeçalhos nem altere a ordem das colunas.</Typography>
+          <Typography>referenciaExterna identifica o título/recebível de origem, com referência única entre lotes na organização; não identifica a organização. A organização vem exclusivamente da sessão JWT validada pelo servidor, nunca do arquivo.</Typography>
+          <Typography>cedenteDocumento é o CNPJ brasileiro do cedente, numérico ou alfanumérico, com ou sem máscara completa. Mantenha a coluna como texto, inclusive ao abrir CSV em planilhas, para preservar zeros à esquerda. O servidor valida o documento e resolve o UUID de um cedente ativo da sua organização; a conferência abaixo mostra esse UUID. Validação de formato e dígitos não comprova existência ou regularidade fiscal na Receita Federal.</Typography>
+          <Typography>Modalidade DUPLICATA_MERCANTIL ou CHEQUE_PRE_DATADO; valor decimal canônico 25000.00; meses inteiros; vencimento opcional como texto ISO 2027-02-04; moeda BRL ou USD.</Typography>
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-            <Link href="/modelos/modelo-lote.csv" download>Baixar modelo CSV</Link>
-            <Link href="/modelos/modelo-lote.xlsx" download>Baixar modelo XLSX</Link>
+            <Link href="/modelos/modelo-lote-cnpj.csv" download>Baixar modelo CSV por CNPJ</Link>
+            <Link href="/modelos/modelo-lote-cnpj.xlsx" download>Baixar modelo XLSX por CNPJ</Link>
+            <Link href="/modelos/modelo-lote.csv" download>Baixar modelo CSV por UUID (legado)</Link>
+            <Link href="/modelos/modelo-lote.xlsx" download>Baixar modelo XLSX por UUID (legado)</Link>
+          </Stack>
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
             <Link href="/modelos/lote-a-200.csv" download>Baixar massa demonstrativa A (200)</Link>
             <Link href="/modelos/lote-b-200.csv" download>Baixar massa demonstrativa B (200, 4 repetidos)</Link>
           </Stack>
-          <Typography variant="body2">Modelos usam o marcador CEDENTE_ID_AQUI, que deve ser substituído. Massas A/B são exclusivamente demonstrativas: substitua o cedente por um cadastrado; não remova as quatro referências repetidas para aferir os conflitos.</Typography>
+          <Typography variant="body2">Substitua CEDENTE_CNPJ_AQUI ou CEDENTE_ID_AQUI pelo identificador de um cedente cadastrado e ativo. Não preencha ambos. Modelos e massas A/B são exclusivamente demonstrativos; as massas mantêm o modelo UUID. Para usá-las por CNPJ, troque somente o cabeçalho cedenteId por cedenteDocumento e os identificadores por CNPJ como texto; preserve as quatro referências repetidas para aferir os conflitos.</Typography>
           <Box component="input" type="file" aria-label="Arquivo CSV ou XLSX" accept=".csv,.xlsx"
             disabled={bloqueado || Boolean(cadastro) || pendente}
             key={versaoArquivo}
