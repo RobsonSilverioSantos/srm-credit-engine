@@ -1,6 +1,18 @@
 package br.com.srm.creditengine.lotes
 
 import br.com.srm.creditengine.cadastro.adaptador.saida.CedentesJdbc
+import br.com.srm.creditengine.liquidacao.aplicacao.porta.saida.IdentidadeConfiavel
+import br.com.srm.creditengine.lotes.adaptador.saida.LiquidacaoLoteJdbc
+import br.com.srm.creditengine.lotes.aplicacao.ServicoLiquidacaoLote
+import br.com.srm.creditengine.lotes.aplicacao.porta.entrada.LiquidarLote
+import br.com.srm.creditengine.taxas.adaptador.saida.HistoricoFinanceiroJdbc
+import br.com.srm.creditengine.taxas.aplicacao.ManterEConsultarTaxas
+import br.com.srm.creditengine.taxas.dominio.SeletorTaxas
+import java.time.Clock
+import java.time.Duration
+import io.micrometer.core.instrument.MeterRegistry
+import org.slf4j.LoggerFactory
+import tools.jackson.databind.ObjectMapper
 import br.com.srm.creditengine.lotes.adaptador.saida.LotesJdbc
 import br.com.srm.creditengine.lotes.aplicacao.ServicoImportacaoLote
 import br.com.srm.creditengine.lotes.aplicacao.porta.entrada.ImportarRecebiveis
@@ -26,6 +38,32 @@ import org.springframework.transaction.support.TransactionTemplate
 @ConditionalOnBean(value = [JdbcTemplate::class, PlatformTransactionManager::class,
     SimularRecebivel::class, ContextoUsuario::class])
 class LotesAutoConfiguracao {
+    @Bean
+    fun liquidarLote(
+        jdbc: JdbcTemplate,
+        transacao: PlatformTransactionManager,
+        identidade: IdentidadeConfiavel,
+        json: ObjectMapper,
+        metricas: MeterRegistry,
+        @Value("\${srm.lotes.max-linhas:200}") maxTitulos: Int,
+        @Value("\${srm.cambio.validade:PT30M}") validade: Duration,
+    ): LiquidarLote {
+        val relogio = Clock.systemUTC()
+        val logger = LoggerFactory.getLogger(LotesAutoConfiguracao::class.java)
+        val persistencia = LiquidacaoLoteJdbc(jdbc, TransactionTemplate(transacao), relogio, json,
+            aposCommit = { quantidade ->
+                metricas.counter("srm.lotes.liquidacoes.confirmadas").increment()
+                metricas.counter("srm.liquidacoes.confirmadas").increment(quantidade.toDouble())
+                logger.atInfo().addKeyValue("event", "lote.liquidacao.confirmada")
+                    .addKeyValue("quantidade", quantidade).log("Liquidação integral do lote confirmada após commit")
+            },
+            aposReplay = { metricas.counter("srm.lotes.liquidacoes.replays").increment() },
+        )
+        // Revalidação local JDBC: não usar o executor/retry cambial fora da conexão transacional.
+        val taxas = ManterEConsultarTaxas(HistoricoFinanceiroJdbc(jdbc), SeletorTaxas(validade), relogio)
+        return ServicoLiquidacaoLote(identidade, CedentesJdbc(jdbc), persistencia, taxas, relogio, maxTitulos)
+    }
+
     @Bean
     fun importarRecebiveis(
         jdbc: JdbcTemplate,
