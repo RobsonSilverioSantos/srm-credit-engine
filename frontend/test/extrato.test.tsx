@@ -11,7 +11,7 @@ import { tema } from '../src/tema/tema'
 const filtros = { inicio: '', fim: '', cedenteId: '', moeda: '' } as const
 const consulta: ConsultaExtrato = { ...filtros, pagina: 0, tamanho: 20 }
 const item: ItemExtrato = {
-  liquidacaoId: 'liquidacao-1', recebivelId: 'recebivel-1', cedenteId: 'cedente-1', modalidade: 'DUPLICATA',
+  liquidacaoId: 'liquidacao-1', recebivelId: 'recebivel-1', cedenteId: 'cedente-1', cedenteNome: 'Cedente exemplo', modalidade: 'DUPLICATA_MERCANTIL',
   valorFaceBrl: '100000.00', prazoMeses: 3, versaoRecebivel: 1, taxaBaseId: 'taxa-1',
   taxaBaseMensal: '0.0100', taxaBaseVigenteEm: '2026-01-01T00:00:00Z', spreadId: 'spread-1',
   spreadMensal: '0.0150', spreadVigenteEm: '2026-01-01T00:00:00Z', valorPresenteBrl: '92859.94',
@@ -57,9 +57,11 @@ test('adaptadores rejeitam expiração, erros HTTP e respostas malformadas', asy
   await expect(bffExtrato.consultar(consulta, 'jwt', new AbortController().signal)).rejects.toThrow('Resposta inválida')
   fetchMock.mockResolvedValueOnce(resposta({ ...pagina, itens: [{ ...item, valorPagamento: 42 }] }))
   await expect(bffExtrato.consultar(consulta, 'jwt', new AbortController().signal)).rejects.toThrow('Resposta inválida')
+  fetchMock.mockResolvedValueOnce(resposta({ ...pagina, itens: [{ ...item, cedenteNome: null }] }))
+  await expect(bffExtrato.consultar(consulta, 'jwt', new AbortController().signal)).rejects.toThrow('Resposta inválida')
   fetchMock.mockResolvedValueOnce(resposta({ accessToken: 'jwt', tokenType: 'Bearer', expiresIn: 60 }))
   await expect(autenticacaoHttp.autenticar('a@b.com', 'senha', new AbortController().signal)).resolves.toBe('jwt')
-  expect(fetchMock.mock.calls[4]?.[0]).toBe('/api/v1/auth/token')
+  expect(fetchMock.mock.calls[5]?.[0]).toBe('/api/v1/auth/token')
 })
 
 function renderizar(ui: React.ReactNode) {
@@ -73,13 +75,31 @@ test('filtros e paginação são enviados ao servidor; snapshots mantêm os valo
   expect(await screen.findByText(/17\.094,67/)).toBeVisible()
   expect(screen.getByText('Código da liquidação')).toBeVisible()
   expect(screen.getByText('liquidacao-1')).toBeVisible()
+  expect(screen.getByText('Cedente exemplo')).toBeVisible()
+  expect(screen.getByText('Duplicata mercantil')).toBeVisible()
+  expect(screen.queryByText('cedente-1')).not.toBeInTheDocument()
   const instanteLiquidacao = screen.getByText('31/12/2025 21:10:00 (America/Sao_Paulo)')
   expect(instanteLiquidacao).toHaveAttribute('dateTime', item.liquidadaEm)
   expect(instanteLiquidacao).toHaveAttribute('title', `ISO 8601 UTC: ${item.liquidadaEm}`)
-  await user.click(screen.getByText('Detalhes'))
-  expect(screen.getByText('5,4321')).toBeVisible()
-  expect(screen.getByText('1,00%')).toBeVisible()
-  expect(screen.getAllByText('31/12/2025 21:00:00 (America/Sao_Paulo)')).toHaveLength(3)
+  const botao = screen.getByRole('button', { name: 'Ver detalhes da liquidação liquidacao-1' })
+  await user.click(botao)
+  const dialogo = screen.getByRole('dialog', { name: 'Detalhes da liquidação' })
+  for (const rotulo of ['Código da liquidação', 'Cedente', 'ID do cedente', 'Recebível', 'Modalidade',
+    'Versão do recebível', 'Prazo (meses)', 'Valor de face BRL', 'Valor presente BRL', 'Deságio BRL',
+    'Moeda', 'Pagamento', 'Taxa base ID', 'Taxa base mensal', 'Taxa base vigente em', 'Spread ID',
+    'Spread mensal', 'Spread vigente em', 'Cotação ID', 'BRL por unidade', 'Cotação vigente em',
+    'Cotação válida até', 'Data/hora da liquidação']) {
+    expect(within(dialogo).getByText(rotulo, { selector: 'dt' })).toBeVisible()
+  }
+  expect(porta.consultar).toHaveBeenCalledTimes(1)
+  expect(within(dialogo).getByText('cedente-1')).toBeVisible()
+  expect(within(dialogo).getByText('5,4321')).toBeVisible()
+  expect(within(dialogo).getByText('1,00%')).toBeVisible()
+  expect(within(dialogo).getAllByText('31/12/2025 21:00:00 (America/Sao_Paulo)')).toHaveLength(3)
+  expect(within(dialogo).getAllByText('31/12/2025 21:00:00 (America/Sao_Paulo)')[0]).toHaveAttribute('dateTime', '2026-01-01T00:00:00Z')
+  await user.keyboard('{Escape}')
+  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+  expect(botao).toHaveFocus()
   await user.click(screen.getByRole('button', { name: 'Próxima página' }))
   await waitFor(() => expect(porta.consultar).toHaveBeenLastCalledWith(expect.objectContaining({ pagina: 1, tamanho: 20 }), 'jwt', expect.any(AbortSignal)))
   expect(await screen.findByText('21–25 de 25')).toBeVisible()
@@ -99,6 +119,40 @@ test('filtros e paginação são enviados ao servidor; snapshots mantêm os valo
   await waitFor(() => expect(porta.consultar).toHaveBeenLastCalledWith(expect.objectContaining({ pagina: 1, tamanho: 10 }), 'jwt', expect.any(AbortSignal)))
   await user.click(screen.getByRole('button', { name: 'Página anterior' }))
   await waitFor(() => expect(porta.consultar).toHaveBeenLastCalledWith(expect.objectContaining({ pagina: 0, tamanho: 10 }), 'jwt', expect.any(AbortSignal)))
+})
+
+test('diálogo mostra snapshot BRL e fecha ao trocar filtros, tela ou sessão', async () => {
+  const user = userEvent.setup()
+  const brl = { ...item, modalidade: 'CHEQUE_PRE_DATADO', moeda: 'BRL' as const, cotacaoCambialId: null,
+    taxaBrlPorUnidade: null, cotacaoVigenteEm: null, cotacaoValidaAte: null }
+  const porta = { consultar: vi.fn().mockResolvedValue({ ...pagina, itens: [brl] }) }
+  const aoExpirar = vi.fn()
+  const props = { porta, token: 'jwt', locale: 'pt-BR', aoExpirar }
+  const tela = renderizar(<PaginaExtrato {...props} />)
+  expect(await screen.findByText('Cheque pré-datado')).toBeVisible()
+  const abrir = () => user.click(screen.getByRole('button', { name: 'Ver detalhes da liquidação liquidacao-1' }))
+  await abrir()
+  expect(within(screen.getByRole('dialog')).getAllByText('Não informado')).toHaveLength(4)
+  await user.click(screen.getByRole('button', { name: 'Fechar' }))
+  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+  const aplicar = screen.getByRole('button', { name: 'Aplicar filtros' })
+  await abrir()
+  fireEvent.click(aplicar)
+  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+  await screen.findByText('Cheque pré-datado')
+  const proxima = screen.getByRole('button', { name: 'Próxima página' })
+  await abrir()
+  fireEvent.click(proxima)
+  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+  await screen.findByText('Cheque pré-datado')
+  await abrir()
+  tela.rerender(<ThemeProvider theme={tema}><PaginaExtrato {...props} ativa={false} /></ThemeProvider>)
+  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+  tela.rerender(<ThemeProvider theme={tema}><PaginaExtrato {...props} ativa /></ThemeProvider>)
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  await abrir()
+  tela.rerender(<ThemeProvider theme={tema}><PaginaExtrato {...props} token="outro" /></ThemeProvider>)
+  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
 })
 
 test('ignora respostas antigas mesmo quando o adaptador não respeita abort', async () => {

@@ -11,6 +11,7 @@ export type ItemExtrato = {
   liquidacaoId: string
   recebivelId: string
   cedenteId: string
+  cedenteNome: string
   modalidade: string
   valorFaceBrl: string
   prazoMeses: number

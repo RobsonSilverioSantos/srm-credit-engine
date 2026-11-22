@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { Box, Button, Container, Stack, TablePagination, Typography } from '@mui/material'
+import { Box, Button, Container, Dialog, DialogActions, DialogContent, DialogTitle, Stack, TablePagination, Typography } from '@mui/material'
 import { consultarExtrato, SessaoExpirada, validarFiltros, type ConsultaExtrato, type PortaAutenticacao, type PortaExtrato } from '../aplicacao/extrato'
 import type { FiltrosExtrato, ItemExtrato, PaginaExtrato as Pagina } from '../dominio/extrato'
 import { CampoFormulario } from '../tema/componentes/CampoFormulario'
@@ -14,21 +14,36 @@ const filtrosIniciais: FiltrosExtrato = { inicio: '', fim: '', cedenteId: '', mo
 const instantesSnapshot = new Set(['Taxa base vigente em', 'Spread vigente em', 'Cotação vigente em', 'Cotação válida até'])
 type DetalheSnapshot = readonly [string, string | number | null]
 
-function detalhesSnapshot(item: ItemExtrato, locale: string): readonly DetalheSnapshot[] {
+function detalhesSnapshot(item: ItemExtrato, locale: string): readonly (readonly [string, readonly DetalheSnapshot[]])[] {
   return [
-    ['Recebível', item.recebivelId], ['Versão do recebível', item.versaoRecebivel], ['Prazo (meses)', item.prazoMeses],
-    ['Valor de face BRL', formatarMonetario(item.valorFaceBrl, 'BRL', locale)],
-    ['Valor presente BRL', formatarMonetario(item.valorPresenteBrl, 'BRL', locale)],
-    ['Deságio BRL', formatarMonetario(item.desagioBrl, 'BRL', locale)],
-    ['Taxa base ID', item.taxaBaseId], ['Taxa base mensal', formatarPercentual(item.taxaBaseMensal, locale)], ['Taxa base vigente em', item.taxaBaseVigenteEm],
-    ['Spread ID', item.spreadId], ['Spread mensal', formatarPercentual(item.spreadMensal, locale)], ['Spread vigente em', item.spreadVigenteEm],
-    ...(item.cotacaoCambialId !== null ? [
+    ['Recebível e identidade', [
+      ['Código da liquidação', item.liquidacaoId], ['Cedente', item.cedenteNome], ['ID do cedente', item.cedenteId],
+      ['Recebível', item.recebivelId], ['Modalidade', modalidade(item.modalidade)],
+      ['Versão do recebível', item.versaoRecebivel], ['Prazo (meses)', item.prazoMeses],
+    ]],
+    ['Valores', [
+      ['Valor de face BRL', formatarMonetario(item.valorFaceBrl, 'BRL', locale)],
+      ['Valor presente BRL', formatarMonetario(item.valorPresenteBrl, 'BRL', locale)],
+      ['Deságio BRL', formatarMonetario(item.desagioBrl, 'BRL', locale)],
+      ['Moeda', item.moeda], ['Pagamento', formatarMonetario(item.valorPagamento, item.moeda, locale)],
+    ]],
+    ['Taxas e spread', [
+      ['Taxa base ID', item.taxaBaseId], ['Taxa base mensal', formatarPercentual(item.taxaBaseMensal, locale)], ['Taxa base vigente em', item.taxaBaseVigenteEm],
+      ['Spread ID', item.spreadId], ['Spread mensal', formatarPercentual(item.spreadMensal, locale)], ['Spread vigente em', item.spreadVigenteEm],
+    ]],
+    ['Câmbio', [
       ['Cotação ID', item.cotacaoCambialId],
-      ['BRL por unidade', item.taxaBrlPorUnidade === null ? 'Não informado' : formatarCotacao(item.taxaBrlPorUnidade, locale)],
-      ['Cotação vigente em', item.cotacaoVigenteEm],
-      ['Cotação válida até', item.cotacaoValidaAte],
-    ] as const : []),
+      ['BRL por unidade', item.taxaBrlPorUnidade === null ? null : formatarCotacao(item.taxaBrlPorUnidade, locale)],
+      ['Cotação vigente em', item.cotacaoVigenteEm], ['Cotação válida até', item.cotacaoValidaAte],
+    ]],
+    ['Liquidação', [['Data/hora da liquidação', item.liquidadaEm]]],
   ]
+}
+
+function modalidade(valor: string): string {
+  if (valor === 'CHEQUE_PRE_DATADO') return 'Cheque pré-datado'
+  if (valor === 'DUPLICATA_MERCANTIL') return 'Duplicata mercantil'
+  return valor
 }
 
 export function PaginaExtrato({ porta, token, aoExpirar, locale, fusoHorario, ativa = true, mostrarTitulo = true }: {
@@ -47,8 +62,11 @@ export function PaginaExtrato({ porta, token, aoExpirar, locale, fusoHorario, at
   const [estado, setEstado] = useState<'carregando' | 'pronto' | 'erro'>('carregando')
   const [erro, setErro] = useState('')
   const [tentativa, setTentativa] = useState(0)
+  const [selecionado, setSelecionado] = useState<ItemExtrato>()
   const geracao = useRef(0)
   const erros = validado ? validarFiltros(filtros) : {}
+
+  useEffect(() => () => setSelecionado(undefined), [ativa, token])
 
   useEffect(() => {
     if (!ativa) return
@@ -77,6 +95,7 @@ export function PaginaExtrato({ porta, token, aoExpirar, locale, fusoHorario, at
   }, [ativa, porta, token, consulta, tentativa, aoExpirar])
 
   function atualizarConsulta(proxima: ConsultaExtrato) {
+    setSelecionado(undefined)
     geracao.current++
     setEstado('carregando')
     setResultado(undefined)
@@ -121,18 +140,10 @@ export function PaginaExtrato({ porta, token, aoExpirar, locale, fusoHorario, at
           colunas={[
             { id: 'data', rotulo: 'Data/hora da liquidação', renderizar: (item) => <InstanteLocal isoUtc={item.liquidadaEm} locale={locale} rotulo="Data/hora da liquidação" fusoHorario={fusoHorario} /> },
             { id: 'id', rotulo: 'Código da liquidação', cabecalhoLinha: true, renderizar: (item) => item.liquidacaoId },
-            { id: 'cedente', rotulo: 'ID do cedente', renderizar: (item) => item.cedenteId },
-            { id: 'modalidade', rotulo: 'Modalidade', renderizar: (item) => item.modalidade },
+            { id: 'cedente', rotulo: 'Cedente', renderizar: (item) => <Box sx={{ overflowWrap: 'anywhere' }}>{item.cedenteNome}</Box> },
+            { id: 'modalidade', rotulo: 'Modalidade', renderizar: (item) => modalidade(item.modalidade) },
             { id: 'pagamento', rotulo: 'Pagamento', alinhar: 'right', renderizar: (item) => formatarMonetario(item.valorPagamento, item.moeda, locale) },
-            { id: 'detalhes', rotulo: 'Snapshot', renderizar: (item) => <details><summary>Detalhes</summary>
-              <Box component="dl" sx={{ minWidth: 260 }}>
-                {detalhesSnapshot(item, locale).map(([nome, valor]) => <Box key={nome}><Typography component="dt" fontWeight={700}>{nome}</Typography><Typography component="dd" sx={{ ml: 0, overflowWrap: 'anywhere' }}>
-                  {typeof valor === 'string' && instantesSnapshot.has(nome)
-                    ? <InstanteLocal isoUtc={valor} locale={locale} rotulo={nome} fusoHorario={fusoHorario} />
-                    : valor ?? 'Não informado'}
-                </Typography></Box>)}
-              </Box>
-            </details> },
+            { id: 'detalhes', rotulo: 'Snapshot', renderizar: (item) => <Button aria-label={`Ver detalhes da liquidação ${item.liquidacaoId}`} onClick={() => setSelecionado(item)}>Ver detalhes</Button> },
           ]} />
         {estado === 'pronto' && resultado && <TablePagination component="div" count={resultado.total} page={resultado.pagina} rowsPerPage={resultado.tamanho}
           rowsPerPageOptions={[10, 20, 50, 100]} labelRowsPerPage="Itens por página"
@@ -141,6 +152,22 @@ export function PaginaExtrato({ porta, token, aoExpirar, locale, fusoHorario, at
           onPageChange={(_, pagina) => atualizarConsulta({ ...consulta, pagina })}
           onRowsPerPageChange={(e) => atualizarConsulta({ ...consulta, pagina: 0, tamanho: Number(e.target.value) })} />}
       </Painel>
+      <Dialog open={ativa && !!selecionado} onClose={() => setSelecionado(undefined)} fullWidth maxWidth="sm" scroll="paper" aria-labelledby="detalhes-liquidacao-titulo">
+        <DialogTitle id="detalhes-liquidacao-titulo">Detalhes da liquidação</DialogTitle>
+        <DialogContent dividers>
+          {selecionado && detalhesSnapshot(selecionado, locale).map(([secao, detalhes]) => <Box component="section" key={secao} sx={{ mb: 2 }}>
+            <Typography variant="h2">{secao}</Typography>
+            <Box component="dl">
+              {detalhes.map(([nome, valor]) => <Box key={nome}><Typography component="dt" fontWeight={700}>{nome}</Typography><Typography component="dd" sx={{ ml: 0, overflowWrap: 'anywhere' }}>
+                {typeof valor === 'string' && (instantesSnapshot.has(nome) || nome === 'Data/hora da liquidação')
+                  ? <InstanteLocal isoUtc={valor} locale={locale} rotulo={nome} fusoHorario={fusoHorario} />
+                  : valor ?? 'Não informado'}
+              </Typography></Box>)}
+            </Box>
+          </Box>)}
+        </DialogContent>
+        <DialogActions><Button onClick={() => setSelecionado(undefined)}>Fechar</Button></DialogActions>
+      </Dialog>
     </Stack>
   )
 }

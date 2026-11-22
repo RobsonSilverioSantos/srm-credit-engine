@@ -406,9 +406,10 @@ class ContratosHttpPostgresTest {
         val cedenteA = UUID.randomUUID()
         val outroCedenteA = UUID.randomUUID()
         val cedenteB = UUID.randomUUID()
-        listOf(cedenteA to orgA, outroCedenteA to orgA, cedenteB to orgB).forEach { (id, org) ->
-            jdbc.update("INSERT INTO cedentes (id, organizacao_id, nome, documento) VALUES (?, ?, 'Teste', ?)",
-                id, org, id.toString().take(32))
+        listOf(Triple(cedenteA, orgA, "Nome igual"), Triple(outroCedenteA, orgA, "Nome diferente"),
+            Triple(cedenteB, orgB, "Nome igual")).forEach { (id, org, nome) ->
+            jdbc.update("INSERT INTO cedentes (id, organizacao_id, nome, documento) VALUES (?, ?, ?, ?)",
+                id, org, nome, id.toString().take(32))
         }
         fun inserir(org: UUID, cedente: UUID, moeda: String, data: Instant): UUID {
             val recebivel = UUID.randomUUID()
@@ -457,8 +458,13 @@ class ContratosHttpPostgresTest {
         assertThat(vazia["total"].asLong()).isEqualTo(2)
         assertThat(get("/api/v1/extrato?$filtro", tokenB).tree()["total"].asLong()).isZero()
         assertThat(get("/api/v1/extrato", tokenB).tree()["total"].asLong()).isEqualTo(1)
+        val itemB = get("/bff/v1/extrato", tokenB).tree()["itens"][0]
+        assertThat(itemB["cedenteId"].asText()).isEqualTo(cedenteB.toString())
+        assertThat(itemB["cedenteNome"].asText()).isEqualTo("Nome igual")
         assertThat(get("/api/v1/extrato?inicio=$dia&fim=$dia", tokenA).tree()["total"].asLong()).isEqualTo(5)
         val todos = get("/api/v1/extrato", tokenA).tree()["itens"]
+        assertThat(todos.filter { it["cedenteId"].asText() == outroCedenteA.toString() }
+            .map { it["cedenteNome"].asText() }).containsExactly("Nome diferente")
         assertThat(todos.first()["liquidacaoId"].asText()).isEqualTo(posterior.toString())
         assertThat(todos.last()["liquidacaoId"].asText()).isEqualTo(anterior.toString())
         val brl = todos.find { it["moeda"].asText() == "BRL" }!!
@@ -466,12 +472,16 @@ class ContratosHttpPostgresTest {
         assertThat(brl["cotacaoCambialId"].isNull).isTrue()
         val item = pagina0.tree()["itens"][0]
         assertThat(item["cedenteId"].asText()).isEqualTo(cedenteA.toString())
+        assertThat(item["cedenteNome"].asText()).isEqualTo("Nome igual")
         assertThat(item["valorFaceBrl"].asText()).isEqualTo("100000.00")
         assertThat(item["valorPresenteBrl"].asText()).isEqualTo("92859.94")
         assertThat(item["desagioBrl"].asText()).isEqualTo("7140.06")
         assertThat(item["valorPagamento"].asText()).isEqualTo("17094.67")
         assertThat(item["cotacaoCambialId"].asText()).isEqualTo(cotacao.id.toString())
         assertThat(item["liquidadaEm"].asText()).isEqualTo(inicioDia.toString())
+        jdbc.update("UPDATE cedentes SET nome = ? WHERE id = ? AND organizacao_id = ?", "Nome atualizado", cedenteA, orgA)
+        assertThat(get("/bff/v1/extrato?$filtro", tokenA).tree()["itens"][0]["cedenteNome"].asText())
+            .isEqualTo("Nome atualizado")
     }
 
     @Test

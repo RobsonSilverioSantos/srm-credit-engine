@@ -40,9 +40,10 @@ class ExtratoJdbc(jdbc: JdbcTemplate) : LeituraExtrato {
         }
         val sql = """
             WITH filtradas AS NOT MATERIALIZED (
-                SELECT l.*, r.cedente_id
+                SELECT l.*, r.cedente_id, c.nome AS cedente_nome
                 FROM liquidacoes l
                 JOIN recebiveis r ON r.id = l.recebivel_id AND r.organizacao_id = l.organizacao_id
+                JOIN cedentes c ON c.id = r.cedente_id AND c.organizacao_id = l.organizacao_id
                 WHERE ${condicoes.joinToString(" AND ")}
             )
             SELECT pagina.*, totais.total
@@ -64,7 +65,7 @@ class ExtratoJdbc(jdbc: JdbcTemplate) : LeituraExtrato {
 
     private fun ResultSet.item() = ItemExtrato(
         getObject("id", UUID::class.java), getObject("recebivel_id", UUID::class.java),
-        getObject("cedente_id", UUID::class.java), getString("modalidade"), getBigDecimal("valor_face_brl"),
+        getObject("cedente_id", UUID::class.java), getString("cedente_nome"), getString("modalidade"), getBigDecimal("valor_face_brl"),
         getInt("prazo_meses"), getLong("versao_recebivel"), getObject("taxa_base_id", UUID::class.java),
         getBigDecimal("taxa_base_mensal"), getObject("taxa_base_vigente_em", OffsetDateTime::class.java).toInstant(),
         getObject("spread_id", UUID::class.java), getBigDecimal("spread_mensal"),
