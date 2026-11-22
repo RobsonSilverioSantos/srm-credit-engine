@@ -8,6 +8,10 @@ spring:
     hikari:
       connection-timeout: 3000
       validation-timeout: 1000
+  servlet:
+    multipart:
+      max-file-size: ${SRM_LOTES_MAX_BYTES:2097152}B
+      max-request-size: ${SRM_LOTES_MAX_REQUEST_BYTES:2162688}B
   flyway:
     locations: classpath:db/migration
 
@@ -35,3 +39,8 @@ management:
       show-details: never
       probes:
         enabled: false
+
+srm:
+  lotes:
+    max-linhas: ${SRM_LOTES_MAX_LINHAS:200}
+    max-bytes: ${SRM_LOTES_MAX_BYTES:2097152}
