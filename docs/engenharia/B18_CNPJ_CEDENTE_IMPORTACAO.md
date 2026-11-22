@@ -51,4 +51,18 @@ A interpretação do arquivo deve distinguir cabeçalhos completos e exatos, sem
 
 A F09 ajustará a interface React, os modelos baixáveis e a experiência de entrada pelo CNPJ **após a B18 integrada**. Não editar a F08 na mesma worktree/backend; não liberar F09 por antecipação.
 
-**Evidência:** este documento registra requisitos e autorização condicionada; nenhuma implementação funcional ou teste B18 foi executado.
+**Evidência do planejamento:** na elaboração deste documento, nenhuma implementação funcional ou teste B18 havia sido executado. Os resultados da implementação devem ser registrados separadamente no PR.
+
+## Contrato técnico B18
+
+Os cabeçalhos UUID e CNPJ são alternativos e completos; o segundo campo da
+prévia confirmável é convertido para `cedenteId` no comando JSON B16. A
+confirmação não aceita documento como substituto do UUID. O CNPJ deve ser
+informado como texto no XLSX para preservar zeros à esquerda; não é possível
+recuperar zeros perdidos ao armazenar uma célula como número. Documento
+validado indica apenas formato e dígitos verificadores, não situação fiscal.
+
+A consulta usa a organização autenticada e restringe a identificação
+canônica `BR/CNPJ` a cedentes ativos; reservas de legado impedem a resolução.
+A confirmação continua revalidando o UUID e a atividade sob a transação B16,
+sem reservar cedentes ou gravar recebíveis na prévia.

@@ -20,8 +20,11 @@ class LeitorArquivoLote(private val maxLinhas: Int, private val maxBytes: Int) {
             nome?.endsWith(".xlsx", ignoreCase = true) == true -> lerPlanilhaPadronizada(bytes, maxBytes, maxLinhas)
             else -> throw IllegalArgumentException("Formato de arquivo não suportado.")
         }
-        require(linhas.size in 2..(maxLinhas + 1) && linhas.first() == CABECALHO) { "Cabeçalho ou quantidade de dados inválidos." }
-        return linhas.drop(1).mapIndexed { i, valores -> interpretarLinhaLote(i + 2, valores) }
+        require(linhas.size in 2..(maxLinhas + 1) && linhas.first() in listOf(CABECALHO, CABECALHO_DOCUMENTO)) {
+            "Cabeçalho ou quantidade de dados inválidos."
+        }
+        val porDocumento = linhas.first() == CABECALHO_DOCUMENTO
+        return linhas.drop(1).mapIndexed { i, valores -> interpretarLinhaLote(i + 2, valores, porDocumento) }
     }
 
     private fun lerCsv(bytes: ByteArray): List<List<String>> {
@@ -72,5 +75,6 @@ class LeitorArquivoLote(private val maxLinhas: Int, private val maxBytes: Int) {
         internal val CABECALHO = listOf(
             "referenciaExterna", "cedenteId", "modalidade", "valorFaceBrl", "prazoMeses", "vencimento", "moedaPagamento",
         )
+        internal val CABECALHO_DOCUMENTO = CABECALHO.toMutableList().apply { this[1] = "cedenteDocumento" }.toList()
     }
 }

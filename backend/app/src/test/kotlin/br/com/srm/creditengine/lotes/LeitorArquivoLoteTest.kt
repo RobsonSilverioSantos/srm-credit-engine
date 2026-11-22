@@ -45,9 +45,36 @@ class LeitorArquivoLoteTest {
         assertThat(resultado.last().erros.single().campo).isEqualTo("valorFaceBrl")
     }
 
+    @Test
+    fun `CSV e XLSX aceitam cabecalho documento sem aceitar cabecalho misto`() {
+        val cabecalhoDocumento = cabecalho.toMutableList().apply { this[1] = "cedenteDocumento" }
+        val linhaDocumento = linha.toMutableList().apply { this[1] = "00000000000191" }
+        val csv = listOf(cabecalhoDocumento, linhaDocumento).joinToString("\n") { it.joinToString(";") }
+        val a = ler("modelo.csv", csv.toByteArray())
+        val b = ler("modelo.xlsx", planilha(cabecalho = cabecalhoDocumento, linha = linhaDocumento))
+        assertThat(a).isEqualTo(b)
+        assertThat(a.single().documentoInformado).isEqualTo("00000000000191")
+        for (invalido in listOf(
+            cabecalhoDocumento + "cedenteId",
+            cabecalhoDocumento.toMutableList().apply { this[1] = "cnpj" },
+            cabecalhoDocumento.toMutableList().apply { this[2] = "cedenteId" },
+            cabecalhoDocumento.reversed(),
+        )) {
+            assertThrows<IllegalArgumentException> {
+                ler("invalido.csv", (invalido.joinToString(";") + "\n" + linhaDocumento.joinToString(";")).toByteArray())
+            }
+            assertThrows<IllegalArgumentException> {
+                ler("invalido.xlsx", planilha(cabecalho = invalido, linha = linhaDocumento))
+            }
+        }
+    }
+
     private fun ler(nome: String, bytes: ByteArray) = leitor.ler(nome, bytes.size.toLong(), bytes.inputStream())
 
-    private fun planilha(formula: Boolean = false, doctype: Boolean = false, externo: Boolean = false): ByteArray {
+    private fun planilha(
+        formula: Boolean = false, doctype: Boolean = false, externo: Boolean = false,
+        cabecalho: List<String> = this.cabecalho, linha: List<String> = this.linha,
+    ): ByteArray {
         val saida = ByteArrayOutputStream()
         ZipOutputStream(saida).use { zip ->
             fun parte(nome: String, txt: String) {
