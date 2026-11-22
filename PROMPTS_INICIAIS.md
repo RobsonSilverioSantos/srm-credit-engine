@@ -80,9 +80,17 @@
 >
 > Testes PostgreSQL reais e CI: formatos CSV/XLSX CNPJ e UUID, numérico/alfanumérico, DV inválido, documentos legados/inativos/inexistentes e isolamento tenant; concorrência/revalidação, rollback total, A/B 200+200 e quatro referências repetidas. Pedir revisão `architect`, `qa`, `reviewer`; evidências reais. Commit/push somente da própria feature e PR para `develop`, **sem merge**.
 
-## Agente frontend — F09 (modelos e experiência CNPJ, ainda bloqueada)
+## Agente frontend — F09 (modelos e interface de importação por CNPJ)
 
-**Gate:** F09 apenas após B18 integrada em `develop` e posterior PR documental de liberação com status literal `Liberada para iniciar`. **Não iniciar por conta da liberação B18.** A issue #83 e `docs/engenharia/F09_INTERFACE_IMPORTACAO_CNPJ.md` descrevem modelos e interface, mantendo compatibilidade UUID e fluxos B16/B17. F09 usa worktree própria e não altera regras financeiras.
+**Gate:** B18 integrada em `develop` pelo PR #86 e F08 pelo PR #81. **Somente iniciar a F09 após merge humano do PR documental de liberação e confirmação da expressão literal `Liberada para iniciar` em `origin/develop:TASKS.md`**. A liberação não autoriza executar B15 ou F06.
+
+> Você é o agente `frontend`. Execute **exclusivamente F09**, em branch derivada de ID + Trabalho de `TASKS.md` e worktree própria. Leia `AGENTS.md`, `.github/copilot-instructions.md`, `SPEC.md`, `DECISIONS.md`, `TASKS.md`, `PROMPTS_INICIAIS.md`, `docs/engenharia/F09_INTERFACE_IMPORTACAO_CNPJ.md`, a issue #83, a documentação F08 e os contratos B18/B16/B17 realmente integrados. Não invente API nem regra de negócio.
+>
+> Adapte a UI React/TypeScript/MUI por arquitetura hexagonal para oferecer modelo CSV e XLSX pelo **CNPJ brasileiro** (`cedenteDocumento`) e manter disponíveis os modelos legados por UUID (`cedenteId`) para compatibilidade/cedentes estrangeiros. Exiba claramente que `referenciaExterna` é a identidade do título na organização, não o identificador da organização. Os modelos usam cabeçalhos exatos e os CNPJs devem ser tratados como **texto**, preservando zeros à esquerda no CSV/XLSX. Não converter CNPJ para UUID no navegador.
+>
+> O backend B18 aceita **alternativamente** os cabeçalhos completos com `cedenteId` OU `cedenteDocumento`, nunca ambos. A pré-validação `/bff/v1/lotes/recebiveis/validacoes` devolve comandos **canônicos já resolvidos para `cedenteId`**; a confirmação `/bff/v1/lotes/recebiveis` mantém o payload UUID existente e a mesma `Idempotency-Key`. Não enviar `cedenteDocumento` para o POST JSON de confirmação. Preservar dois modais separados de cadastro B16 e liquidação B17, prévia financeira 100% válida, rollback integral, idempotência e recuperação de resposta incerta. Não expor CNPJ, JWT ou outros dados sensíveis em URL, localStorage ou logs.
+>
+> Testar CSV e XLSX por CNPJ numérico/alfanumérico, máscara e zeros iniciais, legado UUID, CNPJ inexistente/inativo/inválido/legado sem identificação confiável, erros por linha, A/B 200+200 com quatro `JA_LIQUIDADO` após liquidar A, 401/403/409/422/503, duplo clique, navegação, responsividade, teclado, acessibilidade e sessão. Executar `npm ci`, `npm run lint`, `npm test` e `npm run build` em `frontend/`, anexando resultados reais. Solicitar revisões `architect`, `qa` e `reviewer`, corrigir impedimentos e abrir PR da própria feature para `develop` após commit/push exclusivamente na feature. **Nunca faça merge**, não altere B15/F06 nem políticas financeiras.
 
 ## Agente QA / revisão de PR
 
