@@ -1,0 +1,31 @@
+sequenceDiagram
+  autonumber
+  participant C as Cliente
+  participant A as Command API
+  participant S as Command Store / Outbox
+  participant K as Kafka
+  participant W as Worker Single Writer
+  participant F as PostgreSQL financeiro
+  participant Q as Status Query
+  C->>A: POST lote/recebível + Idempotency-Key
+  A->>S: Em uma transação: intenção + hash + itens + outbox
+  S-->>A: COMMIT durável
+  A-->>C: 202 Accepted + operationId
+  S->>K: Relay publica comando (at-least-once)
+  K->>W: Comando particionado por orgId:recebivelId
+  W->>F: BEGIN; verificar idempotência, estado e políticas
+  alt Replay idêntico já concluído
+    F-->>W: Resultado financeiro original sem nova gravação
+  else Recebível elegível
+    W->>F: Alterar estado + liquidação + snapshot + auditoria + idem + outbox
+    F-->>W: COMMIT ACID por recebível
+  else Conflito / inelegível
+    W->>F: Persistir resultado terminal sem nova liquidação
+    F-->>W: Resultado de rejeição
+  end
+  W->>K: Confirmar offset só após resultado durável
+  F-->>Q: Via outbox/eventos: atualizar projeção de status
+  C->>A: GET /operacoes/{operationId}
+  A->>Q: Consultar status por operação
+  Q-->>A: Estado por item / resumo de lote
+  A-->>C: Estado atual (consulta autoritativa quando necessário)
