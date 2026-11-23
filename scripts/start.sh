@@ -54,7 +54,6 @@ case "$ACTION" in
       --profile app up -d --build --wait
     printf '\nSRM Credit Engine iniciado.\n'
     printf 'Acesse http://localhost:5173/ (porta configurável por SRM_FRONTEND_PORT).\n'
-    printf 'Extrato: http://localhost:5173/extrato.html\n'
     printf 'Para provisionar o primeiro MASTER: sh scripts/bootstrap-master.sh\n'
     ;;
   stop|restart|status|logs)
