@@ -61,7 +61,6 @@ if ($Action -eq 'start') {
     Write-Host ''
     Write-Host 'SRM Credit Engine iniciado.'
     Write-Host 'Frontend: http://localhost:5173/ (porta alterável por SRM_FRONTEND_PORT)'
-    Write-Host 'Extrato: http://localhost:5173/extrato.html'
     Write-Host 'Primeiro MASTER: .\scripts\bootstrap-master.ps1'
 } else {
     if (-not (Test-Path -LiteralPath $envFile)) {
