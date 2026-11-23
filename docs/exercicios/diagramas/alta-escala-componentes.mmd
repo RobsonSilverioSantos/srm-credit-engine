@@ -1,0 +1,20 @@
+flowchart TB
+  client["Clientes / integrações / frontend"] --> edge["CDN / WAF / API Gateway"]
+  edge --> api["Command API + autenticação / autorização"]
+  api --> manifest[("Store de comandos aceitos + Outbox de despacho")]
+  api --> query["API de status do lote / recebível"]
+  manifest --> relay["Relay / CDC com reenvio seguro"]
+  relay --> topic[("Kafka: comandos por orgId + recebivelId")]
+  topic --> consumers["Grupo de consumidores: sequencial por partição"]
+  consumers --> router["Registry de buckets + época / fencing"]
+  router --> ca["Célula A: serviço financeiro hexagonal"]
+  router --> cb["Célula B: serviço financeiro hexagonal"]
+  ca --> dba[("PostgreSQL A: recebível + liquidação + idem + auditoria + outbox")]
+  cb --> dbb[("PostgreSQL B: mesmos invariantes locais")]
+  dba --> evt["Relay de eventos financeiros"]
+  dbb --> evt
+  evt --> events[("Kafka: eventos de resultado")]
+  events --> batch["Orquestrador de lotes: estados individuais"]
+  events --> projections[("CQRS: extrato / BI / consultas")]
+  projections --> redis[("Redis: cache não autoritativo")]
+  batch --> query

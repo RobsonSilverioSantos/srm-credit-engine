@@ -1,6 +1,77 @@
-# AI_USAGE.md — SRM Credit Engine (novo repositório)
+# AI_USAGE.md — SRM Credit Engine | Uso de IA e responsabilidade técnica
 
-> **Aviso de rastreabilidade — 20/11/2026:** o conteúdo abaixo inclui o **histórico factual do repositório anterior**, marcado como tal. Nenhum commit, teste, artefato compilado ou serviço do repositório anterior equivale a implementação no novo repositório. O novo repositório começa sem código e terá evidências próprias. A escolha de novo Git/repositório e de escopo é decisão do candidato.
+> **Rastreabilidade consolidada — 22/11/2026:** este documento distingue (a) o planejamento e a execução do ciclo anterior, arquivados sem alterações em [docs/historico/planejamento-anterior/](docs/historico/planejamento-anterior/README.md); (b) o reinício da baseline Git em 20/11/2026; e (c) os commits, PRs, testes e validações posteriores que integram a implementação vigente. O estado **“sem código”** das entradas RESET-01/BOOTSTRAP-02 refere-se **exclusivamente à data dessas entradas**; a `develop` atual contém funcionalidades integradas. Nenhum commit ou teste anterior é transferido ou reapresentado como evidência da implementação vigente.
+
+## CONSOLIDACAO-01 — Responsabilidade técnica, decisões e evidências (22/11/2026)
+
+### Responsabilidade pela solução e participação dos agentes
+
+A condução técnica do desafio, a escolha das premissas, a aprovação de mudanças de escopo, a aceitação dos riscos, a verificação dos critérios de aceite e a **revisão e integração das contribuições dos agentes** cabem ao responsável técnico. Ferramentas de IA (Cursor, GitHub Copilot e ChatGPT) foram utilizadas para planejamento, implementação, testes, redação, organização de tarefas, inspeção de código e revisão documental, de acordo com as atribuições registradas nos prompts, branches e PRs. O uso dessas ferramentas **não atribui autoria manual de cada linha ao responsável**, nem autoriza IA a decidir política financeira ou a integrar sua própria feature.
+
+As ações humanas evidenciadas são diferenciadas por origem: decisões de arquitetura e escopo explicitamente aprovadas, merges efetivamente registrados pelo GitHub, validações manuais relatadas e inspeções visuais. **Um merge não equivale a aprovação formal de code review via GitHub, execução independente de testes, homologação do negócio ou teste produtivo**. Quando um resultado consta apenas do relato do agente, essa fonte permanece identificada.
+
+### Evolução do planejamento até o código atual
+
+| Evolução | Proposta anterior | Solução vigente e evidência |
+|---|---|---|
+| Repositório/fluxo de agentes | Trabalho inicial acumulado em branch/sessão e dificuldades de rastreabilidade relatadas pelo responsável | Reinício Git em 20/11/2026; feature/worktree/PR individual por tarefa, merge exclusivamente humano; registro RESET-01 e PRs da baseline vigente |
+| Autenticação | Keycloak/OIDC com possível federação | Autenticação local Spring Security/BCrypt/JWT, sem SSO ou MFA prometidos; ADR-007, S01 [PR #15](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/15) |
+| Simulação pré-cadastro | Necessidade de cadastrar antes de simular | Pré-simulação indicativa e **sem persistência**; recebível precisa existir **antes da liquidação**; ADR-009, B08-S01 [PR #23](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/23) |
+| Concorrência otimista | Proposta de `@Version` em JPA | JDBC **SQL condicional por `versao` e `status`**, atualizado na transação; [ADR-010](docs/adr/ADR-010-controle-otimista-sql-versionado.md), B06 [PR #17](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/17) e B07 [PR #19](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/19) |
+| Segurança de documentos de cedentes | Identificador livre/sem política internacional aprovada | Validação estrutural `BR/CNPJ` e `OUTRO` estrangeiro `NAO_VERIFICADO`, sem verificação fiscal externa; B14 [PR #56](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/56) e ADR-023 |
+| Experiência frontend | Telas isoladas e extrato com sessão independente nas primeiras entregas | Navegação integrada F05 [PR #61](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/61), após correção de formatação cambial [PR #59](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/59) |
+
+### Evidências recentes e limites
+
+- **Aferição C1–C3:** [PR documental #60](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/60) integrado; [registro manual específico](docs/validacao/VALIDACAO_GOLDEN_CASES_C1_C2_C3_2026-11-21.md). O responsável confirmou C1/C2 até os centavos; a captura C3 permitiu conferir diretamente VP **R$ 92.859,94**, deságio **R$ 7.140,06** e pagamento **US$ 17.094,67**. Essa validação demonstra pré-simulação e **não** liquidação bancária nem homologação de produção.
+- **Base integrada:** os PRs #56 (B14), #58 (ADR-023), #59 (formatação cambial), #60 (aferição documental) e #61 (F05) constam integrados à `develop`. Seus resultados de CI e testes devem ser conferidos individualmente; a elaboração deste adendo **não reexecutou** suites Kotlin/React/PostgreSQL.
+- **Fotografia de planejamento anterior, preservada:** na coleta inicial de 22/11/2026, o [PR #66](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/66) foi registrado como aberto, com F07 e propostas B16/B17/F08 ainda sem API de lote. **Reconciliação G02:** #66 foi integrado às `13:41:44Z` de 22/11/2026 (merge `2f9fd95a1812a80fe2e7afb2bf94007fe3d94a49`); F07 foi integrada no PR #68 e B16 no PR #71. O planejamento não comprovava implementação naquele momento; os merges posteriores e seus limites estão registrados no adendo G02 abaixo. B17/F08 continuam bloqueadas.
+- **Fontes originais:** os arquivos de planejamento anteriores `AI_USAGE.md`, `DECISIONS.md` e `SPEC.md` foram arquivados **integralmente e sem reconciliação retroativa**, com [índice de proveniência](docs/historico/planejamento-anterior/README.md). A cópia histórica neste documento continua registrada como evidência do processo de decisão, não como conjunto de instruções vigentes.
+- **Separação normativa:** [SPEC.md](SPEC.md) descreve o contrato vigente e premissas ainda pendentes; [DECISIONS.md](DECISIONS.md) registra decisões vigentes e [ADR-010](docs/adr/ADR-010-controle-otimista-sql-versionado.md) esclarece a divergência entre escolha documental inicial e JDBC efetivo. Nenhum documento substitui a evidência de execução real.
+
+## G02 — Reconciliação após G01, B16 e QA k6 (22/11/2026)
+
+### Autorização, executor e escopo
+
+- **Ferramenta/papel:** GitHub Copilot CLI, agente executor `analyst`; revisão independente solicitada ao agente `reviewer`, sem delegar implementação financeira. A revisão do responsável técnico e a integração continuam humanas.
+- **Solicitação resumida:** executar exclusivamente G02 liberada no PR #75; confirmar merges #70/#71/#74; atualizar backlog, dependência B16 da B17, referências e evidências; preservar histórico e bloqueios B15/B17/F06/F08; realizar verificações documentais e revisão `reviewer`; commit/push apenas da feature e PR somente para `develop`, sem merge.
+- **Gate observado:** `git fetch origin develop` e `git show origin/develop:TASKS.md` confirmaram G02 com a expressão literal de liberação e G00 operacional. [PR #75](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/75) integrado às `17:00:19Z`, merge `58ef797293574eb21c1b60e69f46dc87f3bdf824`.
+- **Isolamento:** o diretório inicial estava em `develop` no commit `d3fcca6`, sem worktree G02 existente. Criada `feature/g02-reconciliar-backlog-evidencias-apos-integracao-g01-b16-qa-k6` com `git worktree add -b ... ../srm-credit-engine-g02 develop`, derivada do Trabalho **Reconciliar backlog e evidencias apos integracao de G01 B16 e QA k6**. Somente a feature recebeu `git merge --ff-only origin/develop`, até `58ef797`; a branch local `develop` e as worktrees alheias não foram alteradas.
+- **Ambiente e controles:** Linux local; `gh auth status` confirmou autenticação ativa em 22/11/2026, sem registrar credenciais neste documento. `git config --get core.hooksPath` retornou `.githooks`. Isso é evidência atual do clone, não comprovação retroativa de execução da G00, nem proteção server-side.
+
+### Integrações confirmadas
+
+`gh pr view <n> --json state,mergedAt,mergeCommit,baseRefName,headRefName` confirmou os três PRs como `MERGED`, base `develop`. `git merge-base --is-ancestor <SHA> origin/develop` retornou sucesso para cada merge e para #75.
+
+| Entrega | PR / head da feature | Merge em `develop` | Instante UTC |
+|---|---|---|---|
+| QA k6 — scripts | [#70](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/70), `382c61fdcaa7561b7087554f892df6283eee3f5b` | `9043732b86a4671bf7ea368e288bf68151205fdb` | 22/11/2026 `14:44:20Z` |
+| B16 — cadastro atômico | [#71](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/71), `03071220cb3058a17eb2a8d55e2f072a31809c45` | `186786e27320e83700a81e3922c72d096cefcb86` | 22/11/2026 `14:55:39Z` |
+| G01 — diretrizes de agentes | [#74](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/74), `fa7111735ff1f86041ea81a0d0dc9332edaf8477` | `d3fcca65decd1dadff858be892c60f2ef6f1cd52` | 22/11/2026 `16:34:30Z` |
+
+### Evidências por origem e limites
+
+- **G01, relato do PR #74:** Dot coordenou redação e revisão por agentes distintos em nuvem; `AGENTS.md` e instruções Copilot foram alinhados à ADR-010/JDBC. O executor descreveu snapshot documental reconstruído e commit remoto com pai real, **não um clone local autenticado nem acesso à máquina do responsável**. Relatou `git diff --cached --check`, 11 links, precedência, gates e confronto documental com o SQL vigente. Sem testes funcionais locais nessa entrega. **CI observada separadamente:** backend, frontend e Compose com sucesso na [execução 45038434425](https://github.com/RobsonSilverioSantos/srm-credit-engine/actions/runs/45038434425).
+- **B16, relato do PR #71:** agente backend implementou pré-validação CSV/XLSX sem persistência, confirmação atômica/idempotente API/BFF/OpenAPI, referência única por organização e migration V6. Revisão independente apontou multipart/proxy e metadados de moeda/identidade, tratados pelo executor. Compilação manual de domínio/aplicação/parsers, verificador de tipos Kotlin, smoke CSV 200+200/4 repetidas/396 únicas e smoke SQL V1–V6 em PostgreSQL 17.12 foram relatados. **Limite local explícito:** o `clean check` completo não terminou por falta de suporte `javac --release 21` no toolchain; não apresentar compilação parcial como suíte completa aprovada.
+- **B16, CI remota observada:** backend (build, PostgreSQL e fronteiras), frontend (lint/testes/build) e Compose passaram na [execução 45034842155](https://github.com/RobsonSilverioSantos/srm-credit-engine/actions/runs/45034842155), vinculada ao head `03071220` no PR. Os checks consultados também mostram sucesso nas execuções 45035060569 e 45035189253. Isso não é reexecução local pela G02, homologação nem prova de controle otimista da liquidação de lote.
+- **QA k6, relato do PR #70 e [roteiro](qa/k6/b16/README.md):** agente QA (ChatGPT) preparou duas confirmações concorrentes, replay e verificação posterior de 200/0 e 396 identidades após correção explícita. Foram relatados `node --input-type=module --check < qa/k6/b16/concorrencia.js` e `node --test qa/k6/b16/contrato.test.mjs`, com cinco testes aprovados em substituto de contrato **sem rede**. Não demonstram transporte k6, HTTP real, concorrência transacional ou PostgreSQL.
+- **QA k6, CI remota observada:** backend, frontend e Compose passaram na [execução 45033885384](https://github.com/RobsonSilverioSantos/srm-credit-engine/actions/runs/45033885384). Esses jobs não executam o cenário k6. **Execução real de `k6 run qa/k6/b16/concorrencia.js` contra B16 ainda pendente**, exigindo ambiente descartável, contrato integrado conferido e registro verdadeiro dos resultados. A integração posterior da B16 não elimina essa lacuna.
+- **Decisões preservadas:** B16 atende a dependência técnica de B17 e F08; não decide atomicidade financeira, replay, limites ou política cambial. B15, B17, F06 e F08 permanecem bloqueadas, sem início de implementação autorizado pela G02. Scripts de cadastro não comprovam concorrência otimista financeira.
+
+### Reconciliação documental e histórico
+
+- `TASKS.md`: G01/B16 integradas com merges; G02 em execução, não integrada; indicadores recalculados sobre 35 tarefas (30 integradas/operacionais, cinco não integradas), preservando fotografias históricas 24/24 e 28/33. QA k6 permanece evidência complementar, fora da contagem de tarefas.
+- Referências atualizadas em [B16](docs/engenharia/B16_IMPORTACAO_RECEBIVEIS_LOTE.md), [ADR-024](docs/adr/ADR-024-cadastro-atomico-lotes.md), [B17](docs/engenharia/B17_LIQUIDACAO_LOTE_CONCORRENCIA.md), [F08](docs/engenharia/F08_TELA_IMPORTACAO_LOTE.md), [massas](docs/validacao/lotes/README.md), [QA k6](qa/k6/b16/README.md) e [prompts](PROMPTS_INICIAIS.md). A ADR-024 recebeu somente estado/evidência datados; sua decisão não mudou. O escopo e os critérios de planejamento B16 foram mantidos e identificados como tais, sem transformar caixas de aceite em testes observados.
+- **Histórico preservado:** correção explícita da fotografia do PR #66 nesta consolidação; entradas RESET/BOOTSTRAP/D03/A01 e todo o bloco do ciclo anterior permanecem intactos. Pendências históricas não são reescritas como execuções atuais.
+- **Não executado na G02:** Kotlin/Gradle, React, migrations, banco, k6, benchmark, fluxo financeiro ou homologação. O diff é exclusivamente documental; testes de produto anteriores permanecem atribuídos aos PRs/CI de origem. Resultados das verificações desta G02 e revisão independente serão registrados no PR da própria feature; nenhum merge pelo agente.
+
+### Verificações locais G02 e revisão independente
+
+- `git diff --check` passou após corrigir espaços finais nas linhas documentais novas, apontados na primeira execução. Não houve alteração de produto para contornar validação.
+- Verificação com `python3`: nove markdowns no escopo; **60 links relativos existentes**; mesmos 35 IDs, critérios de aceite e dependências da base; 30 tarefas integradas/operacionais e P0 20/20; B15/F06 com linhas integralmente idênticas à base e B17/F08 mantendo estado bloqueado, sem expressão liberadora na situação. G02 não contabilizada como integrada.
+- Comparação textual automática confirmou **todo o AI_USAGE desde RESET-01 intacto** e o corpo decisório da ADR-024 preservado. Nenhum arquivo do histórico arquivado foi alterado.
+- `bash -n .githooks/pre-push` passou; entradas sintéticas enviadas ao hook aceitaram somente a própria feature (status 0) e recusaram `refs/heads/main`/`refs/heads/develop` (status 1 esperado). **Não houve tentativa de push nessas branches**. Novo `git fetch origin develop` manteve a base `58ef797`; `gh repo view` confirmou repositório e branch padrão `develop`, sem depender desse padrão para criar PR.
+- **Revisão do agente `reviewer`: sem achados impeditivos.** Inspecionou diff, instruções e fontes na worktree G02, confirmou ancestralidade #66/#70/#71/#74/#75, 60 links, contagens, bloqueios, histórico e decisão preservados. Executou `git diff --check origin/develop` e verificações Python independentes; a primeira tentativa com `python` falhou por comando ausente e foi corrigida para `python3`. Não editou, não reexecutou produto/k6 e não refez a consulta ao GitHub. Este parecer de agente **não substitui revisão humana**, ainda pendente.
 
 ## RESET-01 — Reinício planejado após incidente Git e revisão de custo/prazo (20/11/2026)
 
@@ -28,15 +99,118 @@
 - **Artefatos:** SPEC, DECISIONS, TASKS, README, guia Git, prompts, agentes Cursor/Copilot, template de PR, ADRs/EDA do MVP, matriz de avaliação e exercícios independentes já redigidos.
 - **Estado:** arquivos documentais preparados para extração; **nenhum repositório remoto, commit, push, PR, workflow CI, build, teste ou benchmark novo confirmado**.
 
-## Evidências do novo repositório (preencher somente após execução)
+## Evidências da baseline Git vigente — registro inicial de 20/11/2026
 
-| Tarefa | Branch | Commit | PR para develop | Testes observados | Revisão/merge humano |
+| Tarefa | Branch / origem | Commit / merge observado | PR e evidência | Testes registrados | Revisão / merge humano |
 |---|---|---|---|---|---|
-| G00 | Pendente | — | — | Não executados | — |
+| G00 — baseline e governança | `main`, `develop`; governança em `feature/g00-...` | Baseline `05b9528`; governança integrada `7b89828`; sincronização inicial da `main` `5e7a87b` | [PR #1](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/1) → `develop`; [PR #2](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/2) `develop` → `main`; [PR #3](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/3) — teste proibido, não integrado | [Action do caminho permitido](https://github.com/RobsonSilverioSantos/srm-credit-engine/actions/runs/44787664195): sucesso; [Action do caminho proibido](https://github.com/RobsonSilverioSantos/srm-credit-engine/actions/runs/44789563476): falha intencional, PR fechado pelo bot; recusa local de push nas duas branches demonstrada pelo responsável | #1 e #2 integrados mediante decisão humana; #3 fechado pelo bot, sem merge. A verificação de `gh auth status` no Linux ainda não consta como evidência direta |
+| B02 — bootstrap backend | `feature/b02-preparar-backend-kotlin-spring-boot-gradle-e-docker-compose` | Feature `053c215`; merge `1a3ba3b` | [PR #5](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/5) para `develop` | **Declarado no PR pelo agente:** `./gradlew --no-daemon clean build --warning-mode all`, `./gradlew --no-daemon check`, 1 teste JUnit e smoke Compose/PostgreSQL/Actuator; não existe validação de CI B12 desse PR | Responsável técnico informou aprovação e GitHub confirma merge em `develop` |
+| F00 — design system frontend | `feature/f00-definir-tema-material-ui-e-componentes-visuais-reutilizaveis` | Feature `80cc60f`; merge `c081fd5` | [PR #4](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/4) para `develop` | **Declarado no PR pelo agente:** `npm ci`, `npm run lint`, `npm test` (4/4) e `npm run build`, com verificações visuais; CI B12 ainda pendente | Responsável técnico informou aprovação e GitHub confirma merge em `develop` |
+
+### GOV-01 — Controle compensatório de PRs sem GitHub Pro
+
+- **Condição externa confirmada:** repositório privado sem Rulesets disponíveis na configuração atual; tentativa de consulta da API retornou HTTP 403 com exigência de GitHub Pro ou repositório público.
+- **Decisão humana:** preservar repositório privado e evitar custo adicional; ADR-022 registra a combinação de GitHub Actions, hook local e instruções dos agentes, aceitando risco residual por ausência de bloqueio server-side.
+- **Validação automatizada positiva:** PR #2 com origem `develop` para `main` — workflow `Guardar branch main` completou com sucesso.
+- **Validação negativa real:** PR #3 com origem `feature/g00-validar-guard-main` para `main` — execução [44789563476](https://github.com/RobsonSilverioSantos/srm-credit-engine/actions/runs/44789563476) terminou em falha intencional; `github-actions[bot]` comentou e fechou o PR automaticamente. Não houve merge.
+- **Validação local do hook:** responsável executou entradas de teste para `refs/heads/main` e `refs/heads/develop` em `.githooks/pre-push`, obtendo a mensagem de bloqueio; teste da `develop` retornou status 1. Esses comandos validam a lógica local, **não** um bloqueio imposto pelo servidor.
+- **Limitação:** há janela até a Action reagir; a UI/API do GitHub e clones sem hook não são abrangidos. Não declarar proteção absoluta de `main`.
+
+### DEV-01 — Execução de agentes em worktrees isolados
+
+- Backend B02: sessão de agente inicialmente arquivada antes de executar; tentativa de restauração repetiu a interrupção. Uma **nova sessão** no mesmo worktree concluiu a tarefa e publicou PR #5. A causa exata do arquivamento não foi diagnosticada.
+- Frontend F00: sessão distinta concluiu tema e componentes, publicou PR #4. Ambas as tarefas foram integradas por revisão e merge humanos.
+- **Rastreabilidade e limites:** descrições dos PRs documentam comandos e resultados relatados por cada agente. GitHub confirma as branches, commits, PRs e merges, mas não substitui reexecução independente dos testes. B12 (CI automatizada em PRs) permanece pendente; B01/B03/B12 estão desbloqueadas pelas dependências integradas.
+- **Roteiro de trabalho:** não utilizar a mesma sessão nem o mesmo worktree para B01, B03 ou B12; cada tarefa deverá ter PR didático para `develop`. Os exercícios independentes de review, post-mortem e alta escala permanecem fora deste backlog.
 
 ---
 
-## Histórico do repositório anterior (preservado, não vigente para o novo código)
+## D03 — Consolidação de evidências e roteiro de defesa (20/11/2026)
+
+- **Agente/ferramenta:** analyst/reviewer no GitHub Copilot Agent para VS Code.
+- **Solicitação resumida:** consolidar README, AI_USAGE e roteiro de defesa com execução verificável, links de PR, limites, custos e intervenções humanas; manter decisões financeiras e contratos existentes.
+- **Escopo realizado:** alteração documental em `README.md`, `AI_USAGE.md` e `docs/defesa/RASTREABILIDADE_STAFF_TECH_LEAD.md`. Nenhum código, tarefa global, regra financeira ou arquitetura foi alterado.
+- **Execução local verificada neste worktree:**
+  - Ambiente: Linux; OpenJDK `24.0.1`; Node.js `v24.13.1`; npm `11.8.0`; Docker Engine `29.10.0`.
+  - `cd backend && bash scripts/test-cadastro-postgres.sh` → `BUILD SUCCESSFUL`; 70 testes, 0 falhas, 0 erros e 0 ignorados. O script iniciou um PostgreSQL descartável e removeu seu contêiner, rede e volume ao terminar.
+  - `cd frontend && npm ci` → 313 pacotes adicionados; auditoria informou 0 vulnerabilidades.
+  - `cd frontend && npm run lint && npm test && npm run build` → lint e build concluídos; Vitest: 4 arquivos e 21 testes aprovados.
+- **CI remota consultada:** os jobs de backend e frontend passaram em [B12 #7](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/7), [F03 #25](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/25), [F01 #26](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/26) e [G00 #28](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/28). No [PR D03 #29](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/29), os dois jobs passaram para `f71eb43` ([execução #44848917116](https://github.com/RobsonSilverioSantos/srm-credit-engine/actions/runs/44848917116)). No commit documental `6a61fda`, o backend passou; o primeiro job frontend falhou no teste `frontend/test/operacoes.test.tsx` por não encontrar o botão “Entrar”, e passou após uma repetição ([execução #44849306596](https://github.com/RobsonSilverioSantos/srm-credit-engine/actions/runs/44849306596)). No head `50d950d`, o backend passou, mas o mesmo job frontend voltou a falhar ([execução #44849740354](https://github.com/RobsonSilverioSantos/srm-credit-engine/actions/runs/44849740354)); essa execução ficou vermelha. No commit documental `cbdbd20`, os dois jobs passaram ([execução #44850079836](https://github.com/RobsonSilverioSantos/srm-credit-engine/actions/runs/44850079836)). A suíte local passou; nenhum código foi alterado. A causa das falhas pontuais não foi estabelecida; conferir o CI do head atual antes da integração.
+- **PRs e intervenção humana:** [B07 #19](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/19), [B08 #20](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/20), [B08-E01 #22](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/22), [B08-S01 #23](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/23), [F03 #25](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/25) e [F01 #26](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/26) foram integrados em `develop` pelo responsável identificado no GitHub. Revisão e integração permanecem decisões humanas; integração de PR não foi interpretada como teste manual ponta a ponta.
+- **Erro operacional do agente detectado:** as primeiras chamadas de build/lint foram feitas no diretório raiz, onde não existem `./gradlew` nem `package.json`; a chamada de lint também revelou dependências frontend ausentes. As mensagens `not found`, `ENOENT` e `eslint: not found` identificaram o problema. Os comandos foram corrigidos para os diretórios indicados nos READMEs (`backend/` e `frontend/`), e as dependências foram instaladas com `npm ci`; as execuções acima são os resultados corrigidos. Nenhum desses erros ocorreu em código de produto.
+- **Custos:** não houve deploy, serviço cloud ou pagamento real durante esta validação. O teste PostgreSQL foi efêmero. Não foi verificado valor de assinatura ou custo monetário do uso de IA; o registro OPS-01 descreve uma mensagem de limite do Cursor, não uma cobrança.
+- **Limitações:** não foi executado benchmark; não foi feita demonstração manual do fluxo completo F01/F03; as telas ainda têm entradas/autenticação independentes. Relatos nos PRs e checks remotos permanecem separados dos testes locais acima. Decisões e premissas do MVP continuam sujeitas à validação humana descrita em `SPEC.md` e `DECISIONS.md`.
+
+## A01 — Registro inicial de evidências de IA e PRs didáticos (20/11/2026)
+
+Esta coleta inicial documenta B10 e S02, integradas depois da consolidação D03. Os resumos abaixo são paráfrases das descrições dos PRs e do backlog, não transcrições dos prompts originais. Os resultados de testes locais são relatos dos agentes, **não reexecutados nesta coleta**; os checks remotos são apresentados separadamente. **O registro posterior de F04 e o encerramento documental da A01 constam no adendo abaixo**, realizado após os merges dos PRs #37 e #36.
+
+### A01 — Esta coleta documental
+
+- **Agente / ID:** Copilot SDK no VS Code; A01.
+- **Prompt/resumo:** pedido para confirmar branch, base e dependências; registrar evidências reais de IA e PRs didáticos com ID, agente, resumo do prompt, revisão, comandos, testes, commit e PR; manter o escopo documental e adiar a conclusão até F04.
+- **Revisão no momento da abertura do PR:** o agente conferiu o diff e o escopo. Posteriormente, o PR #36 foi integrado em `develop` pelo responsável técnico; o GitHub confirma merge, não necessariamente uma aprovação formal de review.
+- **Comandos/testes desta coleta:** `git branch --show-current`, `git status --short` e `git worktree list` confirmaram o worktree/branch previstos; `git diff --check` passou. Nenhum teste de aplicação foi executado porque a mudança é somente documental.
+- **Commit / PR:** commit de conteúdo `3d3df56`; [PR #36](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/36), base `develop`, merge `d7177f0`; [CI backend/frontend aprovada](https://github.com/RobsonSilverioSantos/srm-credit-engine/actions/runs/44856268536).
+- **Estado:** registro inicial da A01 integrado. O adendo F04 nesta mesma seção completa sua rastreabilidade, sem alegar reexecução dos testes da F04 pela A01.
+
+### B10 — Logs estruturados, métricas e trilha operacional
+
+- **Agente / ID:** agente Copilot no papel backend/devops (B10, conforme `TASKS.md`); o commit da feature registra Robson Silvério Santos e Copilot como coautores.
+- **Prompt/resumo:** implementar logs JSON correlacionados sem segredos, métricas Micrometer de confirmações/replays/duração sem tags de alta cardinalidade e expor métricas pelo Actuator autenticado, sem alterar contratos financeiros.
+- **Revisão:** PR [#33](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/33) integrado em `develop` por RobsonSilverioSantos. A consulta ao GitHub não retornou aprovação/review formal (`reviews` vazio e `reviewDecision` vazio); portanto, o merge não é apresentado como aprovação formal. A descrição do PR registra pontos para revisão humana e correções feitas durante a iteração.
+- **Comandos/testes locais relatados no PR:** `cd backend && bash scripts/test-cadastro-postgres.sh` — `BUILD SUCCESSFUL`, 74 testes, 0 falhas, 0 erros e 0 ignorados, com PostgreSQL temporário; `git diff --check` — passou. Incluídos testes para JSON/MDC, correlação, métricas sem tags, replay, rollback e confirmação pós-commit. Uma chamada inicial do wrapper na raiz e uma configuração YAML incorreta falharam durante a iteração; foram corrigidas antes da execução final reportada.
+- **CI remota:** execução [44852388657](https://github.com/RobsonSilverioSantos/srm-credit-engine/actions/runs/44852388657): jobs backend e frontend aprovados. Isso não é uma reexecução local feita por A01.
+- **Commit / PR:** feature `49f4392`; merge `f82f224`; [PR #33](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/33), base `develop`.
+- **Limite didático:** métricas não têm exporter Prometheus, dashboard ou alerta; não houve benchmark nem teste de carga.
+
+### S02 — Gestão segura de usuários organizacionais
+
+- **Agente / ID:** agente Copilot no papel backend (S02, conforme `TASKS.md`); o commit da feature registra Robson Silvério Santos e Copilot como coautores.
+- **Prompt/resumo:** implementar perfis MASTER/ADMIN/OPERADOR e bootstrap local controlado do primeiro MASTER; derivar organização da identidade JWT validada, consultar autorização atual no PostgreSQL e compartilhar os casos de uso entre API e BFF, sem cadastro público de MASTER nem reescrita das migrations V1–V3.
+- **Revisão:** PR [#34](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/34) integrado em `develop` por RobsonSilverioSantos. A consulta ao GitHub não retornou aprovação/review formal (`reviews` vazio e `reviewDecision` vazio); portanto, o merge não é apresentado como aprovação formal. A descrição do PR registra as limitações do bootstrap e que o fluxo interativo completo do terminal não foi validado manualmente.
+- **Comandos/testes locais relatados no PR:** `cd backend && bash scripts/test-cadastro-postgres.sh` — `BUILD SUCCESSFUL`, 73 testes, 0 falhas, 0 erros e 0 ignorados, com PostgreSQL efêmero; `bash -n backend/scripts/bootstrap-master.sh` — passou; `git diff --cached --check` — passou. O PR relata testes de bootstrap BCrypt/reexecução, permissões, escopo, API/BFF, segredos e revogação de JWT. Uma asserção de teste e um problema de nulabilidade foram corrigidos antes da execução final reportada.
+- **CI remota:** execução [44852904037](https://github.com/RobsonSilverioSantos/srm-credit-engine/actions/runs/44852904037): jobs backend e frontend aprovados. Isso não é uma reexecução local feita por A01.
+- **Commit / PR:** feature `736a5e8`; merge `8dc1251`; [PR #34](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/34), base `develop`.
+- **Limite didático:** o bootstrap interativo e os testes mobile de F04 continuam pendentes; não presumir um fluxo administrativo frontend integrado.
+
+### F04 — Administração de usuários (adendo após os merges)
+
+- **Agente / ID:** GitHub Copilot no papel frontend, F04; evidência originada no PR #37 e na CI. O adendo documental registra fatos verificados no GitHub e **não** representa nova execução do agente F04.
+- **Solicitação resumida:** construir a interface responsiva MUI para MASTER criar ADMIN/OPERADOR e ADMIN criar OPERADOR, consultar capacidades em `/bff/v1/usuarios/me`, consumir API/BFF da S02 por portas/adaptadores hexagonais, listar e ativar/inativar usuários da própria organização com feedback e confirmação, sem cadastro de MASTER no navegador.
+- **Resultado registrado no PR:** tela administrativa reutiliza a sessão F01 em memória; criação, listagem e alteração de status com escopo e autorização revalidados pelo backend S02. F03 mantém entrada independente, sem prova de navegação/sessão unificadas.
+- **Comandos e testes locais relatados pelo agente F04:** `cd frontend && npm ci` (313 pacotes, 0 vulnerabilidades reportadas); `npm run lint` passou; `npm test` passou com 8 arquivos e 51 testes; `npm run build` passou. Verificação visual com **BFF simulado** e viewport de `390×844` confirmou formulário em coluna única e rolagem horizontal da tabela. **Não foi teste ponta a ponta com backend real, nem no celular físico**, e não foi reexecutado na coleta A01.
+- **CI remota comprovada:** [execução #44856619021](https://github.com/RobsonSilverioSantos/srm-credit-engine/actions/runs/44856619021), jobs backend e frontend concluídos com sucesso no head `13102a4`.
+- **Commit / PR / merge:** feature `13102a4`; [PR #37](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/37), base `develop`, merge `8493928`; integração confirmada no GitHub. Revisão técnica e merge são responsabilidades humanas; a API informa o estado do merge, não a execução de testes manuais.
+- **Documentação A01:** [PR #36](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/36) integrou a coleta inicial de B10/S02 (merge `d7177f0`), com CI verde. A complementação factual F04 foi incorporada posteriormente neste adendo para encerrar a rastreabilidade do backlog.
+- **Limitações persistentes:** bootstrap interativo do primeiro MASTER ainda não foi comprovado manualmente; testar login MASTER → ADMIN → OPERADOR, permissões 401/403/409, simulação, cadastro, liquidação e extrato com banco e BFF reais, inclusive no celular. Não há benchmark ou homologação de negócio pela conclusão dos PRs.
+
+### A01 — Fechamento do registro documental
+
+- **Base verificada:** PRs #33 (B10), #34 (S02), #36 (A01) e #37 (F04), com merges reais e CI backend/frontend aprovadas em seus respectivos heads.
+- **Escopo deste complemento:** consolidar o registro F04 e o estado de conclusão no `AI_USAGE.md` e no `TASKS.md`. Nenhum teste local da aplicação foi realizado neste complemento; os resultados do agente permanecem claramente atribuídos ao PR de origem.
+- **Situação:** evidências do backlog MVP registradas para os 24 itens integrados/operacionais; testes de aceitação humana/end-to-end ainda necessários e independentes da contagem de tarefas.
+
+## AFERICAO-MANUAL-01 — Golden cases C1, C2 e C3 pela interface (21/11/2026)
+
+- **Ator e origem da evidência:** responsável técnico do projeto, executando a aplicação local e comparando os resultados com a seção de aferição obrigatória do enunciado. **C1 e C2** foram declarados corretos até os centavos pelo responsável; não foi fornecida captura individual desses casos. **C3** foi declarado correto e apresentado em captura visual da pré-simulação React.
+- **Resultados exigidos e conferidos:**
+
+  | Caso | Modalidade / dados | Resultado esperado | Evidência manual |
+  |---|---|---|---|
+  | C1 | Duplicata mercantil; R$ 100.000,00; 3 meses; BRL | **R$ 92.859,94** (deságio R$ 7.140,06) | **Confirmado pelo responsável** como coincidente nos centavos; sem captura versionada |
+  | C2 | Cheque pré-datado; R$ 25.000,00; 2 meses; BRL | **R$ 23.337,77** (deságio R$ 1.662,23) | **Confirmado pelo responsável** como coincidente nos centavos; sem captura versionada |
+  | C3 | Duplicata mercantil; R$ 100.000,00; 3 meses; USD; 5,4321 BRL/USD | **US$ 17.094,67** (VP BRL R$ 92.859,94; deságio R$ 7.140,06) | **Captura da interface apresentada** com os três valores correspondentes |
+
+- **Evidência visual de C3:** tela `Simulação pré-cadastro` apresenta pagamento `US$ 17.094,67`, valor presente `R$ 92.859,94`, deságio `R$ 7.140,06`, taxa base mensal `1,00000000%`, spread mensal `1,50000000%` e cotação `5.4321000000`. Referência da simulação: `2026-11-21T22:26:22.110780Z`. **Imagem não incorporada ao repositório neste registro**.
+- **Teste automatizado separado:** `backend/app/src/test/kotlin/br/com/srm/creditengine/precificacao/PrecificacaoTest.kt` já possui assertions Kotlin `BigDecimal` para C1/C2/C3, mais cenários de `HALF_EVEN`. A regressão local PostgreSQL em `D03` é evidência histórica própria; **não foi reexecutada** nesta coleta documental.
+- **Intervenção humana:** aferição na interface e relato dos resultados são ações do responsável, não execução por agente de IA. ChatGPT revisou a captura C3, conferiu valores e referências de código/repositório e estruturou o registro documental. **B14 já integrada** no PR [#56](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/56); essa atualização não implementa ou reinicia B14.
+- **Limites:** evidência **3/3 dos resultados de pré-simulação conferidos em centavos**, não homologação financeira produtiva, liquidação ponta a ponta, transação bancária, PTAX oficial, disponibilidade contínua ou teste de todas as combinações. A cotação de C3 é mock fixo 5,4321; o problema visual dos zeros de escala está em [PR #59](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/59), sem impacto no valor calculado. Não foram usados tokens JWT nem informações de empresas reais no registro documental.
+- **Documento de apoio:** [VALIDACAO_GOLDEN_CASES_C1_C2_C3_2026-11-21.md](docs/validacao/VALIDACAO_GOLDEN_CASES_C1_C2_C3_2026-11-21.md). Os valores e a origem de cada evidência ficam reunidos nesse relatório.
+
+## Histórico do planejamento e da execução anteriores (preservado, não normativo)
+
+**Nota de proveniência:** os relatos, planos, branches e resultados abaixo dizem respeito à etapa anterior ao reinício Git de 20/11/2026. A íntegra da versão original enviada para consolidação está em [AI_USAGE_PLANEJAMENTO_ORIGINAL.md](docs/historico/planejamento-anterior/AI_USAGE_PLANEJAMENTO_ORIGINAL.md); decisões e especificação originais também estão arquivadas. A continuação reproduz o histórico já presente, sem reinterpretá-lo como regras, commits ou testes atuais.
 
 
 **Exceção editorial:** este documento registra explicitamente o uso de IA, inclusive prompts, conversas, verificações, limitações e correções, quando houver evidências. A restrição de linguagem metadiscursiva aplicada aos documentos técnicos não se aplica a este registro.

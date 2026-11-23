@@ -1,0 +1,22 @@
+# Overlay de demonstracao local: usar junto com backend/compose.yaml.
+# Caminhos de build relativos ao primeiro arquivo Compose (backend/).
+services:
+  app:
+    environment:
+      SPRING_PROFILES_ACTIVE: demo
+      SRM_DEMO_BOOTSTRAP_ORGANIZACAO: "true"
+      SRM_DEMO_BOOTSTRAP_TAXAS: "true"
+
+  frontend:
+    build:
+      context: ../frontend
+    depends_on:
+      app:
+        condition: service_healthy
+    ports:
+      - "${SRM_FRONTEND_BIND:-127.0.0.1}:${SRM_FRONTEND_PORT:-5173}:80"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 12

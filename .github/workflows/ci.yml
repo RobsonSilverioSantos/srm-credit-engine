@@ -1,0 +1,155 @@
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - develop
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - edited
+
+permissions:
+  contents: read
+
+jobs:
+  qa-b16-contract:
+    name: QA B16 — contrato do cenário k6 (sem rede)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Obter código
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - name: Configurar Node.js 24
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: '24'
+      - name: Validar sintaxe do cenário k6
+        run: node --input-type=module --check < qa/k6/b16/concorrencia.js
+      - name: Testar contrato de replay e concorrência
+        run: node --test qa/k6/b16/contrato.test.mjs
+
+  backend:
+    name: Backend — build e testes
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Obter código
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - name: Configurar JDK 21
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Preparar Gradle e validar Wrapper
+        uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c # v5
+        with:
+          cache-read-only: false
+      - name: Build, testes PostgreSQL e fronteiras hexagonais
+        run: bash scripts/test-cadastro-postgres.sh
+
+  frontend:
+    name: Frontend — lint, testes e build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Obter código
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - name: Configurar Node.js 24
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Instalar dependências
+        run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: Testes
+        run: npm test
+      - name: Modelos CSV e XLSX reproduzíveis
+        run: python3 -B -m unittest discover -s scripts -p 'test_*.py'
+      - name: Build
+        run: npm run build
+
+  full-stack:
+    name: Docker Compose — backend, frontend e PostgreSQL
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Obter código
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+
+      - name: Preparar credenciais efêmeras
+        shell: bash
+        run: |
+          umask 077
+          printf 'SRM_DB_USER=ci_local\nSRM_DB_PASSWORD=%s\nSRM_JWT_SECRET=%s\n' \
+            "$(openssl rand -hex 32)" "$(openssl rand -hex 32)" \
+            > "$RUNNER_TEMP/srm-stack.env"
+
+      - name: Build e inicialização dos três serviços
+        shell: bash
+        run: |
+          docker compose --env-file "$RUNNER_TEMP/srm-stack.env" \
+            -f backend/compose.yaml -f backend/compose.full.yaml \
+            --profile app up -d --build --wait
+
+      - name: Smoke test HTTP e organização de demonstração
+        shell: bash
+        run: |
+          curl -fsS http://127.0.0.1:8080/actuator/health | grep -q '"UP"'
+          curl -fsS http://127.0.0.1:5173/ | grep -q 'SRM Credit Engine'
+          curl -fsS http://127.0.0.1:5173/extrato.html | grep -q 'SRM Credit Engine'
+          status="$(curl -s -o /dev/null -w '%{http_code}' \
+            http://127.0.0.1:5173/bff/v1/usuarios/me)"
+          test "$status" = "401"
+          count="$(docker compose --env-file "$RUNNER_TEMP/srm-stack.env" \
+            -f backend/compose.yaml -f backend/compose.full.yaml \
+            --profile app exec -T postgres \
+            psql -U ci_local -d srm_credit_engine -Atqc \
+            "SELECT count(*) FROM organizacoes WHERE id = '00000000-0000-4000-8000-000000000001'")"
+          test "$count" = "1"
+          # Todas as cotações e taxas abaixo são exclusivamente de demonstração.
+          # Verifica carga inicial exata no PostgreSQL efêmero do job.
+          taxas="$(docker compose --env-file "$RUNNER_TEMP/srm-stack.env" \
+            -f backend/compose.yaml -f backend/compose.full.yaml \
+            --profile app exec -T postgres \
+            psql -U ci_local -d srm_credit_engine -Atqc \
+            "SELECT
+                (SELECT count(*) FROM taxas_base WHERE taxa_mensal = 0.01),
+                (SELECT count(*) FROM spreads_recebiveis
+                 WHERE modalidade = 'DUPLICATA_MERCANTIL' AND spread_mensal = 0.015),
+                (SELECT count(*) FROM spreads_recebiveis
+                 WHERE modalidade = 'CHEQUE_PRE_DATADO' AND spread_mensal = 0.025),
+                (SELECT count(*) FROM cotacoes_cambiais WHERE taxa_brl_por_unidade = 5.4321)")"
+          test "$taxas" = "1|1|1|1"
+
+      - name: Diagnóstico e limpeza de recursos efêmeros
+        if: always()
+        shell: bash
+        run: |
+          if [ -f "$RUNNER_TEMP/srm-stack.env" ]; then
+            docker compose --env-file "$RUNNER_TEMP/srm-stack.env" \
+              -f backend/compose.yaml -f backend/compose.full.yaml \
+              --profile app logs --no-color --tail=80 || true
+            docker compose --env-file "$RUNNER_TEMP/srm-stack.env" \
+              -f backend/compose.yaml -f backend/compose.full.yaml \
+              --profile app down -v --remove-orphans || true
+            rm -f "$RUNNER_TEMP/srm-stack.env"
+          fi

@@ -1,29 +1,26 @@
-# ADR-019 — Fluxo síncrono transacional versus arquitetura orientada a eventos
+# ADR-019 — Confirmação síncrona versus eventos
 
-- **Status:** síncrono para confirmação lógica no MVP; EDA como evolução documentada, não implementada
-- **Artefato de desenho:** `docs/arquitetura/EDA_LIQUIDACAO.md`
+**Status:** decisão aprovada para o MVP; implementação de liquidação pendente. EDA é evolução futura, não infraestrutura existente. Referência normativa: [DECISIONS](../../DECISIONS.md), ADR-019.
 
 ## Contexto
 
-A confirmação de uma antecipação financeira exige que um recebível seja liquidado uma única vez, com valor, taxa e cotação reproduzíveis. Processamento externo de pagamento pode ser lento, ficar indisponível ou retornar um estado desconhecido.
+Confirmar uma antecipação exige um resultado local único e snapshot reproduzível. O MVP não faz desembolso real; um provedor futuro poderá falhar ou retornar resultado incerto, sem participar da transação local.
 
 ## Alternativas
 
-1. **Fluxo síncrono com uma transação PostgreSQL:** simplifica a demonstração do domínio; confirma a liquidação lógica local com ACID. Não garante uma transferência bancária externa.
-2. **Publicar diretamente no broker durante a transação:** parece simples, mas abre janela entre commit do banco e publicação ou vice-versa; **rejeitada**.
-3. **Transação local + transactional outbox + consumidores idempotentes:** recomendado para integração futura de desembolso. Suporta retentativas, mas exige controle de duplicatas e reconciliação.
-4. **Transação distribuída/XA entre banco e provedor de pagamento:** elevada complexidade/aderência limitada a provedores externos; **não selecionada**.
+| Alternativa | Benefício | Custo ou motivo de rejeição |
+|---|---|---|
+| Confirmação síncrona em transação local | Resultado imediato após commit; invariantes locais mais simples | Disponibilidade/latência ligadas ao banco; não comprova pagamento externo |
+| Publicar diretamente no broker e gravar no banco | Integração aparentemente simples | Rejeitada: falha entre escritas cria evento sem estado ou estado sem evento |
+| Transação local, outbox e consumidores idempotentes | Comunicação futura desacoplada e recuperável | Consistência eventual, duplicatas, operação e reconciliação |
+| Transação distribuída/XA com provedor | Tentativa de coordenação atômica entre participantes | Acoplamento operacional e suporte externo incerto; não selecionada |
 
 ## Decisão
 
-**MVP:** endpoint síncrono usa transação PostgreSQL, atualização otimista, idempotência e auditoria; a liquidação representa a confirmação lógica da antecipação ao cedente, **não prova efetivação bancária**.
+No MVP, a futura operação síncrona confirma **liquidação lógica** no PostgreSQL, com versão, idempotência, snapshot e auditoria atômicos. Não se bloqueia em pagamento externo nem se afirma pagamento bancário. A implementação atual dispõe de esquema preparatório, não do caso de uso, endpoint ou garantias fim a fim.
 
-**Evolução:** registrar eventos na *outbox* na mesma transação da mudança de estado; publicar depois do commit; consumidores com *inbox* e deduplicação; estado de pagamento separado (pendente, enviado, confirmado, rejeitado ou desconhecido), conciliação com processador externo. Publicação e entrega de eventos são **ao menos uma vez**, não uma promessa de execução exatamente uma vez.
+Se integração assíncrona for aprovada, gravar evento na outbox na mesma transação local e publicar após commit; consumidores devem deduplicar efeitos locais e reconciliar efeitos externos. Entrega é **ao menos uma vez**, não execução exatamente uma vez. Detalhes, falhas e validação proposta estão em [EDA](../arquitetura/EDA_LIQUIDACAO.md).
 
-## Trade-offs
+## Consequências e gatilhos de revisão
 
-A resposta síncrona é previsível para o usuário, mas não bloqueia em transferência externa. A EDA absorve picos e desacopla sistemas, porém introduz consistência eventual entre liquidação lógica e comprovante bancário. Eventos são contratos versionados, sem dados fiscais ou segredos.
-
-## Condições para adoção
-
-Operação com desembolso real, requisitos de indisponibilidade/reprocessamento externo, observabilidade e conciliação definidos, testes de duplicidade, reordenação, poison messages e recuperação de outbox.
+O síncrono reduz componentes e consistência distribuída, mas compartilha a disponibilidade do banco. A evolução aumenta desacoplamento às custas de atraso, reprocessamento e estados incertos; broker, relay, inbox e provedor não estão implementados. Reavaliar quando houver necessidade aprovada de integração externa, exigências de disponibilidade e volume medidos, contrato e operação de reconciliação, além de testes de falhas e duplicidade. Nenhuma decisão altera a semântica financeira aprovada sem revisão humana.

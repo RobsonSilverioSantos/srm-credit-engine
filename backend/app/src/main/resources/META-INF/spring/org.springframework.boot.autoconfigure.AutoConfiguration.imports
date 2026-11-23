@@ -1,0 +1,4 @@
+br.com.srm.creditengine.cadastro.CadastroAutoConfiguracao
+br.com.srm.creditengine.liquidacao.LiquidacaoAutoConfiguracao
+br.com.srm.creditengine.extrato.ExtratoConfiguracao
+br.com.srm.creditengine.lotes.LotesAutoConfiguracao

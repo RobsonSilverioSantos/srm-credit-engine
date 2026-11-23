@@ -1,0 +1,46 @@
+spring:
+  application:
+    name: srm-credit-engine
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://127.0.0.1:5432/srm_credit_engine}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+    hikari:
+      connection-timeout: 3000
+      validation-timeout: 1000
+  servlet:
+    multipart:
+      max-file-size: ${SRM_LOTES_MAX_BYTES:2097152}B
+      max-request-size: ${SRM_LOTES_MAX_REQUEST_BYTES:2162688}B
+  flyway:
+    locations: classpath:db/migration
+
+logging:
+  structured:
+    format:
+      console: logstash
+
+security:
+  jwt:
+    secret: ${SRM_JWT_SECRET}
+    issuer: ${SRM_JWT_ISSUER:srm-credit-engine}
+    expiration: ${SRM_JWT_EXPIRATION:PT15M}
+
+server:
+  address: 127.0.0.1
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics
+  endpoint:
+    health:
+      show-details: never
+      probes:
+        enabled: false
+
+srm:
+  lotes:
+    max-linhas: ${SRM_LOTES_MAX_LINHAS:200}
+    max-bytes: ${SRM_LOTES_MAX_BYTES:2097152}
