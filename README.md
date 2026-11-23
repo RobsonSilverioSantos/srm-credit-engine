@@ -62,7 +62,6 @@ e aguarda os três serviços ficarem saudáveis. Acesse:
 | Serviço | Endereço padrão |
 |---|---|
 | Frontend: operações e administração | http://localhost:5173/ |
-| Extrato (entrada e login separados) | http://localhost:5173/extrato.html |
 | Saúde do backend | http://localhost:8080/actuator/health |
 | OpenAPI/Swagger | http://localhost:8080/swagger-ui/index.html |
 | PostgreSQL (uso local) | localhost:5432 |
