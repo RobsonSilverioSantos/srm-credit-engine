@@ -9,7 +9,7 @@
 | Monólito versus microserviços | `docs/adr/ADR-005-monolito-modular-vs-microservicos.md` | ADR redigido; validação humana pendente | fronteira ACID, trade-offs e modularização |
 | Síncrono versus eventos | `docs/adr/ADR-019-sincrono-vs-eventos.md` | ADR redigido; validação humana pendente | qual transação permanece síncrona e por quê |
 | Proposta EDA de liquidação | `docs/arquitetura/EDA_LIQUIDACAO.md` | Proposta documental disponível; revisão humana pendente; não implementada | outbox/inbox, duplicatas, erro externo e conciliação |
-| 1 milhão de transações/min | `docs/exercicios/ALTA_ESCALA_STATUS.md` | **PENDENTE: HLD ainda não produzido; versão anterior rejeitada** | futuro desenho independente com caching, shards, consistência eventual e semântica de idempotência |
+| 1 milhão de transações/min | [`HLD de alta escala`](../exercicios/HLD_ALTA_ESCALA_1M_TPM.md), [`status`](../exercicios/ALTA_ESCALA_STATUS.md) e [diagramas SVG/Mermaid](../exercicios/diagramas/) | **HLD elaborado, com revisão e integração humanas pendentes**; desenho de caching, sharding, consistência eventual e idempotência distribuída; **nenhum benchmark executado ou capacidade comprovada** | explicar fronteira ACID por recebível, semântica de lote parcial, retries/rebalanceamento, custos e plano de prova de 1M/min |
 | Post-mortem — Anexo B | `docs/exercicios/POST_MORTEM_ANEXO_B.md` | Exercício independente disponível; revisão humana pendente | war room, hipóteses versus evidência, contenção e prevenção |
 | Code review reverso — Anexo A | `docs/exercicios/REVIEW.md` | Exercício independente disponível; revisão humana pendente | priorização, severidade, impacto e correções |
 | Git Flow justificado | `README.md`, `INICIO_GIT.md`, `docs/arquitetura/GIT_WORKTREES.md` | **Comprovado em PRs reais**: [#1](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/1), [#4](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/4) e [#5](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/5) integrados em `develop`; #2 sincronização deliberada para `main` | branches reais, PRs para `develop`, revisão humana |
@@ -18,7 +18,7 @@
 | Cortes conscientes | `DECISIONS.md` ADR-007/017 e `AI_USAGE.md` | Decisões documentadas; execução ainda pendente | por que Keycloak/cloud foram excluídos e quais riscos restam |
 | Observabilidade e C4 do MVP | `TASKS.md` B10/D01; `docs/arquitetura/C4_MVP.md` | Diagramas iniciais conceituais e tarefas pendentes | logs/métricas testados, desenho C4 validado contra código real |
 
-**Os três exercícios independentes não integram `TASKS.md`.** O exercício de escala será feito em conversa futura entre o responsável técnico e ChatGPT, **sem ocupar agentes Cursor/Copilot**. Arquivo placeholder não atende à exigência de design.
+**Os três exercícios independentes não integram `TASKS.md`.** `REVIEW.md` e `POST_MORTEM_ANEXO_B.md` estão versionados; o HLD de alta escala foi produzido como proposta documental separada, sem delegação a agentes Cursor/Copilot. A proposta não comprova throughput ou implantação produtiva.
 
 ## Checklist para a entrega
 
@@ -27,7 +27,7 @@
 - [x] Setup e checks locais reproduzidos; CI remota dos PRs [#7](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/7), [#25](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/25), [#26](https://github.com/RobsonSilverioSantos/srm-credit-engine/pull/26) e PR D03 passaram. A execução mais recente registrada é [#44850079836](https://github.com/RobsonSilverioSantos/srm-credit-engine/actions/runs/44850079836) no commit `cbdbd20`; falhas anteriores do mesmo teste frontend estão documentadas e devem ser avaliadas pelo revisor.
 - [ ] C4 nível 1/2 validado de acordo com a implementação final.
 - [ ] ADRs e proposta EDA revisados pelo responsável técnico.
-- [ ] Exercício de arquitetura de alta escala elaborado, revisado e entregue (atualmente pendente).
+- [ ] Exercício de arquitetura de alta escala **elaborado em HLD e acompanhado de diagramas**; revisão humana, integração e entrega ainda pendentes. Não há ensaio de capacidade comprovado.
 - [x] Ao menos um PR real para `develop` ensina decisões, alternativas, testes e riscos: #4 e #5 integrados.
 - [x] Gate do GitHub Actions validado com PR #3 de `feature/*` → `main` fechado automaticamente pelo bot e comentário público no PR; permissões de execução demonstradas no caso testado.
 - [x] Responsável ativou `core.hooksPath=.githooks` e demonstrou recusa local em testes simulados para `main` e `develop` (sem push remoto).
