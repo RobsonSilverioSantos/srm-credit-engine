@@ -1,14 +1,19 @@
 # Proposta independente — arquitetura para 1 milhão de transações/minuto
 
-**Estado: PENDENTE — arquitetura ainda não desenhada nem aprovada.**
+**Estado: HLD DOCUMENTADO — revisão de integração pendente.**
 
-Este arquivo é somente um marcador de pendência e de separação de escopo. **Não constitui um HLD, solução de referência, prova de capacidade ou evidência de atendimento ao requisito.** A versão anterior da proposta foi rejeitada pelo responsável técnico e não é utilizada como baseline.
+O documento [HLD_ALTA_ESCALA_1M_TPM.md](HLD_ALTA_ESCALA_1M_TPM.md) apresenta a arquitetura de referência para **1 milhão de liquidações unitárias concluídas por minuto**, com:
 
-## Natureza
+- microsserviços por fronteiras de domínio e arquitetura hexagonal;
+- recebível como unidade ACID e lotes como orquestrações com resultado parcial;
+- Kafka, Single Writer lógico por agregado, outbox/inbox, retry, DLQ e recuperação;
+- sharding por recebível, células, fencing e migração segura entre proprietários;
+- caching/CQRS, consistência eventual em leituras e status autoritativo;
+- idempotência por item e por manifesto de lote, inclusive após reentrega e failover;
+- alternativas ECS/Fargate e EKS Auto Mode, custos, riscos, SLOs e plano de benchmarks.
 
-- Exercício independente do SRM Credit Engine MVP, assim como `REVIEW.md` e `POST_MORTEM_ANEXO_B.md`.
-- Será elaborado em discussão específica entre o responsável técnico e ChatGPT, **sem alocação de agente Cursor/Copilot**.
-- O artefato final deverá abordar arquitetura de software apropriada à carga alvo, critérios de latência/disponibilidade, modelagem de carga e hotspots, caching, sharding, consistência eventual, idempotência em ambiente particionado, diagramas, falhas, riscos, segurança, custos e validação por testes de capacidade.
-- Não existe obrigatoriedade de seguir o monólito, o banco ou as decisões técnicas do MVP; apenas o domínio financeiro pode ser reaproveitado como cenário.
+Os **dois diagramas** do HLD possuem versões SVG para leitura visual e fontes Mermaid editáveis em [diagramas/](diagramas/). Os documentos independentes [REVIEW.md](REVIEW.md) e [POST_MORTEM_ANEXO_B.md](POST_MORTEM_ANEXO_B.md) permanecem disponíveis, sem alterações funcionais.
 
-**Próxima ação, fora deste ciclo de implementação:** produzir e revisar o documento de arquitetura de alta escala. Até lá, a matriz Staff/Tech Lead deve marcar este item como **não atendido / pendente**.
+**Limite da evidência:** a arquitetura está **documentada**, mas não implantada, testada sob carga ou homologada. Não afirmar que a meta de capacidade foi alcançada. O HLD é um exercício de desenho, não uma alteração das regras financeiras vigentes no sistema demonstrativo.
+
+**Próxima ação:** revisão e integração humanas do PR documental para `develop`, seguidas do fluxo de promoção autorizado para `main`.

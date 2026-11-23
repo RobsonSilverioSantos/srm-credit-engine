@@ -277,6 +277,15 @@ as telas ainda têm entradas e autenticação independentes, conforme
 
 As decisões arquiteturais do sistema estão registradas nos documentos em `docs/adr/`, no [modelo C4](docs/arquitetura/C4_MVP.md) e na [proposta EDA para liquidação](docs/arquitetura/EDA_LIQUIDACAO.md). Esses materiais descrevem escolhas, restrições e possibilidades de evolução da implementação atual, sem representar funcionalidades adicionais executadas.
 
+## Exercícios independentes de avaliação Staff / Tech Lead
+
+Os materiais avulsos estão em `docs/exercicios/` e **não descrevem funcionalidades implantadas no MVP**:
+
+- [HLD de alta escala — 1 milhão de transações/minuto](docs/exercicios/HLD_ALTA_ESCALA_1M_TPM.md): arquitetura proposta, com [diagramas SVG e fontes Mermaid](docs/exercicios/diagramas/); meta ainda não comprovada por benchmark.
+- [Code review reverso — Anexo A](docs/exercicios/REVIEW.md): parecer técnico com achados e decisão `REQUEST CHANGES` sobre código fornecido para o exercício.
+- [Post-mortem — Anexo B](docs/exercicios/POST_MORTEM_ANEXO_B.md): simulação de incidente, hipóteses e plano de resposta; não representa incidente real.
+- [Rastreabilidade Staff/Tech Lead](docs/defesa/RASTREABILIDADE_STAFF_TECH_LEAD.md): evidências, ressalvas e roteiro de defesa.
+
 ## Por que Git Flow simplificado nesta entrega
 
 **Estratégia:** `main` representa versões deliberadamente liberadas; `develop` integra features revisadas; cada ID do `TASKS.md` produz `feature/<id>-<slug-do-trabalho>` em **worktree independente**. Os agentes são autorizados a fazer commit, push e abrir PR **sempre para `develop`**; **apenas o responsável técnico revisa e decide merge**. O trabalho de um agente não aparece automaticamente na branch de outro: dependências precisam estar integradas antes de iniciar uma tarefa.
